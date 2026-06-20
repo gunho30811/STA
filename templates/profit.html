@@ -78,6 +78,8 @@
         <div class="fg"><label>네이버÷삼삼주당 ≥</label><input type="number" id="f-mult" step="0.1" placeholder="배"></div>
         <div class="fg"><label>1달예약일 ≥</label><input type="number" id="f-bk" placeholder="일"></div>
         <div class="fg"><label>보증금 ≤</label><input type="number" id="f-dep" placeholder="만원"></div>
+        <div class="fg"><label>구공실률 ≤</label><input type="number" id="f-vacancy" step="0.1" placeholder="%"></div>
+        <div class="fg"><label>역공실률 ≤</label><input type="number" id="f-st-vacancy" step="0.1" placeholder="%"></div>
         <div class="fg"><label>평수</label><div style="display:flex;gap:4px"><input type="number" id="f-pmin" placeholder="최소" style="width:64px"><input type="number" id="f-pmax" placeholder="최대" style="width:64px"></div></div>
         <div class="fg"><label>&nbsp;</label><button class="btn btn-go" onclick="search(1)">검색</button></div>
         <div class="fg"><label>&nbsp;</label><button class="btn btn-reset" onclick="resetF()">초기화</button></div>
@@ -85,6 +87,8 @@
       <div class="legend">
         <b>순수익</b>=1달실현수익−(네이버월세+관리비) · <b>1달실현수익</b>=삼삼주당×(예약일/7) · <b>네이버÷삼삼주당</b>=네이버월총÷삼삼주당 ·
         <b>현실효율</b>=1달실현÷네이버월세 · <b>구공실률/구경쟁매물수</b>=같은 시군구의 삼삼 평균 공실률·매물수(구별 공실률 탭 기준) ·
+        <b>동삼삼매물수</b>=같은 동의 삼삼 매물수(자기 제외, 직접 계산) ·
+        <b>역공실률/역경쟁매물수</b>=같은 인근역의 삼삼 평균 공실률·매물수(역별 공실률 탭 기준, 매물수 3개 미만은 '-') ·
         관리비 미표기는 평당 2만원 추정 · 헤더 클릭 시 정렬, 다시 클릭하면 오름차순/내림차순 토글
       </div>
     </div>
@@ -114,6 +118,10 @@ const COLS = [
   {k:"dong", t:"동", l:true},
   {k:"guVacancy", t:"구공실률%"},
   {k:"guCompetitors", t:"구경쟁매물수"},
+  {k:"samNearby", t:"동삼삼매물수"},
+  {k:"station", t:"인근역", l:true},
+  {k:"stVacancy", t:"역공실률%"},
+  {k:"stCompetitors", t:"역경쟁매물수"},
   {k:"pyeong", t:"평"},
   {k:"profit", t:"순수익"},
   {k:"realized", t:"1달실현"},
@@ -167,6 +175,8 @@ async function search(page){
   if(v('f-mult'))p.set('mult_min',v('f-mult'));
   if(v('f-bk'))p.set('bk_min',v('f-bk'));
   if(v('f-dep'))p.set('dep_max',v('f-dep'));
+  if(v('f-vacancy'))p.set('vacancy_max',v('f-vacancy'));
+  if(v('f-st-vacancy'))p.set('station_vacancy_max',v('f-st-vacancy'));
   if(v('f-pmin'))p.set('pyeong_min',v('f-pmin'));
   if(v('f-pmax'))p.set('pyeong_max',v('f-pmax'));
   p.set('sort',curSort);p.set('dir',curDir);p.set('page',page);p.set('size',50);
@@ -191,6 +201,10 @@ function renderRows(items){
       <td class="l">${x.sido||''}</td><td class="l">${x.sigungu||''}</td><td class="l">${x.dong||''}</td>
       <td>${x.guVacancy!=null?x.guVacancy+'%':'-'}</td>
       <td>${num(x.guCompetitors)}</td>
+      <td>${num(x.samNearby)}</td>
+      <td class="l">${x.station||''}</td>
+      <td>${x.stVacancy!=null?x.stVacancy+'%':'-'}</td>
+      <td>${num(x.stCompetitors)}</td>
       <td>${num(x.pyeong)}</td>
       <td class="${profCls}">${num(x.profit)}</td>
       <td>${num(x.realized)}</td>
