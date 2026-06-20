@@ -153,6 +153,8 @@ def api_profit():
         items = le("pyeong_max", "pyeong")
     if fnum("dep_max") is not None:
         items = le("dep_max", "nDep")
+    if fnum("vacancy_max") is not None:
+        items = le("vacancy_max", "guVacancy")
 
     sort = a.get("sort", "profit")
     direction = a.get("dir", "desc")
