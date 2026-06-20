@@ -34,7 +34,8 @@ def _num(v):
 # net_profit_integrated.csv 원본 컬럼 → 짧은 키
 PROFIT_MAP = {
     "삼삼ID": "id", "매물명": "name", "건물유형": "btype", "방수": "rooms",
-    "시도": "sido", "시군구": "sigungu", "동": "dong", "평수": "pyeong",
+    "시도": "sido", "시군구": "sigungu", "동": "dong", "인근역": "station",
+    "동삼삼매물수": "samNearby", "평수": "pyeong",
     "삼삼주당_만원": "wk", "삼삼월환산_만원": "mEq",
     "1달예약일": "bk", "1달막힘일": "blk", "1달실현수익_만원": "realized",
     "네이버월세_만원": "nRent", "네이버관리비_만원": "nMgmt", "관리비표기여부": "mgmtFlag",
@@ -45,7 +46,8 @@ PROFIT_MAP = {
 }
 NUM_FIELDS = {"pyeong", "wk", "mEq", "bk", "blk", "realized", "nRent", "nMgmt",
               "nTotal", "nDep", "matches", "mult", "eff", "realEff", "profit",
-              "guVacancy", "guCompetitors"}
+              "guVacancy", "guCompetitors", "samNearby", "stVacancy", "stCompetitors"}
+EXTRA_FIELDS = {"guVacancy", "guCompetitors", "stVacancy", "stCompetitors"}
 
 
 def load_gu_vacancy():
@@ -63,7 +65,26 @@ def load_gu_vacancy():
     return out
 
 
+def load_station_vacancy():
+    """역별 공실률(%)·경쟁 매물수 (data/by_station.csv, 매물수>=3만, /api/by_station과 동일 기준)."""
+    out = {}
+    path = os.path.join(DATA, "by_station.csv")
+    if not os.path.exists(path):
+        return out
+    with open(path, encoding="utf-8-sig") as f:
+        for r in csv.DictReader(f):
+            n = _num(r.get("매물수"))
+            if not n or n < 3:
+                continue
+            out[r.get("인근역")] = {
+                "stVacancy": _num(r.get("공실률(%)")),
+                "stCompetitors": n,
+            }
+    return out
+
+
 GU_VACANCY = load_gu_vacancy()
+STATION_VACANCY = load_station_vacancy()
 
 
 def load_profit():
@@ -80,6 +101,9 @@ def load_profit():
             gu = GU_VACANCY.get((o["sido"], o["sigungu"]), {})
             o["guVacancy"] = gu.get("guVacancy")
             o["guCompetitors"] = gu.get("guCompetitors")
+            st = STATION_VACANCY.get(o["station"], {})
+            o["stVacancy"] = st.get("stVacancy")
+            o["stCompetitors"] = st.get("stCompetitors")
             rows.append(o)
     return rows
 
@@ -155,10 +179,12 @@ def api_profit():
         items = le("dep_max", "nDep")
     if fnum("vacancy_max") is not None:
         items = le("vacancy_max", "guVacancy")
+    if fnum("station_vacancy_max") is not None:
+        items = le("station_vacancy_max", "stVacancy")
 
     sort = a.get("sort", "profit")
     direction = a.get("dir", "desc")
-    valid_keys = set(PROFIT_MAP.values()) | {"guVacancy", "guCompetitors"}
+    valid_keys = set(PROFIT_MAP.values()) | EXTRA_FIELDS
     key = sort if sort in valid_keys else "profit"
     is_num = key in NUM_FIELDS
     rev = direction == "desc"
