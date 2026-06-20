@@ -1,9 +1,10 @@
-# 웹 뷰어 실행에 필요 (필수)
+# 웹 뷰어 + 파이프라인 공통 (필수)
 flask>=3.0
+psycopg2-binary>=2.9
+python-dotenv>=1.0
 
 # 데이터 갱신(재크롤)에 필요 (선택 — 뷰어만 볼 거면 불필요)
 requests>=2.31
 playwright>=1.40
-python-dotenv>=1.0
 # playwright 설치 후 크롬 1회 다운로드 필요:
 #   python -m playwright install chromium
