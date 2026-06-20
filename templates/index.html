@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>네이버 오피스텔 월세 검색 (서울·경기·인천)</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:"Malgun Gothic","맑은 고딕",sans-serif; background:#f4f6f8; color:#222; }
+  header { background:#03c75a; color:#fff; padding:14px 20px; display:flex; align-items:baseline; gap:12px; }
+  header h1 { font-size:18px; margin:0; }
+  header .sub { font-size:13px; opacity:.9; }
+  .wrap { display:flex; gap:14px; padding:14px; align-items:flex-start; }
+  .panel { background:#fff; border:1px solid #e3e6ea; border-radius:10px; }
+  .filters { width:280px; flex:0 0 280px; padding:16px; position:sticky; top:14px; }
+  .filters h2 { font-size:14px; margin:0 0 10px; }
+  .fg { margin-bottom:14px; }
+  .fg label { display:block; font-size:12px; font-weight:bold; color:#444; margin-bottom:5px; }
+  select, input { width:100%; padding:7px 8px; border:1px solid #ccd2d8; border-radius:6px; font-size:13px; }
+  .row2 { display:flex; gap:6px; align-items:center; }
+  .row2 input { width:auto; flex:1; }
+  .row2 span { color:#888; font-size:12px; }
+  .chips { max-height:150px; overflow:auto; border:1px solid #e3e6ea; border-radius:6px; padding:6px; }
+  .chips label { display:flex; align-items:center; gap:6px; font-weight:normal; font-size:13px; margin:2px 0; cursor:pointer; }
+  .chips input { width:auto; }
+  .btns { display:flex; gap:8px; }
+  button { cursor:pointer; border:none; border-radius:6px; padding:9px 12px; font-size:13px; font-weight:bold; }
+  .btn-go { background:#03c75a; color:#fff; flex:2; }
+  .btn-reset { background:#eceff1; color:#444; flex:1; }
+  .main { flex:1; min-width:0; }
+  .toolbar { padding:12px 16px; display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px; }
+  .toolbar .count { font-size:14px; } .toolbar .count b { color:#03a64a; font-size:18px; }
+  .toolbar .right { display:flex; gap:8px; align-items:center; }
+  .toolbar select { width:auto; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
+  .card { background:#fff; border:1px solid #e3e6ea; border-radius:10px; overflow:hidden; display:flex; flex-direction:column; transition:.15s; }
+  .card:hover { box-shadow:0 4px 14px rgba(0,0,0,.1); transform:translateY(-2px); }
+  .card .thumb { height:150px; background:#eef1f3 center/cover no-repeat; position:relative; }
+  .card .thumb .tag { position:absolute; left:8px; top:8px; background:rgba(3,166,74,.92); color:#fff; font-size:11px; padding:2px 7px; border-radius:4px; }
+  .card .body { padding:10px 12px; flex:1; display:flex; flex-direction:column; gap:5px; }
+  .card .price { font-size:16px; font-weight:bold; color:#222; }
+  .card .price em { color:#03a64a; font-style:normal; }
+  .card .name { font-size:14px; font-weight:bold; }
+  .card .meta { font-size:12px; color:#555; line-height:1.5; }
+  .card .loc { font-size:12px; color:#0067a3; }
+  .card .ft { font-size:11px; color:#888; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .card a.link { margin-top:auto; font-size:12px; color:#fff; background:#222; text-align:center; padding:7px; text-decoration:none; }
+  .pager { display:flex; justify-content:center; gap:6px; padding:18px 0; flex-wrap:wrap; }
+  .pager button { background:#fff; border:1px solid #ccd2d8; color:#333; min-width:36px; font-weight:normal; }
+  .pager button.on { background:#03c75a; color:#fff; border-color:#03c75a; font-weight:bold; }
+  .empty { text-align:center; padding:60px; color:#999; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏢 네이버 오피스텔 월세 검색</h1>
+  <span class="sub">서울 · 경기 · 인천 / <span id="stat"></span></span>
+</header>
+
+<div class="wrap">
+  <div class="panel filters">
+    <h2>🔎 필터</h2>
+    <div class="fg"><label>시/도</label><select id="f-sido"><option value="">전체</option></select></div>
+    <div class="fg"><label>구/시</label><select id="f-sigungu"><option value="">전체</option></select></div>
+    <div class="fg"><label>동 (복수 선택)</label><div class="chips" id="f-dong"><span style="color:#aaa;font-size:12px">구/시를 먼저 선택</span></div></div>
+
+    <div class="fg"><label>보증금 (만원)</label>
+      <div class="row2"><input type="number" id="dep-min" placeholder="최소"><span>~</span><input type="number" id="dep-max" placeholder="최대"></div>
+    </div>
+    <div class="fg"><label>월세 (만원)</label>
+      <div class="row2"><input type="number" id="rent-min" placeholder="최소"><span>~</span><input type="number" id="rent-max" placeholder="최대"></div>
+    </div>
+    <div class="fg"><label>전용면적 (㎡)</label>
+      <div class="row2"><input type="number" id="area-min" placeholder="최소"><span>~</span><input type="number" id="area-max" placeholder="최대"></div>
+    </div>
+    <div class="fg"><label>방향</label>
+      <div class="chips" id="f-dir">
+        <label><input type="checkbox" value="동향">동</label>
+        <label><input type="checkbox" value="서향">서</label>
+        <label><input type="checkbox" value="남향">남</label>
+        <label><input type="checkbox" value="북향">북</label>
+        <label><input type="checkbox" value="남동향">남동</label>
+        <label><input type="checkbox" value="남서향">남서</label>
+        <label><input type="checkbox" value="북동향">북동</label>
+        <label><input type="checkbox" value="북서향">북서</label>
+      </div>
+    </div>
+    <div class="fg"><label>키워드 (건물명/특징)</label><input type="text" id="f-kw" placeholder="예: 역세권, 신축"></div>
+    <div class="btns">
+      <button class="btn-go" onclick="search(1)">검색</button>
+      <button class="btn-reset" onclick="resetF()">초기화</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="panel toolbar">
+      <div class="count">검색결과 <b id="cnt">0</b> 건</div>
+      <div class="right">
+        <span style="font-size:12px;color:#666">정렬</span>
+        <select id="sort" onchange="search(1)">
+          <option value="recent">최신 등록순</option>
+          <option value="rent_asc">월세 낮은순</option>
+          <option value="rent_desc">월세 높은순</option>
+          <option value="deposit_asc">보증금 낮은순</option>
+          <option value="deposit_desc">보증금 높은순</option>
+          <option value="area_desc">면적 넓은순</option>
+          <option value="area_asc">면적 좁은순</option>
+        </select>
+        <select id="size" onchange="search(1)">
+          <option value="30">30개</option><option value="60">60개</option><option value="120">120개</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid" id="grid"></div>
+    <div class="empty" id="empty" style="display:none">조건에 맞는 매물이 없습니다.</div>
+    <div class="pager" id="pager"></div>
+  </div>
+</div>
+
+<script>
+const IMG_BASE = "https://landthumb-phinf.pstatic.net";
+let TREE = {};
+
+async function init(){
+  const s = await (await fetch('/api/stats')).json();
+  document.getElementById('stat').textContent = `총 ${s.total.toLocaleString()}건 수집됨`;
+  TREE = await (await fetch('/api/regions')).json();
+  const sido = document.getElementById('f-sido');
+  Object.keys(TREE).forEach(k=>{ const o=document.createElement('option'); o.value=k; o.textContent=k; sido.appendChild(o); });
+  search(1);
+}
+document.getElementById('f-sido').addEventListener('change', e=>{
+  const sg = document.getElementById('f-sigungu');
+  sg.innerHTML='<option value="">전체</option>';
+  document.getElementById('f-dong').innerHTML='<span style="color:#aaa;font-size:12px">구/시를 먼저 선택</span>';
+  const t = TREE[e.target.value]||{};
+  Object.keys(t).forEach(k=>{ const o=document.createElement('option'); o.value=k; o.textContent=k; sg.appendChild(o); });
+});
+document.getElementById('f-sigungu').addEventListener('change', e=>{
+  const sido=document.getElementById('f-sido').value;
+  const box=document.getElementById('f-dong'); box.innerHTML='';
+  const dongs=((TREE[sido]||{})[e.target.value])||[];
+  if(!dongs.length){ box.innerHTML='<span style="color:#aaa;font-size:12px">동 정보 없음</span>'; return; }
+  dongs.forEach(d=>{ const l=document.createElement('label'); l.innerHTML=`<input type="checkbox" value="${d}">${d}`; box.appendChild(l); });
+});
+
+function checked(id){ return [...document.querySelectorAll(`#${id} input:checked`)].map(c=>c.value); }
+function val(id){ return document.getElementById(id).value.trim(); }
+
+async function search(page){
+  const p = new URLSearchParams();
+  if(val('f-sido')) p.set('sido', val('f-sido'));
+  if(val('f-sigungu')) p.set('sigungu', val('f-sigungu'));
+  const dongs=checked('f-dong'); if(dongs.length) p.set('dong', dongs.join(','));
+  const dirs=checked('f-dir'); if(dirs.length) p.set('direction', dirs.join(','));
+  [['dep-min','deposit_min'],['dep-max','deposit_max'],['rent-min','rent_min'],['rent-max','rent_max'],['area-min','area_min'],['area-max','area_max']]
+    .forEach(([id,k])=>{ if(val(id)) p.set(k, val(id)); });
+  if(val('f-kw')) p.set('keyword', val('f-kw'));
+  p.set('sort', val('sort')); p.set('size', val('size')); p.set('page', page);
+
+  const r = await (await fetch('/api/listings?'+p.toString())).json();
+  document.getElementById('cnt').textContent = r.total.toLocaleString();
+  render(r); renderPager(r);
+  window.scrollTo(0,0);
+}
+
+function fmtArea(m2){ return m2 ? `${m2}㎡(${(m2/3.3058).toFixed(1)}평)` : '-'; }
+function render(r){
+  const g=document.getElementById('grid'); const empty=document.getElementById('empty');
+  g.innerHTML='';
+  if(!r.items.length){ empty.style.display='block'; return; } empty.style.display='none';
+  r.items.forEach(x=>{
+    const img = x.imgUrl ? `${IMG_BASE}${x.imgUrl}?type=f130_98` : '';
+    const card=document.createElement('div'); card.className='card';
+    card.innerHTML=`
+      <div class="thumb" style="${img?`background-image:url('${img}')`:''}">
+        <span class="tag">${x.realEstateType||'오피스텔'} · 월세</span>
+      </div>
+      <div class="body">
+        <div class="price">보증금 <em>${(x.deposit||0).toLocaleString()}</em> / 월 <em>${(x.rent||0).toLocaleString()}</em> <span style="font-size:11px;color:#999">만원</span></div>
+        <div class="name">${x.articleName||''} ${x.buildingName?`<span style="font-weight:normal;color:#777;font-size:12px">${x.buildingName}</span>`:''}</div>
+        <div class="loc">📍 ${x.sido} ${x.sigungu} ${x.dong}</div>
+        <div class="meta">${fmtArea(x.area_real_m2)} · ${x.floorInfo||'-'}층 · ${x.direction||'-'}</div>
+        <div class="ft">${x.featureDesc||x.tags||''}</div>
+        <div class="meta" style="color:#999">확인 ${x.confirmYmd||'-'} · ${x.realtorName||x.cpName||''}</div>
+        <a class="link" href="${x.articleUrl}" target="_blank">네이버에서 보기 →</a>
+      </div>`;
+    g.appendChild(card);
+  });
+}
+function renderPager(r){
+  const pg=document.getElementById('pager'); pg.innerHTML='';
+  if(r.pages<=1) return;
+  const cur=r.page, max=r.pages;
+  const add=(n,label,on)=>{ const b=document.createElement('button'); b.textContent=label||n; if(on)b.className='on'; b.onclick=()=>search(n); pg.appendChild(b); };
+  if(cur>1) add(cur-1,'‹');
+  let s=Math.max(1,cur-3), e=Math.min(max,cur+3);
+  if(s>1) add(1,'1');
+  if(s>2){ const d=document.createElement('span'); d.textContent='…'; d.style.padding='6px'; pg.appendChild(d);}
+  for(let i=s;i<=e;i++) add(i,null,i===cur);
+  if(e<max-1){ const d=document.createElement('span'); d.textContent='…'; d.style.padding='6px'; pg.appendChild(d);}
+  if(e<max) add(max,String(max));
+  if(cur<max) add(cur+1,'›');
+}
+function resetF(){
+  document.querySelectorAll('input').forEach(i=>{ if(i.type==='checkbox')i.checked=false; else i.value=''; });
+  document.getElementById('f-sido').value=''; document.getElementById('f-sigungu').innerHTML='<option value="">전체</option>';
+  document.getElementById('f-dong').innerHTML='<span style="color:#aaa;font-size:12px">구/시를 먼저 선택</span>';
+  search(1);
+}
+init();
+</script>
+</body>
+</html>

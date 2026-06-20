@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>삼삼엠투 × 네이버 단기임대 수익성</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Malgun Gothic","맑은 고딕",sans-serif;background:#f3f5f7;color:#1f2937}
+  header{background:#111827;color:#fff;padding:14px 22px}
+  header h1{margin:0;font-size:18px}
+  header p{margin:4px 0 0;font-size:12.5px;color:#9ca3af}
+  .tabs{display:flex;gap:4px;padding:10px 22px 0;background:#111827}
+  .tabs button{background:#1f2937;color:#cbd5e1;border:none;padding:9px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-size:13px;font-weight:bold}
+  .tabs button.on{background:#f3f5f7;color:#111827}
+  .wrap{padding:16px 22px}
+  .cards{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px 16px;min-width:150px}
+  .card .lbl{font-size:12px;color:#6b7280}
+  .card .val{font-size:22px;font-weight:bold;margin-top:3px}
+  .card .val small{font-size:12px;color:#9ca3af;font-weight:normal}
+  .panel{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-bottom:14px}
+  .filters{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
+  .fg{display:flex;flex-direction:column;gap:4px}
+  .fg label{font-size:11px;font-weight:bold;color:#4b5563}
+  .fg input,.fg select{padding:7px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px}
+  .fg input[type=number]{width:90px}
+  .btn{cursor:pointer;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:bold}
+  .btn-go{background:#2563eb;color:#fff}.btn-reset{background:#e5e7eb;color:#374151}
+  .legend{font-size:11.5px;color:#6b7280;margin-top:10px;line-height:1.6}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{padding:7px 8px;text-align:right;border-bottom:1px solid #eef0f2;white-space:nowrap}
+  th{background:#f9fafb;position:sticky;top:0;cursor:pointer;user-select:none;color:#374151}
+  th:hover{background:#eef2ff}
+  td.l,th.l{text-align:left}
+  tbody tr:hover{background:#f8fafc}
+  .pos{color:#dc2626;font-weight:bold}.neg{color:#2563eb}
+  .mult{font-weight:bold;color:#7c3aed}
+  .name{font-weight:bold}.sub{color:#9ca3af;font-size:11px}
+  .lnk{display:inline-block;padding:3px 7px;border-radius:4px;text-decoration:none;font-size:11px;color:#fff;margin-left:3px}
+  .lnk.n{background:#03c75a}.lnk.s{background:#ff5a5f}
+  .pager{display:flex;justify-content:center;gap:6px;padding:14px 0;flex-wrap:wrap}
+  .pager button{background:#fff;border:1px solid #d1d5db;border-radius:6px;min-width:34px;padding:6px;cursor:pointer}
+  .pager button.on{background:#2563eb;color:#fff;border-color:#2563eb}
+  .scroll{overflow:auto;max-height:70vh}
+</style>
+</head>
+<body>
+<header>
+  <h1>🏠 삼삼엠투 × 네이버부동산 단기임대 수익성</h1>
+  <p>임대인 관점 — "1달 기준 공실 반영 실현 순수익이 크고 보증금 작은(싼데 잘 파는) 매물" · 전국 삼삼 오피스텔 × 네이버 월세 엄격매칭 · 단위 만원</p>
+</header>
+<div class="tabs">
+  <button class="on" data-tab="profit" onclick="tab('profit')">매물 수익성</button>
+  <button data-tab="dong" onclick="tab('dong')">동별 베스트</button>
+  <button data-tab="gu" onclick="tab('gu')">구별 공실률</button>
+  <button data-tab="station" onclick="tab('station')">역별 공실률</button>
+</div>
+
+<div class="wrap">
+  <!-- 매물 수익성 탭 -->
+  <div id="t-profit">
+    <div class="cards">
+      <div class="card"><div class="lbl">매물 수</div><div class="val" id="c-cnt">-</div></div>
+      <div class="card"><div class="lbl">순수익 중앙값</div><div class="val" id="c-med">-<small> 만원</small></div></div>
+      <div class="card"><div class="lbl">순수익 최대</div><div class="val pos" id="c-max">-<small> 만원</small></div></div>
+      <div class="card"><div class="lbl">가격배수 중앙값</div><div class="val mult" id="c-mult">-<small> 배</small></div></div>
+    </div>
+    <div class="panel">
+      <div class="filters">
+        <div class="fg"><label>건물유형</label><select id="f-btype"><option value="">전체</option></select></div>
+        <div class="fg"><label>방수</label><select id="f-rooms"><option value="">전체</option><option>원룸</option><option>투룸</option><option>쓰리룸+</option></select></div>
+        <div class="fg"><label>시/도</label><select id="f-sido"><option value="">전체</option></select></div>
+        <div class="fg"><label>시군구</label><select id="f-sigungu"><option value="">전체</option></select></div>
+        <div class="fg"><label>동 포함</label><input id="f-dong" placeholder="예: 삼성동"></div>
+        <div class="fg"><label>키워드(매물/건물)</label><input id="f-kw" placeholder="예: 역, 풀옵션"></div>
+        <div class="fg"><label>순수익 ≥</label><input type="number" id="f-profit" placeholder="만원"></div>
+        <div class="fg"><label>가격배수 ≥</label><input type="number" id="f-mult" step="0.1" placeholder="배"></div>
+        <div class="fg"><label>1달예약일 ≥</label><input type="number" id="f-bk" placeholder="일"></div>
+        <div class="fg"><label>보증금 ≤</label><input type="number" id="f-dep" placeholder="만원"></div>
+        <div class="fg"><label>평수</label><div style="display:flex;gap:4px"><input type="number" id="f-pmin" placeholder="최소" style="width:64px"><input type="number" id="f-pmax" placeholder="최대" style="width:64px"></div></div>
+        <div class="fg"><label>&nbsp;</label><button class="btn btn-go" onclick="search(1)">검색</button></div>
+        <div class="fg"><label>&nbsp;</label><button class="btn btn-reset" onclick="resetF()">초기화</button></div>
+      </div>
+      <div class="legend">
+        <b>순수익</b>=1달실현수익−(네이버월세+관리비) · <b>1달실현수익</b>=삼삼주당×(예약일/7) · <b>가격배수</b>=삼삼월환산÷네이버월총 ·
+        <b>현실효율</b>=1달실현÷네이버월세 · 관리비 미표기는 평당 2만원 추정 · 헤더 클릭 시 정렬
+      </div>
+    </div>
+    <div class="panel scroll">
+      <table id="tbl">
+        <thead><tr id="thead"></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="pager" id="pager"></div>
+  </div>
+
+  <!-- 보조 탭 -->
+  <div id="t-dong" style="display:none"><div class="panel scroll"><table><thead id="dong-h"></thead><tbody id="dong-b"></tbody></table></div></div>
+  <div id="t-gu" style="display:none"><div class="panel scroll"><table><thead id="gu-h"></thead><tbody id="gu-b"></tbody></table></div></div>
+  <div id="t-station" style="display:none"><div class="panel scroll"><table><thead id="station-h"></thead><tbody id="station-b"></tbody></table></div></div>
+</div>
+
+<script>
+let curSort = "profit";
+const COLS = [
+  {k:"name", t:"매물명 / 건물", l:true},
+  {k:"btype", t:"유형", l:true},
+  {k:"rooms", t:"방수", l:true},
+  {k:"sido", t:"시도", l:true},
+  {k:"sigungu", t:"시군구", l:true},
+  {k:"dong", t:"동", l:true},
+  {k:"pyeong", t:"평"},
+  {k:"profit", t:"순수익"},
+  {k:"realized", t:"1달실현"},
+  {k:"mult", t:"가격배수"},
+  {k:"realEff", t:"현실효율"},
+  {k:"bk", t:"예약일"},
+  {k:"blk", t:"막힘일"},
+  {k:"wk", t:"삼삼주당"},
+  {k:"nTotal", t:"네이버월총"},
+  {k:"nRent", t:"네이버월세"},
+  {k:"nDep", t:"보증금"},
+  {k:"matches", t:"매칭수"},
+  {k:"link", t:"링크", l:true},
+];
+
+async function init(){
+  const fc = await (await fetch('/api/facets')).json();
+  const fill=(id,arr)=>{const sel=document.getElementById(id);arr.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);});};
+  fill('f-sigungu',fc.sigungu); fill('f-sido',fc.sido); fill('f-btype',fc.btype);
+  // thead
+  const tr = document.getElementById('thead');
+  COLS.forEach(c=>{const th=document.createElement('th');th.textContent=c.t;if(c.l)th.className='l';
+    if(c.k!=='link'&&c.k!=='name')th.onclick=()=>{curSort=c.k;search(1);};th.title='정렬';tr.appendChild(th);});
+  search(1);
+}
+function v(id){return document.getElementById(id).value.trim();}
+async function search(page){
+  const p=new URLSearchParams();
+  if(v('f-btype'))p.set('btype',v('f-btype'));
+  if(v('f-rooms'))p.set('rooms',v('f-rooms'));
+  if(v('f-sido'))p.set('sido',v('f-sido'));
+  if(v('f-sigungu'))p.set('sigungu',v('f-sigungu'));
+  if(v('f-dong'))p.set('dong',v('f-dong'));
+  if(v('f-kw'))p.set('keyword',v('f-kw'));
+  if(v('f-profit'))p.set('profit_min',v('f-profit'));
+  if(v('f-mult'))p.set('mult_min',v('f-mult'));
+  if(v('f-bk'))p.set('bk_min',v('f-bk'));
+  if(v('f-dep'))p.set('dep_max',v('f-dep'));
+  if(v('f-pmin'))p.set('pyeong_min',v('f-pmin'));
+  if(v('f-pmax'))p.set('pyeong_max',v('f-pmax'));
+  p.set('sort',curSort);p.set('page',page);p.set('size',50);
+  const r=await (await fetch('/api/profit?'+p)).json();
+  const s=r.summary;
+  document.getElementById('c-cnt').textContent=s.count.toLocaleString();
+  document.getElementById('c-med').innerHTML=(s.profit_med??'-')+'<small> 만원</small>';
+  document.getElementById('c-max').innerHTML=(s.profit_max??'-')+'<small> 만원</small>';
+  document.getElementById('c-mult').innerHTML=(s.mult_med??'-')+'<small> 배</small>';
+  renderRows(r.items);renderPager(r);
+}
+function num(x){return x==null?'-':x.toLocaleString();}
+function renderRows(items){
+  const tb=document.getElementById('tbody');tb.innerHTML='';
+  items.forEach(x=>{
+    const tr=document.createElement('tr');
+    const profCls=(x.profit!=null&&x.profit>=0)?'pos':'neg';
+    tr.innerHTML=`
+      <td class="l"><span class="name">${x.name||''}</span><br><span class="sub">${x.bldg||''}</span></td>
+      <td class="l">${x.btype||''}</td><td class="l">${x.rooms||''}</td>
+      <td class="l">${x.sido||''}</td><td class="l">${x.sigungu||''}</td><td class="l">${x.dong||''}</td>
+      <td>${num(x.pyeong)}</td>
+      <td class="${profCls}">${num(x.profit)}</td>
+      <td>${num(x.realized)}</td>
+      <td class="mult">${x.mult!=null?x.mult+'배':'-'}</td>
+      <td>${x.realEff!=null?x.realEff:'-'}</td>
+      <td>${num(x.bk)}</td><td>${num(x.blk)}</td>
+      <td>${num(x.wk)}</td><td>${num(x.nTotal)}</td><td>${num(x.nRent)}</td>
+      <td>${num(x.nDep)}</td><td>${num(x.matches)}</td>
+      <td class="l">
+        ${x.naverUrl?`<a class="lnk n" href="${x.naverUrl}" target="_blank">네이버</a>`:''}
+        ${x.samUrl?`<a class="lnk s" href="${x.samUrl}" target="_blank">삼삼</a>`:''}
+      </td>`;
+    tb.appendChild(tr);
+  });
+}
+function renderPager(r){
+  const pg=document.getElementById('pager');pg.innerHTML='';
+  if(r.pages<=1)return;const cur=r.page;
+  const add=(n,l,on)=>{const b=document.createElement('button');b.textContent=l||n;if(on)b.className='on';b.onclick=()=>search(n);pg.appendChild(b);};
+  if(cur>1)add(cur-1,'‹');
+  let s=Math.max(1,cur-3),e=Math.min(r.pages,cur+3);
+  for(let i=s;i<=e;i++)add(i,null,i===cur);
+  if(e<r.pages)add(r.pages,String(r.pages));
+  if(cur<r.pages)add(cur+1,'›');
+}
+function resetF(){document.querySelectorAll('#t-profit input').forEach(i=>i.value='');document.querySelectorAll('#t-profit select').forEach(s=>{if(s.id!=='sort'&&s.id!=='size')s.value='';});curSort='profit';search(1);}
+
+// ---- 보조 탭 ----
+function genTable(rows,hId,bId){
+  const h=document.getElementById(hId),b=document.getElementById(bId);
+  if(!rows.length){h.innerHTML='';b.innerHTML='<tr><td>데이터 없음</td></tr>';return;}
+  const cols=Object.keys(rows[0]);
+  h.innerHTML='<tr>'+cols.map(c=>`<th class="l">${c}</th>`).join('')+'</tr>';
+  b.innerHTML=rows.map(r=>'<tr>'+cols.map(c=>{const val=r[c];const isNum=typeof val==='number';return `<td class="${isNum?'':'l'}">${isNum?val.toLocaleString():(val??'')}</td>`;}).join('')+'</tr>').join('');
+}
+let loaded={};
+async function tab(name){
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===name));
+  ['profit','dong','gu','station'].forEach(t=>document.getElementById('t-'+t).style.display=(t===name?'':'none'));
+  if(name!=='profit'&&!loaded[name]){
+    const api={dong:'/api/best_dong',gu:'/api/vacancy_gu',station:'/api/by_station'}[name];
+    const rows=await (await fetch(api)).json();
+    genTable(rows,name+'-h',name+'-b');loaded[name]=true;
+  }
+}
+init();
+</script>
+</body>
+</html>
