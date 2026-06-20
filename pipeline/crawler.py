@@ -20,8 +20,12 @@ fetch() 로 비공개 API(/api/regions, /api/articles)를 호출한다.
 import argparse
 import base64
 import json
+import os
+import sys
 import time
 import datetime as dt
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from playwright.sync_api import sync_playwright
 import db

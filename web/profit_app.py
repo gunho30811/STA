@@ -10,10 +10,10 @@ import csv
 import os
 from flask import Flask, jsonify, request, render_template
 
-BASE = os.path.dirname(os.path.abspath(__file__))
-DATA = os.path.join(BASE, "data")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA = os.path.join(ROOT, "data")
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder=os.path.join(ROOT, "templates"))
 
 
 def _num(v):

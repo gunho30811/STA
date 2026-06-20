@@ -7,9 +7,10 @@ crawler.py 의 브라우저 fetch 엔진(NaverLand)과 crawl_dong 을 재사용.
 import json, os, time, sys
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
-BASE = os.path.dirname(os.path.abspath(__file__))
-DATA = os.path.join(BASE, "data")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA = os.path.join(ROOT, "data")
 
+sys.path.insert(0, ROOT)
 import db
 db.DB_PATH = os.path.join(DATA, "naver_nonseoul.db")   # 출력 DB 변경
 

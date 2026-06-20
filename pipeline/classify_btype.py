@@ -12,7 +12,7 @@ from playwright.sync_api import sync_playwright
 from datetime import datetime
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(BASE_DIR, "data")
 OUT = os.path.join(DATA, "btype_map.json")
 load_dotenv(os.path.join(BASE_DIR, ".env"))

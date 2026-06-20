@@ -7,8 +7,8 @@
 
 | 앱 | 포트 | 내용 |
 |----|------|------|
-| `app.py` | 5000 | 네이버 오피스텔 **월세 매물 검색** (서울/경기/인천, 시·군·구·동 필터) |
-| `profit_app.py` | 5001 | 삼삼엠투 × 네이버 **단기임대 수익성** 검색 (전국, 건물유형/방수/지역/순수익 필터) |
+| `web/app.py` | 5000 | 네이버 오피스텔 **월세 매물 검색** (서울/경기/인천, 시·군·구·동 필터) |
+| `web/profit_app.py` | 5001 | 삼삼엠투 × 네이버 **단기임대 수익성** 검색 (전국, 건물유형/방수/지역/순수익 필터) |
 
 ---
 
@@ -20,8 +20,8 @@
 # Python 3.10+ 권장
 pip install flask
 
-python app.py          # → http://127.0.0.1:5000  (네이버 매물 검색)
-python profit_app.py   # → http://127.0.0.1:5001  (수익성 분석)
+python web/app.py          # → http://127.0.0.1:5000  (네이버 매물 검색)
+python web/profit_app.py   # → http://127.0.0.1:5001  (수익성 분석)
 ```
 
 브라우저에서 위 주소로 접속. (두 앱은 포트가 달라 동시에 띄워도 됨)
@@ -48,17 +48,19 @@ python -m playwright install chromium     # 크롤용 크롬 1회 다운로드
 ├─ README.md                 ← 이 문서
 ├─ requirements.txt
 ├─ .env.example              ← 삼삼 로그인 환경변수 양식 (갱신 시 .env 로 복사해 사용)
+├─ db.py                     ← SQLite 스키마/헬퍼 (web + pipeline 공유)
 │
-├─ app.py                    ┐ 시스템 A: 네이버 매물 뷰어
-├─ crawler.py                │  네이버 크롤러 (Playwright)
-├─ db.py                     ┘  SQLite 스키마
+├─ web/                      웹앱 (둘 다 db.py·templates·data 를 공유)
+│   ├─ app.py                 시스템 A: 네이버 매물 뷰어
+│   └─ profit_app.py          시스템 B: 수익성 뷰어
 │
-├─ profit_app.py             ┐ 시스템 B: 수익성 뷰어
-├─ get_targets.py            │  ① 크롤 대상 시군구 추출
-├─ crawl_nonseoul.py         │  ② 비수도권 네이버 크롤
-├─ enrich_nonseoul.py        │  ③ 비수도권 관리비 보강
-├─ classify_btype.py         │  ④ 삼삼 건물유형(아파트/빌라) 분류
-├─ build_integrated.py       ┘  ⑤ 매칭 → 최종 CSV 생성
+├─ pipeline/                 데이터 수집/가공 스크립트 (실행 순서대로)
+│   ├─ crawler.py             네이버 크롤러 (Playwright) — 시스템 A 용
+│   ├─ get_targets.py         ① 비수도권 크롤 대상 시군구 추출
+│   ├─ crawl_nonseoul.py      ② 비수도권 네이버 크롤 (crawler.py 재사용)
+│   ├─ enrich_nonseoul.py     ③ 비수도권 관리비 보강
+│   ├─ classify_btype.py      ④ 삼삼 건물유형(아파트/빌라) 분류
+│   └─ build_integrated.py    ⑤ 매칭 → 최종 CSV 생성
 │
 ├─ templates/
 │   ├─ index.html            (네이버 뷰어 UI)
@@ -83,7 +85,7 @@ python -m playwright install chromium     # 크롤용 크롬 1회 다운로드
 ### 네이버부동산
 - `requests` 직접 호출은 TLS 핑거프린팅으로 차단됨(타임아웃).
 - 그래서 **Playwright(진짜 크롬)로 new.land.naver.com 을 띄워 Authorization 토큰을 확보하고,
-  브라우저 내부에서 `fetch()` 로 비공개 API를 호출**한다. (`crawler.py`)
+  브라우저 내부에서 `fetch()` 로 비공개 API를 호출**한다. (`pipeline/crawler.py`)
 - 대상: `realEstateType=OPST`(오피스텔), `tradeType=B2`(월세).
 - 지역 코드(cortarNo) 재귀 드릴다운으로 시/도 → 구/시 → 동까지 분류.
 
@@ -102,14 +104,14 @@ python -m playwright install chromium     # 크롤용 크롬 1회 다운로드
 copy .env.example .env   # 편집 후 SAMSAM_EMAIL / SAMSAM_PASSWORD 입력
 
 # 시스템 A — 네이버 수도권 매물 갱신
-python crawler.py                    # 서울/경기/인천 전체 (이어받기 지원)
+python pipeline/crawler.py                    # 서울/경기/인천 전체 (이어받기 지원)
 
 # 시스템 B — 전국 수익성 재생성
-python get_targets.py                # ① 비수도권 대상 시군구 추출 → data/targets.json
-python crawl_nonseoul.py             # ② 비수도권 네이버 크롤 → data/naver_nonseoul.db
-python enrich_nonseoul.py            # ③ 비수도권 관리비 보강
-python classify_btype.py             # ④ 삼삼 건물유형 분류 → data/btype_map.json
-python build_integrated.py           # ⑤ 매칭 → data/net_profit_integrated.csv
+python pipeline/get_targets.py                # ① 비수도권 대상 시군구 추출 → data/targets.json
+python pipeline/crawl_nonseoul.py             # ② 비수도권 네이버 크롤 → data/naver_nonseoul.db
+python pipeline/enrich_nonseoul.py            # ③ 비수도권 관리비 보강
+python pipeline/classify_btype.py             # ④ 삼삼 건물유형 분류 → data/btype_map.json
+python pipeline/build_integrated.py           # ⑤ 매칭 → data/net_profit_integrated.csv
 ```
 
 모든 크롤은 중단돼도 이미 받은 분은 건너뛰고 **이어받기** 됩니다.

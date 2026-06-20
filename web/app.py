@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
 """네이버 오피스텔 월세 매물 로컬 검색 웹앱 (Flask)."""
+import os, sys
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+
 from flask import Flask, jsonify, request, render_template
 import db
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder=os.path.join(ROOT, "templates"))
 
 
 @app.route("/")

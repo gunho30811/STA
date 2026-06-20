@@ -13,7 +13,7 @@ from datetime import datetime
 from collections import defaultdict
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
-BASE = os.path.dirname(os.path.abspath(__file__))
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(BASE, "data")
 OFF_JSONL = os.path.join(DATA, "officetel_raw.jsonl")
 ONE_JSONL = os.path.join(DATA, "oneroom_raw.jsonl")

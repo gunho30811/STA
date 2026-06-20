@@ -13,7 +13,7 @@ sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 import crawler
 from crawler import NaverLand
 
-BASE = os.path.dirname(os.path.abspath(__file__))
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(BASE, "data")
 NONSEOUL_DB = os.path.join(DATA, "naver_nonseoul.db")
 PYEONG_M2 = 3.305785; R = 50; AREA_ABS = 3.0
