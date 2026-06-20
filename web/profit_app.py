@@ -44,7 +44,26 @@ PROFIT_MAP = {
     "네이버건물": "bldg", "네이버링크": "naverUrl", "삼삼링크": "samUrl",
 }
 NUM_FIELDS = {"pyeong", "wk", "mEq", "bk", "blk", "realized", "nRent", "nMgmt",
-              "nTotal", "nDep", "matches", "mult", "eff", "realEff", "profit"}
+              "nTotal", "nDep", "matches", "mult", "eff", "realEff", "profit",
+              "guVacancy", "guCompetitors"}
+
+
+def load_gu_vacancy():
+    """시군구별 공실률(%)·경쟁 매물수 (data/vacancy_by_gu.csv, 시도+시군구로 매칭)."""
+    out = {}
+    path = os.path.join(DATA, "vacancy_by_gu.csv")
+    if not os.path.exists(path):
+        return out
+    with open(path, encoding="utf-8-sig") as f:
+        for r in csv.DictReader(f):
+            out[(r.get("시도"), r.get("시군구"))] = {
+                "guVacancy": _num(r.get("공실률(%)")),
+                "guCompetitors": _num(r.get("매물수")),
+            }
+    return out
+
+
+GU_VACANCY = load_gu_vacancy()
 
 
 def load_profit():
@@ -58,6 +77,9 @@ def load_profit():
             for kr, key in PROFIT_MAP.items():
                 v = r.get(kr)
                 o[key] = _num(v) if key in NUM_FIELDS else (v or "")
+            gu = GU_VACANCY.get((o["sido"], o["sigungu"]), {})
+            o["guVacancy"] = gu.get("guVacancy")
+            o["guCompetitors"] = gu.get("guCompetitors")
             rows.append(o)
     return rows
 
@@ -134,7 +156,8 @@ def api_profit():
 
     sort = a.get("sort", "profit")
     direction = a.get("dir", "desc")
-    key = sort if sort in PROFIT_MAP.values() else "profit"
+    valid_keys = set(PROFIT_MAP.values()) | {"guVacancy", "guCompetitors"}
+    key = sort if sort in valid_keys else "profit"
     is_num = key in NUM_FIELDS
     rev = direction == "desc"
     present = [x for x in items if x.get(key) not in (None, "")]
