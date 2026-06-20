@@ -64,7 +64,7 @@
       <div class="card"><div class="lbl">매물 수</div><div class="val" id="c-cnt">-</div></div>
       <div class="card"><div class="lbl">순수익 중앙값</div><div class="val" id="c-med">-<small> 만원</small></div></div>
       <div class="card"><div class="lbl">순수익 최대</div><div class="val pos" id="c-max">-<small> 만원</small></div></div>
-      <div class="card"><div class="lbl">가격배수 중앙값</div><div class="val mult" id="c-mult">-<small> 배</small></div></div>
+      <div class="card"><div class="lbl">네이버÷삼삼주당 중앙값</div><div class="val mult" id="c-mult">-<small> 배</small></div></div>
     </div>
     <div class="panel">
       <div class="filters">
@@ -75,7 +75,7 @@
         <div class="fg"><label>동 포함</label><input id="f-dong" placeholder="예: 삼성동"></div>
         <div class="fg"><label>키워드(매물/건물)</label><input id="f-kw" placeholder="예: 역, 풀옵션"></div>
         <div class="fg"><label>순수익 ≥</label><input type="number" id="f-profit" placeholder="만원"></div>
-        <div class="fg"><label>가격배수 ≥</label><input type="number" id="f-mult" step="0.1" placeholder="배"></div>
+        <div class="fg"><label>네이버÷삼삼주당 ≥</label><input type="number" id="f-mult" step="0.1" placeholder="배"></div>
         <div class="fg"><label>1달예약일 ≥</label><input type="number" id="f-bk" placeholder="일"></div>
         <div class="fg"><label>보증금 ≤</label><input type="number" id="f-dep" placeholder="만원"></div>
         <div class="fg"><label>평수</label><div style="display:flex;gap:4px"><input type="number" id="f-pmin" placeholder="최소" style="width:64px"><input type="number" id="f-pmax" placeholder="최대" style="width:64px"></div></div>
@@ -83,8 +83,8 @@
         <div class="fg"><label>&nbsp;</label><button class="btn btn-reset" onclick="resetF()">초기화</button></div>
       </div>
       <div class="legend">
-        <b>순수익</b>=1달실현수익−(네이버월세+관리비) · <b>1달실현수익</b>=삼삼주당×(예약일/7) · <b>가격배수</b>=삼삼월환산÷네이버월총 ·
-        <b>현실효율</b>=1달실현÷네이버월세 · 관리비 미표기는 평당 2만원 추정 · 헤더 클릭 시 정렬
+        <b>순수익</b>=1달실현수익−(네이버월세+관리비) · <b>1달실현수익</b>=삼삼주당×(예약일/7) · <b>네이버÷삼삼주당</b>=네이버월총÷삼삼주당 ·
+        <b>현실효율</b>=1달실현÷네이버월세 · 관리비 미표기는 평당 2만원 추정 · 헤더 클릭 시 정렬, 다시 클릭하면 오름차순/내림차순 토글
       </div>
     </div>
     <div class="panel scroll">
@@ -114,7 +114,7 @@ const COLS = [
   {k:"pyeong", t:"평"},
   {k:"profit", t:"순수익"},
   {k:"realized", t:"1달실현"},
-  {k:"mult", t:"가격배수"},
+  {k:"mult", t:"네이버÷주당"},
   {k:"realEff", t:"현실효율"},
   {k:"bk", t:"예약일"},
   {k:"blk", t:"막힘일"},
@@ -126,14 +126,29 @@ const COLS = [
   {k:"link", t:"링크", l:true},
 ];
 
+let curDir = "desc";
+function renderThead(){
+  const tr = document.getElementById('thead'); tr.innerHTML='';
+  COLS.forEach(c=>{
+    const th=document.createElement('th');
+    th.textContent = c.t + (c.k===curSort ? (curDir==='asc' ? ' ▲' : ' ▼') : '');
+    if(c.l)th.className='l';
+    if(c.k!=='link'){
+      th.onclick=()=>{
+        if(curSort===c.k){curDir = curDir==='asc' ? 'desc' : 'asc';}
+        else {curSort=c.k; curDir='asc';}
+        search(1);
+      };
+      th.title='정렬 (다시 클릭하면 반대로)';
+    }
+    tr.appendChild(th);
+  });
+}
 async function init(){
   const fc = await (await fetch('/api/facets')).json();
   const fill=(id,arr)=>{const sel=document.getElementById(id);arr.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);});};
   fill('f-sigungu',fc.sigungu); fill('f-sido',fc.sido); fill('f-btype',fc.btype);
-  // thead
-  const tr = document.getElementById('thead');
-  COLS.forEach(c=>{const th=document.createElement('th');th.textContent=c.t;if(c.l)th.className='l';
-    if(c.k!=='link'&&c.k!=='name')th.onclick=()=>{curSort=c.k;search(1);};th.title='정렬';tr.appendChild(th);});
+  renderThead();
   search(1);
 }
 function v(id){return document.getElementById(id).value.trim();}
@@ -151,7 +166,8 @@ async function search(page){
   if(v('f-dep'))p.set('dep_max',v('f-dep'));
   if(v('f-pmin'))p.set('pyeong_min',v('f-pmin'));
   if(v('f-pmax'))p.set('pyeong_max',v('f-pmax'));
-  p.set('sort',curSort);p.set('page',page);p.set('size',50);
+  p.set('sort',curSort);p.set('dir',curDir);p.set('page',page);p.set('size',50);
+  renderThead();
   const r=await (await fetch('/api/profit?'+p)).json();
   const s=r.summary;
   document.getElementById('c-cnt').textContent=s.count.toLocaleString();
@@ -195,15 +211,34 @@ function renderPager(r){
   if(e<r.pages)add(r.pages,String(r.pages));
   if(cur<r.pages)add(cur+1,'›');
 }
-function resetF(){document.querySelectorAll('#t-profit input').forEach(i=>i.value='');document.querySelectorAll('#t-profit select').forEach(s=>{if(s.id!=='sort'&&s.id!=='size')s.value='';});curSort='profit';search(1);}
+function resetF(){document.querySelectorAll('#t-profit input').forEach(i=>i.value='');document.querySelectorAll('#t-profit select').forEach(s=>{if(s.id!=='sort'&&s.id!=='size')s.value='';});curSort='profit';curDir='desc';search(1);}
 
-// ---- 보조 탭 ----
-function genTable(rows,hId,bId){
+// ---- 보조 탭 (헤더 클릭 시 정렬, 다시 클릭하면 오름차순/내림차순 토글) ----
+let tableData={}, tableSort={};
+function genTable(rows,hId,bId,name){
   const h=document.getElementById(hId),b=document.getElementById(bId);
   if(!rows.length){h.innerHTML='';b.innerHTML='<tr><td>데이터 없음</td></tr>';return;}
   const cols=Object.keys(rows[0]);
-  h.innerHTML='<tr>'+cols.map(c=>`<th class="l">${c}</th>`).join('')+'</tr>';
+  const st=tableSort[name]||{col:null,dir:'asc'};
+  h.innerHTML='<tr>'+cols.map(c=>{
+    const arrow = st.col===c ? (st.dir==='asc'?' ▲':' ▼') : '';
+    return `<th class="l" title="정렬 (다시 클릭하면 반대로)" onclick="sortTable('${name}','${c}','${hId}','${bId}')">${c}${arrow}</th>`;
+  }).join('')+'</tr>';
   b.innerHTML=rows.map(r=>'<tr>'+cols.map(c=>{const val=r[c];const isNum=typeof val==='number';return `<td class="${isNum?'':'l'}">${isNum?val.toLocaleString():(val??'')}</td>`;}).join('')+'</tr>').join('');
+}
+function sortTable(name,col,hId,bId){
+  const rows=tableData[name];
+  let st=tableSort[name]||{col:null,dir:'asc'};
+  st = st.col===col ? {col, dir: st.dir==='asc'?'desc':'asc'} : {col, dir:'asc'};
+  tableSort[name]=st;
+  const present=rows.filter(r=>r[col]!==null&&r[col]!==undefined&&r[col]!=='');
+  const missing=rows.filter(r=>r[col]===null||r[col]===undefined||r[col]==='');
+  present.sort((a,b)=>{
+    const av=a[col],bv=b[col];
+    const cmp=(typeof av==='number'&&typeof bv==='number')?(av-bv):String(av).localeCompare(String(bv),'ko');
+    return st.dir==='asc'?cmp:-cmp;
+  });
+  genTable(present.concat(missing),hId,bId,name);
 }
 let loaded={};
 async function tab(name){
@@ -212,7 +247,8 @@ async function tab(name){
   if(name!=='profit'&&!loaded[name]){
     const api={dong:'/api/best_dong',gu:'/api/vacancy_gu',station:'/api/by_station'}[name];
     const rows=await (await fetch(api)).json();
-    genTable(rows,name+'-h',name+'-b');loaded[name]=true;
+    tableData[name]=rows;
+    genTable(rows,name+'-h',name+'-b',name);loaded[name]=true;
   }
 }
 init();

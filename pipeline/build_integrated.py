@@ -165,7 +165,7 @@ for s in valid:
         'sam_week': sam_week, 'sam_month': sam_month, 'bk': s['bk'], 'ds': s['ds'],
         'realized': realized, 'rent': rent, 'dep': dep, 'navmgmt': navmgmt, 'nav_tot': nav_tot,
         'n': len(use), 'mgmt_known': mgmt_known, 'nv_url': nv_url, 'nv_bldg': rep['articleName'],
-        'eff': round(sam_month/nav_tot, 2) if nav_tot else 0,
+        'eff': round(nav_tot/sam_week, 2) if sam_week else 0,
         'real_eff': round(realized/nav_tot, 2) if nav_tot else 0,
         'real_eff_rent': round(realized/rent, 2) if rent else 0,
         'net': round(realized-nav_tot, 1)})
@@ -175,7 +175,7 @@ with open(OUT, 'w', encoding='utf-8-sig', newline='') as f:
     w = csv.writer(f)
     w.writerow(['삼삼ID', '매물명', '건물유형', '방수', '시도', '시군구', '동', '평수', '삼삼주당_만원', '삼삼월환산_만원',
                 '1달예약일', '1달막힘일', '1달실현수익_만원', '네이버월세_만원', '네이버관리비_만원', '관리비표기여부',
-                '네이버월총_만원', '네이버보증금_만원', '매칭매물수', '가격배수(삼삼월÷네이버월총)',
+                '네이버월총_만원', '네이버보증금_만원', '매칭매물수', '네이버월총÷삼삼주당',
                 '실현효율(1달실현÷네이버월총)', '현실효율(1달실현÷네이버월세)', '순수익_만원(1달실현−월세−관리비)',
                 '네이버건물', '네이버링크', '삼삼링크'])
     for r in rows:
