@@ -78,6 +78,7 @@
         <div class="fg"><label>네이버÷삼삼주당 ≥</label><input type="number" id="f-mult" step="0.1" placeholder="배"></div>
         <div class="fg"><label>1달예약일 ≥</label><input type="number" id="f-bk" placeholder="일"></div>
         <div class="fg"><label>보증금 ≤</label><input type="number" id="f-dep" placeholder="만원"></div>
+        <div class="fg"><label>구공실률 ≤</label><input type="number" id="f-vacancy" step="0.1" placeholder="%"></div>
         <div class="fg"><label>평수</label><div style="display:flex;gap:4px"><input type="number" id="f-pmin" placeholder="최소" style="width:64px"><input type="number" id="f-pmax" placeholder="최대" style="width:64px"></div></div>
         <div class="fg"><label>&nbsp;</label><button class="btn btn-go" onclick="search(1)">검색</button></div>
         <div class="fg"><label>&nbsp;</label><button class="btn btn-reset" onclick="resetF()">초기화</button></div>
@@ -167,6 +168,7 @@ async function search(page){
   if(v('f-mult'))p.set('mult_min',v('f-mult'));
   if(v('f-bk'))p.set('bk_min',v('f-bk'));
   if(v('f-dep'))p.set('dep_max',v('f-dep'));
+  if(v('f-vacancy'))p.set('vacancy_max',v('f-vacancy'));
   if(v('f-pmin'))p.set('pyeong_min',v('f-pmin'));
   if(v('f-pmax'))p.set('pyeong_max',v('f-pmax'));
   p.set('sort',curSort);p.set('dir',curDir);p.set('page',page);p.set('size',50);
