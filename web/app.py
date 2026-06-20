@@ -111,10 +111,11 @@ def api_listings():
 if __name__ == "__main__":
     import socket
     db.init_db()
+    port = int(os.environ.get("PORT", 5000))
     try:
         ip = socket.gethostbyname(socket.gethostname())
     except Exception:
         ip = "127.0.0.1"
-    print(f"로컬:   http://127.0.0.1:5000")
-    print(f"같은망: http://{ip}:5000  (다른 기기에서 이 주소로 접속)")
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    print(f"로컬:   http://127.0.0.1:{port}")
+    print(f"같은망: http://{ip}:{port}  (다른 기기에서 이 주소로 접속)")
+    app.run(host="0.0.0.0", port=port, debug=False)

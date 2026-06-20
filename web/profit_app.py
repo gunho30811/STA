@@ -235,6 +235,7 @@ def _median(xs):
 
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5001))
     print(f"수익성 매물 {len(PROFIT)}건 로드됨")
-    print("http://127.0.0.1:5001 에서 실행")
-    app.run(host="0.0.0.0", port=5001, debug=False)
+    print(f"http://127.0.0.1:{port} 에서 실행")
+    app.run(host="0.0.0.0", port=port, debug=False)
