@@ -39,7 +39,7 @@ PROFIT_MAP = {
     "1달예약일": "bk", "1달막힘일": "blk", "1달실현수익_만원": "realized",
     "네이버월세_만원": "nRent", "네이버관리비_만원": "nMgmt", "관리비표기여부": "mgmtFlag",
     "네이버월총_만원": "nTotal", "네이버보증금_만원": "nDep", "매칭매물수": "matches",
-    "가격배수(삼삼월÷네이버월총)": "mult", "실현효율(1달실현÷네이버월총)": "eff",
+    "네이버월총÷삼삼주당": "mult", "실현효율(1달실현÷네이버월총)": "eff",
     "현실효율(1달실현÷네이버월세)": "realEff", "순수익_만원(1달실현−월세−관리비)": "profit",
     "네이버건물": "bldg", "네이버링크": "naverUrl", "삼삼링크": "samUrl",
 }
@@ -133,10 +133,17 @@ def api_profit():
         items = le("dep_max", "nDep")
 
     sort = a.get("sort", "profit")
-    desc_fields = {"profit", "realized", "mult", "realEff", "eff", "bk"}
-    rev = sort in desc_fields  # 보증금(nDep)·평수는 오름차순 기본
-    key = sort if sort in NUM_FIELDS else "profit"
-    items.sort(key=lambda x: (x[key] is None, x[key] if x[key] is not None else 0), reverse=rev)
+    direction = a.get("dir", "desc")
+    key = sort if sort in PROFIT_MAP.values() else "profit"
+    is_num = key in NUM_FIELDS
+    rev = direction == "desc"
+    present = [x for x in items if x.get(key) not in (None, "")]
+    missing = [x for x in items if x.get(key) in (None, "")]
+    if is_num:
+        present.sort(key=lambda x: x[key], reverse=rev)
+    else:
+        present.sort(key=lambda x: str(x[key]).lower(), reverse=rev)
+    items = present + missing
 
     # 요약
     profits = [x["profit"] for x in items if x["profit"] is not None]
