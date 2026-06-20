@@ -21,6 +21,7 @@ NAV_DB = os.path.join(DATA, "naver_opst_enriched.db")
 OUT = os.path.join(DATA, "net_profit_integrated.csv")
 
 START = datetime(2026, 6, 16).date(); END = datetime(2026, 7, 15).date()
+WINDOW_DAYS = (END - START).days + 1
 PYEONG_M2 = 3.305785; WEEKS = 4.345; R = 50; AREA_ABS = 3.0; PURE_DEP_MAN = 2000
 
 
@@ -160,7 +161,11 @@ for s in valid:
     nav_tot = rent + navmgmt
     sam_week = man((s.get('fee') or 0) + (s.get('mgmt') or 0))
     sam_month = round(sam_week*WEEKS, 1)
-    realized = round(sam_week*s['bk']/7, 1)
+    # 막힘일(호스트가 의도적으로 막은 날)은 "운영 불가 기간"으로 보고 점유율 계산에서 제외.
+    # 점유율 = 예약일/(전체기간-막힘일) 을 한 달(WINDOW_DAYS) 전체에 적용해서 실현수익 추정.
+    avail_days = WINDOW_DAYS - s['ds']
+    occ_rate = (s['bk']/avail_days) if avail_days > 0 else 0
+    realized = round(sam_week*(occ_rate*WINDOW_DAYS)/7, 1)
     dong_key = (s.get('state', ''), s.get('province', ''), s.get('town', ''))
     sam_nearby = dong_count[dong_key] - 1
     rows.append({
