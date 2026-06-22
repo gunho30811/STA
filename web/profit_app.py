@@ -42,11 +42,14 @@ PROFIT_MAP = {
     "네이버월총_만원": "nTotal", "네이버보증금_만원": "nDep", "매칭매물수": "matches",
     "네이버월총÷삼삼주당": "mult", "실현효율(1달실현÷네이버월총)": "eff",
     "현실효율(1달실현÷네이버월세)": "realEff", "순수익_만원(1달실현−월세−관리비)": "profit",
+    "건물네이버매물수": "bldgCnt", "건물월세최저_만원": "bldgRentMin",
+    "건물월세중간_만원": "bldgRentMed", "건물월세최고_만원": "bldgRentMax",
     "네이버건물": "bldg", "네이버링크": "naverUrl", "삼삼링크": "samUrl",
 }
 NUM_FIELDS = {"pyeong", "wk", "mEq", "bk", "blk", "realized", "nRent", "nMgmt",
               "nTotal", "nDep", "matches", "mult", "eff", "realEff", "profit",
-              "guVacancy", "guCompetitors", "samNearby", "stVacancy", "stCompetitors"}
+              "guVacancy", "guCompetitors", "samNearby", "stVacancy", "stCompetitors",
+              "bldgCnt", "bldgRentMin", "bldgRentMed", "bldgRentMax"}
 EXTRA_FIELDS = {"guVacancy", "guCompetitors", "stVacancy", "stCompetitors"}
 
 
