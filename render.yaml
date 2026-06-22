@@ -1,0 +1,18 @@
+services:
+  # 네이버 오피스텔 월세 검색 (port 5000 → Render 자동 할당)
+  - type: web
+    name: sta-naver
+    runtime: python
+    buildCommand: pip install flask psycopg2-binary python-dotenv gunicorn
+    startCommand: gunicorn --bind 0.0.0.0:$PORT web.app:app
+    envVars:
+      - key: DATABASE_URL
+        sync: false        # Render 대시보드에서 직접 입력
+
+  # 삼삼엠투 × 네이버 수익성 분석 (port 5001 → Render 자동 할당)
+  - type: web
+    name: sta-profit
+    runtime: python
+    buildCommand: pip install flask gunicorn
+    startCommand: gunicorn --bind 0.0.0.0:$PORT web.profit_app:app
+    # DATABASE_URL 불필요 — data/net_profit_integrated.csv 직접 읽음
