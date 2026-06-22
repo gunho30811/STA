@@ -1,21 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-비수도권 네이버(naver_nonseoul.db) 관리비(mgmt) 보강.
-- 매칭에 관여하는(=어떤 삼삼 매물의 50m+면적 후보) 비수도권 네이버 매물만 대상.
-- 네이버 상세 API /api/articles/{no} → articleDetail.monthlyManagementCost (브라우저 fetch).
-- crawler.NaverLand 재사용(토큰 자동 갱신/재시작). 증분 저장(이어받기).
+네이버 매물 관리비(mgmt) 보강 (전국, Supabase).
+- 매칭 관여 매물의 상세 API /api/articles/{no} → monthlyManagementCost.
+- crawler.NaverLand 재사용. 증분 저장(이어받기).
 """
-import json, os, sqlite3, math, re, time, sys
+import json, os, math, re, time, sys
 from collections import defaultdict
 from datetime import datetime
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, BASE)
+import db
 import crawler
 from crawler import NaverLand
 
-BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(BASE, "data")
-NONSEOUL_DB = os.path.join(DATA, "naver_nonseoul.db")
 PYEONG_M2 = 3.305785; R = 50; AREA_ABS = 3.0
 
 
@@ -49,14 +49,10 @@ def main():
     sam = list(off.values()) + [o for r, o in one.items() if r not in off]
     sam = [o for o in sam if o.get('lat') and o.get('lng') and o.get('pyeong') and (o.get('fee') or 0) > 0]
 
-    # 비수도권 네이버 인덱스
-    con = sqlite3.connect(NONSEOUL_DB)
-    cols = [r[1] for r in con.execute("PRAGMA table_info(listings)")]
-    if 'mgmt' not in cols:
-        con.execute("ALTER TABLE listings ADD COLUMN mgmt INTEGER"); con.commit()
-        print("mgmt 컬럼 추가")
-    nav = [dict(zip(['articleNo', 'articleName', 'area_m2', 'lat', 'lon', 'dong'], r)) for r in
-           con.execute("SELECT articleNo,articleName,area_m2,lat,lon,dong FROM listings WHERE lat IS NOT NULL")]
+    # 네이버 전체 매물 인덱스 (Supabase에 수도권+비수도권 통합)
+    con = db.connect()
+    nav = [dict(r) for r in
+           con.execute("SELECT articleNo,articleName,area_m2,lat,lon,dong FROM listings WHERE lat IS NOT NULL").fetchall()]
     fine = defaultdict(list); nidx = defaultdict(list)
     for nv in nav:
         nv['_n'] = norm(nv['articleName'])
@@ -80,11 +76,11 @@ def main():
             if nv['area_m2'] and abs(nv['area_m2']-s_m2) <= AREA_ABS:
                 needed.add(no)
 
-    done = set(r[0] for r in con.execute("SELECT articleNo FROM listings WHERE mgmt IS NOT NULL"))
+    done = set(r[0] for r in con.execute("SELECT articleNo FROM listings WHERE mgmt IS NOT NULL").fetchall())
     todo = [a for a in needed if a not in done]
     print(f"매칭 관여 {len(needed)} / 완료 {len(done)} / 받을 것 {len(todo)}")
     if not todo:
-        print("보강할 것 없음"); return
+        con.close(); print("보강할 것 없음"); return
 
     nl = NaverLand(headless=True)
     got = 0; t0 = time.time()
@@ -104,6 +100,7 @@ def main():
                 nl.restart()
     finally:
         nl.close()
+        con.close()
     print(f"완료. 신규 {got}건 보강")
 
 

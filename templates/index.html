@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
 <title>네이버 오피스텔 월세 검색 (서울·경기·인천)</title>
 <style>
   * { box-sizing: border-box; }
@@ -170,20 +171,20 @@ function render(r){
   g.innerHTML='';
   if(!r.items.length){ empty.style.display='block'; return; } empty.style.display='none';
   r.items.forEach(x=>{
-    const img = x.imgUrl ? `${IMG_BASE}${x.imgUrl}?type=f130_98` : '';
+    const img = x.imgurl ? `${IMG_BASE}${x.imgurl}?type=f130_98` : '';
     const card=document.createElement('div'); card.className='card';
     card.innerHTML=`
       <div class="thumb" style="${img?`background-image:url('${img}')`:''}">
-        <span class="tag">${x.realEstateType||'오피스텔'} · 월세</span>
+        <span class="tag">${x.realestatetype||'오피스텔'} · 월세</span>
       </div>
       <div class="body">
         <div class="price">보증금 <em>${(x.deposit||0).toLocaleString()}</em> / 월 <em>${(x.rent||0).toLocaleString()}</em> <span style="font-size:11px;color:#999">만원</span></div>
-        <div class="name">${x.articleName||''} ${x.buildingName?`<span style="font-weight:normal;color:#777;font-size:12px">${x.buildingName}</span>`:''}</div>
+        <div class="name">${x.articlename||''} ${x.buildingname?`<span style="font-weight:normal;color:#777;font-size:12px">${x.buildingname}</span>`:''}</div>
         <div class="loc">📍 ${x.sido} ${x.sigungu} ${x.dong}</div>
-        <div class="meta">${fmtArea(x.area_real_m2)} · ${x.floorInfo||'-'}층 · ${x.direction||'-'}</div>
-        <div class="ft">${x.featureDesc||x.tags||''}</div>
-        <div class="meta" style="color:#999">확인 ${x.confirmYmd||'-'} · ${x.realtorName||x.cpName||''}</div>
-        <a class="link" href="${x.articleUrl}" target="_blank">네이버에서 보기 →</a>
+        <div class="meta">${fmtArea(x.area_real_m2)} · ${x.floorinfo||'-'}층 · ${x.direction||'-'}</div>
+        <div class="ft">${x.featuredesc||x.tags||''}</div>
+        <div class="meta" style="color:#999">확인 ${x.confirmymd||'-'} · ${x.realtorname||x.cpname||''}</div>
+        <a class="link" href="${x.articleurl}" target="_blank">네이버에서 보기 →</a>
       </div>`;
     g.appendChild(card);
   });

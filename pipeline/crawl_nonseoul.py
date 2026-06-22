@@ -2,7 +2,8 @@
 """
 비수도권 네이버 오피스텔 '월세' 크롤 — 삼삼 오피스텔이 있는 시군구만 타겟.
 crawler.py 의 브라우저 fetch 엔진(NaverLand)과 crawl_dong 을 재사용.
-저장: data/naver_nonseoul.db (db.py 스키마)
+# 저장: data/naver_nonseoul.db (db.py 스키마)
+저장: Supabase listings 테이블 (수도권 크롤과 동일 테이블)
 """
 import json, os, time, sys
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -12,7 +13,7 @@ DATA = os.path.join(ROOT, "data")
 
 sys.path.insert(0, ROOT)
 import db
-db.DB_PATH = os.path.join(DATA, "naver_nonseoul.db")   # 출력 DB 변경
+# db.DB_PATH = os.path.join(DATA, "naver_nonseoul.db")   # 출력 DB 변경
 
 import crawler
 from crawler import NaverLand, crawl_dong, now
