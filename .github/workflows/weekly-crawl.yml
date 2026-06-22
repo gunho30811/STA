@@ -1,0 +1,54 @@
+name: 주간 크롤
+
+on:
+  schedule:
+    - cron: '0 1 * * 0'   # 매주 일요일 10:00 KST (UTC 01:00)
+  workflow_dispatch:        # 수동 트리거
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SAMSAM_EMAIL: ${{ secrets.SAMSAM_EMAIL }}
+      SAMSAM_PASSWORD: ${{ secrets.SAMSAM_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python 세팅
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 의존성 설치
+        run: pip install -r requirements.txt
+
+      - name: Playwright Chromium 설치
+        run: python -m playwright install chromium --with-deps
+
+      - name: 수도권 크롤 (crawler.py)
+        run: python pipeline/crawler.py
+
+      - name: 비수도권 크롤 (crawl_nonseoul.py)
+        run: python pipeline/crawl_nonseoul.py
+
+      - name: 관리비 보강 (enrich_nonseoul.py)
+        run: python pipeline/enrich_nonseoul.py
+
+      - name: 건물유형 분류 (classify_btype.py)
+        run: python pipeline/classify_btype.py
+
+      - name: 통합 분석 (build_integrated.py)
+        run: python pipeline/build_integrated.py
+
+      - name: 결과 커밋
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/net_profit_integrated.csv data/btype_map.json
+          git diff --staged --quiet || git commit -m "data: 주간 크롤 결과 업데이트 $(date +'%Y-%m-%d')"
+          git push
