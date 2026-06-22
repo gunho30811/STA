@@ -21,7 +21,7 @@ OUT = os.path.join(DATA, "net_profit_integrated.csv")
 
 START = datetime(2026, 6, 16).date(); END = datetime(2026, 7, 15).date()
 WINDOW_DAYS = (END - START).days + 1
-PYEONG_M2 = 3.305785; WEEKS = 4.345; R = 50; AREA_ABS = 3.0; PURE_DEP_MAN = 2000
+PYEONG_M2 = 3.305785; WEEKS = 4.345; R = 50; AREA_PCT = 0.15; PURE_DEP_MAN = 2000
 
 
 def inwin(d):
@@ -92,7 +92,7 @@ def load_nav():
     conn = db.connect()
     out = [dict(r) for r in conn.execute(
         "SELECT articleno,articlename,area_m2,rent,deposit,floorinfo,lat,lon,dong,mgmt"
-        " FROM listings WHERE rent>0 AND lat IS NOT NULL"
+        " FROM listings WHERE rent BETWEEN 5 AND 2000 AND lat IS NOT NULL"
     ).fetchall()]
     conn.close()
     return out
@@ -115,23 +115,87 @@ for nv in nav:
     if nv['_n']: nidx[nv['dong']].append(nv)
 def dist(a, b, x, y): return math.hypot((a-x)*111000, (b-y)*88800)
 
+
+def _parse_nav_floor(floorinfo):
+    """네이버 floorInfo '중/18' or '12/20' → (floor_num, total, category)"""
+    if not floorinfo: return None, None, None
+    parts = str(floorinfo).split('/')
+    cat, floor_num, total = None, None, None
+    f = parts[0].strip()
+    if f in ('저', '중', '고'):
+        cat = f
+    else:
+        try: floor_num = int(f)
+        except: pass
+    if len(parts) >= 2:
+        try: total = int(parts[1].strip())
+        except: pass
+    return floor_num, total, cat
+
+
+def _parse_sam_floor(name):
+    """삼삼 name에서 'N층' 숫자 추출"""
+    m = re.search(r'(\d+)층', name or '')
+    return int(m.group(1)) if m else None
+
+
+def _floor_category(n, total):
+    if not n or not total or total <= 0: return None
+    if n > total: return 'impossible'
+    r = n / total
+    return '저' if r <= 0.33 else ('중' if r <= 0.67 else '고')
+
+
+def _floor_ok(nav_floorinfo, sam_floor):
+    """층 호환 여부. 한쪽이라도 층 정보 없으면 True(통과)."""
+    if not sam_floor: return True
+    nav_num, nav_total, nav_cat = _parse_nav_floor(nav_floorinfo)
+    if nav_num is not None:
+        return abs(nav_num - sam_floor) <= 3
+    if nav_cat and nav_total:
+        sam_cat = _floor_category(sam_floor, nav_total)
+        return sam_cat == nav_cat if sam_cat and sam_cat != 'impossible' else (sam_cat != 'impossible')
+    return True
+
+
 def strict_match(s):
+    """(매칭 매물 리스트, 건물 전체 매물 리스트) 반환.
+
+    전략:
+    - 삼삼에 건물명 있으면 → 건물명 매칭만 사용 (좌표 500m 이내 sanity check 병행)
+    - 삼삼에 건물명 없으면 → 좌표 15m 이내(같은 건물 GPS 오차 범위)만 허용
+    좌표 50m 단독 사용하지 않음 → 인접 건물 오매칭 방지.
+    """
     slat, slon = float(s['lat']), float(s['lng']); s_m2 = float(s['pyeong'])*PYEONG_M2
     sb = norm(bldg(s.get('addr', '')))
+    sam_floor = _parse_sam_floor(s.get('name', ''))
     cands = {}
-    ca, co = round(slat, 3), round(slon, 3)
-    for dla in (-0.001, 0, 0.001):
-        for dlo in (-0.001, 0, 0.001):
-            for nv in fine.get((round(ca+dla, 3), round(co+dlo, 3)), []):
-                if dist(slat, slon, nv['lat'], nv['lon']) <= R: cands[id(nv)] = nv
+
     if sb and len(sb) >= 3:
+        # 건물명 매칭: 같은 동 내 이름 일치 + 500m 이내 sanity
         for nv in nidx.get(s.get('town', ''), []):
-            if nv['_n'] == sb or (len(sb) >= 4 and (sb in nv['_n'] or nv['_n'] in sb)): cands[id(nv)] = nv
-    return [nv for nv in cands.values() if nv['area_m2'] and abs(nv['area_m2']-s_m2) <= AREA_ABS]
+            if nv['_n'] == sb or (len(sb) >= 4 and (sb in nv['_n'] or nv['_n'] in sb)):
+                if dist(slat, slon, nv['lat'], nv['lon']) <= 500:
+                    cands[id(nv)] = nv
+    else:
+        # 건물명 없음: GPS 15m 이내만 (같은 건물 출입구 오차 수준)
+        ca, co = round(slat, 3), round(slon, 3)
+        for dla in (-0.001, 0, 0.001):
+            for dlo in (-0.001, 0, 0.001):
+                for nv in fine.get((round(ca+dla, 3), round(co+dlo, 3)), []):
+                    if dist(slat, slon, nv['lat'], nv['lon']) <= 15:
+                        cands[id(nv)] = nv
+
+    bldg_all = list(cands.values())
+    # 면적 ±15% 상대값 필터
+    area_ok = [nv for nv in bldg_all if nv['area_m2'] and abs(nv['area_m2']-s_m2)/s_m2 <= AREA_PCT]
+    # 층수 필터 (둘 다 층 정보 있을 때만)
+    hits = [nv for nv in area_ok if _floor_ok(nv.get('floorinfo'), sam_floor)]
+    return hits, bldg_all
 
 rows = []
 for s in valid:
-    hits = strict_match(s)
+    hits, bldg_all = strict_match(s)
     if not hits: continue
     pure = [h for h in hits if (h['deposit'] or 0) <= PURE_DEP_MAN]
     use = pure if pure else sorted(hits, key=lambda h: (h['deposit'] or 0))[:1]
@@ -145,13 +209,17 @@ for s in valid:
     nav_tot = rent + navmgmt
     sam_week = man((s.get('fee') or 0) + (s.get('mgmt') or 0))
     sam_month = round(sam_week*WEEKS, 1)
-    # 막힘일(호스트가 의도적으로 막은 날)은 "운영 불가 기간"으로 보고 점유율 계산에서 제외.
-    # 점유율 = 예약일/(전체기간-막힘일) 을 한 달(WINDOW_DAYS) 전체에 적용해서 실현수익 추정.
     avail_days = WINDOW_DAYS - s['ds']
     occ_rate = (s['bk']/avail_days) if avail_days > 0 else 0
     realized = round(sam_week*(occ_rate*WINDOW_DAYS)/7, 1)
     dong_key = (s.get('state', ''), s.get('province', ''), s.get('town', ''))
     sam_nearby = dong_count[dong_key] - 1
+    # 건물 전체 통계 (면적·층수 필터 전 bldg_all 기준)
+    bldg_rents = [nv['rent'] for nv in bldg_all if nv['rent']]
+    bldg_cnt = len(bldg_all)
+    bldg_rent_min = round(min(bldg_rents), 1) if bldg_rents else ''
+    bldg_rent_max = round(max(bldg_rents), 1) if bldg_rents else ''
+    bldg_rent_med = round(statistics.median(bldg_rents), 1) if bldg_rents else ''
     rows.append({
         'rid': s['rid'], 'name': s.get('name', ''), 'btype': s['btype'], 'rooms': s['rooms'],
         'sido': s.get('state', ''), 'station': s.get('station', ''), 'sam_nearby': sam_nearby,
@@ -162,7 +230,9 @@ for s in valid:
         'eff': round(nav_tot/sam_week, 2) if sam_week else 0,
         'real_eff': round(realized/nav_tot, 2) if nav_tot else 0,
         'real_eff_rent': round(realized/rent, 2) if rent else 0,
-        'net': round(realized-nav_tot, 1)})
+        'net': round(realized-nav_tot, 1),
+        'bldg_cnt': bldg_cnt, 'bldg_rent_min': bldg_rent_min,
+        'bldg_rent_med': bldg_rent_med, 'bldg_rent_max': bldg_rent_max})
 
 rows.sort(key=lambda x: x['net'], reverse=True)
 with open(OUT, 'w', encoding='utf-8-sig', newline='') as f:
@@ -172,13 +242,16 @@ with open(OUT, 'w', encoding='utf-8-sig', newline='') as f:
                 '1달예약일', '1달막힘일', '1달실현수익_만원', '네이버월세_만원', '네이버관리비_만원', '관리비표기여부',
                 '네이버월총_만원', '네이버보증금_만원', '매칭매물수', '네이버월총÷삼삼주당',
                 '실현효율(1달실현÷네이버월총)', '현실효율(1달실현÷네이버월세)', '순수익_만원(1달실현−월세−관리비)',
+                '건물네이버매물수', '건물월세최저_만원', '건물월세중간_만원', '건물월세최고_만원',
                 '네이버건물', '네이버링크', '삼삼링크'])
     for r in rows:
         w.writerow([r['rid'], r['name'], r['btype'], r['rooms'], r['sido'], r['prov'], r['town'],
                     r['station'], r['sam_nearby'], r['pyeong'],
                     r['sam_week'], r['sam_month'], r['bk'], r['ds'], r['realized'], r['rent'], r['navmgmt'],
                     ('표기' if r['mgmt_known'] else '미표기(평당2만)'), r['nav_tot'], r['dep'], r['n'], r['eff'],
-                    r['real_eff'], r['real_eff_rent'], r['net'], r['nv_bldg'], r['nv_url'],
+                    r['real_eff'], r['real_eff_rent'], r['net'],
+                    r['bldg_cnt'], r['bldg_rent_min'], r['bldg_rent_med'], r['bldg_rent_max'],
+                    r['nv_bldg'], r['nv_url'],
                     f"https://web.33m2.co.kr/guest/room/{r['rid']}"])
 
 print(f"통합 매칭 결과: {len(rows)}개 → {OUT}")

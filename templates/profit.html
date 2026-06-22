@@ -134,6 +134,10 @@ const COLS = [
   {k:"nRent", t:"네이버월세"},
   {k:"nDep", t:"보증금"},
   {k:"matches", t:"매칭수"},
+  {k:"bldgCnt", t:"건물매물수"},
+  {k:"bldgRentMin", t:"건물최저"},
+  {k:"bldgRentMed", t:"건물중간"},
+  {k:"bldgRentMax", t:"건물최고"},
   {k:"link", t:"링크", l:true},
 ];
 
@@ -213,6 +217,7 @@ function renderRows(items){
       <td>${num(x.bk)}</td><td>${num(x.blk)}</td>
       <td>${num(x.wk)}</td><td>${num(x.nTotal)}</td><td>${num(x.nRent)}</td>
       <td>${num(x.nDep)}</td><td>${num(x.matches)}</td>
+      <td>${num(x.bldgCnt)}</td><td>${num(x.bldgRentMin)}</td><td>${num(x.bldgRentMed)}</td><td>${num(x.bldgRentMax)}</td>
       <td class="l">
         ${x.naverUrl?`<a class="lnk n" href="${x.naverUrl}" target="_blank">네이버</a>`:''}
         ${x.samUrl?`<a class="lnk s" href="${x.samUrl}" target="_blank">삼삼</a>`:''}
