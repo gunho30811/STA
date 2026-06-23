@@ -8,7 +8,7 @@ crawler.py 의 브라우저 fetch 엔진(NaverLand)과 crawl_dong 을 재사용.
 import json, os, time, sys
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA = os.path.join(ROOT, "data")
 
 sys.path.insert(0, ROOT)
