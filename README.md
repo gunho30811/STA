@@ -57,10 +57,13 @@ python -m playwright install chromium     # 크롤용 크롬 1회 다운로드
 │
 ├─ pipeline/                 데이터 수집/가공 스크립트 (수집원별로 분리)
 │   ├─ naver/                 ▣ 네이버부동산 (담당: gunho)
-│   │   ├─ crawler.py             네이버 크롤러 (Playwright) — 시스템 A 용
+│   │   ├─ crawler.py             네이버 크롤러 (Playwright) — 목록 수집(listings)
 │   │   ├─ get_targets.py         ① 비수도권 크롤 대상 시군구 추출
 │   │   ├─ crawl_nonseoul.py      ② 비수도권 네이버 크롤 (crawler.py 재사용)
-│   │   └─ enrich_nonseoul.py     ③ 비수도권 관리비 보강
+│   │   ├─ enrich_nonseoul.py     ③ 비수도권 관리비 보강
+│   │   ├─ crawl_detail.py        ④ 상세 수집(상세+단지+학교 API)+좌표역계산 → naver_listings
+│   │   ├─ detail_map.py             상세 응답 → naver_listings 행 매핑(순수 함수)
+│   │   └─ subway.py                 좌표 → 최근접 지하철역(data/subway_stations.csv)
 │   ├─ samsam/                ▣ 삼삼엠투 (담당: Soojung)
 │   │   └─ classify_btype.py      ④ 삼삼 건물유형(아파트/빌라) 분류
 │   └─ integrate/            ▣ 통합 (양쪽 테이블 읽기 전용)
@@ -110,7 +113,8 @@ python -m playwright install chromium     # 크롤용 크롬 1회 다운로드
 copy .env.example .env   # 편집 후 SAMSAM_EMAIL / SAMSAM_PASSWORD 입력
 
 # 시스템 A — 네이버 수도권 매물 갱신
-python pipeline/naver/crawler.py                    # 서울/경기/인천 전체 (이어받기 지원)
+python pipeline/naver/crawler.py                    # 서울/경기/인천 목록 수집 (listings, 이어받기)
+python pipeline/naver/crawl_detail.py               # 상세 보강 → naver_listings (이어받기, --limit N 로 테스트)
 
 # 시스템 B — 전국 수익성 재생성
 python pipeline/naver/get_targets.py                # ① 비수도권 대상 시군구 추출 → data/targets.json

@@ -13,6 +13,7 @@ _PK = {
     'regions': 'cortarNo',
     'crawl_state': 'cortarNo',
     'listings': 'articleNo',
+    'naver_listings': 'article_no',
 }
 
 
@@ -172,12 +173,84 @@ def init_db():
         crawled_at     TEXT,
         mgmt           INTEGER
     )""")
+    # 상세 수집 결과 (SCHEMA.md naver_listings). listings(목록)를 상세 API 3종 + 좌표
+    # 역계산으로 보강한 결과 테이블. JSON 컬럼(summary_tags/facilities/agent_phone/
+    # subway_500m/subway_1km)은 JSON 문자열을 담는 TEXT 로 저장.
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS naver_listings (
+        article_no                    BIGINT PRIMARY KEY,
+        url                           TEXT,
+        building_type                 TEXT,
+        confirmed_at                  TEXT,
+        posted_at                     TEXT,
+        summary                       TEXT,
+        summary_tags                  TEXT,
+        deposit                       INTEGER,
+        rent_monthly                  INTEGER,
+        maintenance_monthly           INTEGER,
+        maintenance_type              TEXT,
+        area_contract_m2              REAL,
+        area_exclusive_m2             REAL,
+        exclusive_ratio               INTEGER,
+        floor_current                 INTEGER,
+        floor_total                   INTEGER,
+        rooms                         INTEGER,
+        bathrooms                     INTEGER,
+        direction                     TEXT,
+        entrance_type                 TEXT,
+        duplex                        BOOLEAN,
+        move_in                       TEXT,
+        facilities                    TEXT,
+        road_address                  TEXT,
+        jibun_address                 TEXT,
+        building_name                 TEXT,
+        lat                           REAL,
+        lng                           REAL,
+        building_use                  TEXT,
+        approval_date                 TEXT,
+        building_age                  INTEGER,
+        households                    INTEGER,
+        households_same_area          INTEGER,
+        heating                       TEXT,
+        parking_total                 INTEGER,
+        parking_per_household         REAL,
+        floor_area_ratio              INTEGER,
+        building_coverage_ratio       INTEGER,
+        builder                       TEXT,
+        dong_count                    INTEGER,
+        agent_office                  TEXT,
+        agent_name                    TEXT,
+        agent_phone                   TEXT,
+        agent_address                 TEXT,
+        agent_reg_no                  TEXT,
+        agent_owner_confirmed_3m      INTEGER,
+        broker_fee_max                REAL,
+        broker_fee_rate               REAL,
+        school_name                   TEXT,
+        school_type                   TEXT,
+        school_walk_min               INTEGER,
+        school_student_per_teacher    REAL,
+        subway_station                TEXT,
+        subway_distance_m             INTEGER,
+        subway_500m                   TEXT,
+        subway_1km                    TEXT,
+        subway_walk_min               INTEGER,
+        same_building_same_area_count INTEGER,
+        sido                          TEXT,
+        sigungu                       TEXT,
+        dong                          TEXT,
+        cortarno                      TEXT,
+        crawled_at                    TEXT
+    )""")
     for idx in [
         "CREATE INDEX IF NOT EXISTS ix_l_region ON listings(sido,sigungu,dong)",
         "CREATE INDEX IF NOT EXISTS ix_l_deposit ON listings(deposit)",
         "CREATE INDEX IF NOT EXISTS ix_l_rent ON listings(rent)",
         "CREATE INDEX IF NOT EXISTS ix_l_area ON listings(area_real_m2)",
         "CREATE INDEX IF NOT EXISTS ix_r_sido ON regions(sido,sigungu,dong)",
+        "CREATE INDEX IF NOT EXISTS ix_nl_region ON naver_listings(sido,sigungu,dong)",
+        "CREATE INDEX IF NOT EXISTS ix_nl_rent ON naver_listings(rent_monthly)",
+        "CREATE INDEX IF NOT EXISTS ix_nl_building ON naver_listings(building_name)",
     ]:
         conn.execute(idx)
     conn.commit()
