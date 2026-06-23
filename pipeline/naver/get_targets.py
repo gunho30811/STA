@@ -13,7 +13,7 @@ for s in sido:
 
 # 2) 삼삼 오피스텔 비수도권 시군구 집합
 import os
-DATA=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),"data")
+DATA=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),"data")
 CACHE=os.path.join(DATA,"officetel_raw.jsonl")
 SUDO={'서울특별시','경기도','인천광역시'}
 by={}
