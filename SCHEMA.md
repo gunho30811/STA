@@ -166,10 +166,16 @@
 | `school_name` | text | 배정 초등학교 | `부천부안초등학교` |
 | `school_type` | text | 공립/사립 | `공립` |
 | `school_distance_m` | int | 거리(m) | `821` |
-| `subway_station` ★ | text | 가장 가까운 지하철역 | `역곡역` |
-| `subway_line` | text | 노선 | `1호선` |
-| `subway_distance_m` | int | 거리(m) | `81` |
-| `bus_routes` | jsonb | 버스 노선(종류별) | `{"일반":["10","12"],"마을":["013"]}` |
+| `subway_station` ★ | text | 가장 가까운 지하철역 | `언주` |
+| `subway_distance_m` | int | 거리(m) | `406` |
+| `subway_500m` | jsonb | 반경 500m 내 역명 | `["언주"]` |
+| `subway_1km` | jsonb | 반경 1km 내 역명 | `["언주","선정릉","역삼","학동"]` |
+| `subway_walk_min` | int | (참고) 네이버 도보 분 | `6` |
+
+> **지하철 출처**: 네이버 상세 API는 역명/거리(m)를 안 주고 `walkingTimeToNearSubway`(도보 분)만 준다.
+> `subway_station`/`subway_distance_m`/`subway_500m`/`subway_1km` 는 매물 좌표(lat/lng)와
+> 역 좌표 테이블(`data/subway_stations.csv`, 수도권 589역)로 **직접 계산**한다 — `pipeline/naver/subway.py`.
+> 노선(`subway_line`)은 역 좌표표에 노선정보가 없어 보류(필요 시 노선맵 별도 추가). 비수도권은 역표 확장 필요.
 
 ### 2.7 같은 건물 통계 (수집/통합 단계 계산)
 | 컬럼 | 타입 | 설명 | 예시 |
@@ -178,6 +184,9 @@
 
 > **"같은 면적" 정의**: 면적차 **≤ 1평(약 3.3㎡)** 이면 같은 면적으로 취급한다.
 > 기준 면적은 `area_exclusive_m2`(전용면적). 즉 `abs(전용면적 − 다른매물 전용면적) ≤ 3.3㎡`.
+>
+> **출처(확인됨)**: 네이버 매물탭 API `/api/articles/complex/{단지번호}` 가 주는 `sameAddrCnt`.
+> 같은 건물이라도 **평형별로 카운트가 따로** 잡힌다(예: 상지카일룸블랙 72OD=3건, 57OC=33건). 그대로 읽으면 됨.
 
 ---
 
