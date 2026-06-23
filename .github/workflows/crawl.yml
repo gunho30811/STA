@@ -1,0 +1,49 @@
+name: 네이버 크롤링 자동화
+
+on:
+  schedule:
+    - cron: '0 1 * * 1'   # 매주 월요일 01:00 UTC (한국시간 10:00)
+  workflow_dispatch:        # 수동 실행 가능
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300    # 최대 5시간
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python 설치
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 의존성 설치
+        run: pip install flask psycopg2-binary python-dotenv playwright requests
+
+      - name: Playwright Chromium 설치
+        run: python -m playwright install chromium --with-deps
+
+      - name: 네이버 목록 크롤 (listings 갱신)
+        run: python pipeline/naver/crawler.py
+        continue-on-error: true   # 목록 실패해도 상세 시도
+
+      - name: 네이버 상세 크롤 (naver_listings 갱신, 신규분만)
+        run: python pipeline/naver/crawl_detail.py
+
+      - name: 수익성 CSV 재생성
+        run: python pipeline/integrate/build_integrated.py
+        continue-on-error: true   # 삼삼 JSONL 없으면 스킵
+
+      - name: CSV 변경분 커밋
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/net_profit_integrated.csv
+          git diff --cached --quiet || git commit -m "chore: 네이버 매물 자동 갱신 $(date +'%Y-%m-%d')"
+          git push

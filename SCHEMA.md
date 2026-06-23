@@ -165,7 +165,8 @@
 |------|------|------|------|
 | `school_name` | text | 배정 초등학교 | `부천부안초등학교` |
 | `school_type` | text | 공립/사립 | `공립` |
-| `school_distance_m` | int | 거리(m) | `821` |
+| `school_walk_min` | int | 도보 분(네이버 API 제공) | `11` |
+| `school_student_per_teacher` | double | 교사 1인당 학생수 | `14.2` |
 | `subway_station` ★ | text | 가장 가까운 지하철역 | `언주` |
 | `subway_distance_m` | int | 거리(m) | `406` |
 | `subway_500m` | jsonb | 반경 500m 내 역명 | `["언주"]` |
