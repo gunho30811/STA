@@ -48,7 +48,7 @@ python -m playwright install chromium     # 크롤용 크롬 1회 다운로드
 ├─ README.md                 ← 이 문서
 ├─ requirements.txt
 ├─ .env.example              ← 삼삼 로그인 환경변수 양식 (갱신 시 .env 로 복사해 사용)
-├─ db.py                     ← SQLite 스키마/헬퍼 (web + pipeline 공유)
+├─ db.py                     ← Supabase(PostgreSQL) 연결 헬퍼 (web + pipeline 공유)
 │
 ├─ web/                      웹앱 (둘 다 db.py·templates·data 를 공유)
 │   ├─ app.py                 시스템 A: 네이버 매물 뷰어
@@ -66,16 +66,16 @@ python -m playwright install chromium     # 크롤용 크롬 1회 다운로드
 │   ├─ index.html            (네이버 뷰어 UI)
 │   └─ profit.html           (수익성 뷰어 UI)
 │
-└─ data/                     모든 데이터
-    ├─ naver_opst.db             네이버 수도권 매물 (시스템 A)
-    ├─ naver_opst_enriched.db    네이버 수도권 + 관리비
-    ├─ naver_nonseoul.db         네이버 비수도권 + 관리비
+└─ data/                     모든 데이터 (*.db, *.jsonl 은 git 미추적 — 로컬 크롤 후 생성)
     ├─ net_profit_integrated.csv ★ 최종 수익성 결과 (profit_app 이 읽음)
-    ├─ officetel_raw.jsonl       삼삼 오피스텔 원본 (전국 8,965)
-    ├─ oneroom_raw.jsonl         삼삼 원룸 원본
     ├─ btype_map.json            삼삼 rid→건물유형
     ├─ targets.json              비수도권 크롤 대상
     └─ landlord_best_dong.csv / vacancy_by_gu.csv / by_station.csv  (보조 탭)
+
+    ※ 크롤 후 자동 생성되는 파일 (git 미추적)
+    ├─ naver_opst.db / naver_nonseoul.db   네이버 매물 (Supabase로 이전됨 — 레거시)
+    ├─ officetel_raw.jsonl                 삼삼 오피스텔 원본
+    └─ oneroom_raw.jsonl                   삼삼 원룸 원본
 ```
 
 ---
@@ -91,7 +91,7 @@ python -m playwright install chromium     # 크롤용 크롬 1회 다운로드
 
 ### 삼삼엠투 (web.33m2.co.kr)
 - 로그인(쿠키) 후 내부 API 호출. **레이트리밋 주의** — 천천히(스레드 낮게, 0.6s 간격), 403 시 대기.
-- 원본 캐시는 이미 `data/*.jsonl` 에 저장돼 있어 재요청 없이 재사용.
+- 원본 캐시는 `data/*.jsonl` 에 저장되며, 이미 받은 경우 재요청 없이 재사용.
 
 ---
 
