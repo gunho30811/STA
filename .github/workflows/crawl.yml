@@ -5,6 +5,9 @@ on:
     - cron: '0 1 * * 1'   # 매주 월요일 01:00 UTC (한국시간 10:00)
   workflow_dispatch:        # 수동 실행 가능
 
+permissions:
+  contents: write   # CSV 커밋·푸시용
+
 jobs:
   crawl:
     runs-on: ubuntu-latest
