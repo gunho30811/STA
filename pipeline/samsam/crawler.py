@@ -403,11 +403,12 @@ def main():
         if args.limit and ok >= args.limit:
             break
 
+        if i % 50 == 0:
+            log(f"[시도{i}/{len(targets)}] 적재{ok} 실패{fail} skip{i - ok - fail}")
+
         detail = fetch_detail(session, rid)
         if not detail:
             fail += 1
-            if i % 100 == 0:
-                log(f"[시도{i}] 적재{ok} 실패{fail}")
             continue
 
         # 시군구 필터: 도로명/지번 주소에 포함 여부 체크
