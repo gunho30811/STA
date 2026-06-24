@@ -353,6 +353,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--limit', type=int, default=0)
     ap.add_argument('--redo', action='store_true', help='기존 수집분 재수집')
+    ap.add_argument('--sigungu', default='', help='시군구 필터 예) 강남구')
     args = ap.parse_args()
 
     email, pw = _get_credentials()
@@ -377,6 +378,10 @@ def main():
         targets = targets[:args.limit]
         log(f"--limit {args.limit} 적용")
 
+    sigungu_filter = args.sigungu.strip()
+    if sigungu_filter:
+        log(f"시군구 필터: {sigungu_filter}")
+
     batch, ok, fail = [], 0, 0
     for i, (rid, pt) in enumerate(targets, 1):
         detail = fetch_detail(session, rid)
@@ -385,6 +390,13 @@ def main():
             if i % 100 == 0:
                 log(f"[{i}/{len(targets)}] ok={ok} fail={fail}")
             continue
+
+        # 시군구 필터: 도로명/지번 주소에 포함 여부 체크
+        if sigungu_filter:
+            road = detail.get('roadAddress') or detail.get('road_address') or ''
+            jibun = detail.get('jibunAddress') or detail.get('jibun_address') or ''
+            if sigungu_filter not in road and sigungu_filter not in jibun:
+                continue
 
         schedules = fetch_schedules(session, rid)
         row = map_row(rid, pt, detail, schedules)
