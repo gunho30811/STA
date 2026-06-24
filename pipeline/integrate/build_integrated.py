@@ -91,8 +91,9 @@ dong_count = Counter((o.get('state', ''), o.get('province', ''), o.get('town', '
 def load_nav():
     conn = db.connect()
     out = [dict(r) for r in conn.execute(
-        "SELECT articleno,articlename,area_m2,rent,deposit,floorinfo,lat,lon,dong,mgmt"
-        " FROM listings WHERE rent BETWEEN 5 AND 2000 AND lat IS NOT NULL"
+        "SELECT article_no,url,building_name,area_exclusive_m2,rent_monthly,deposit,"
+        "maintenance_monthly,floor_current,lat,lng,dong"
+        " FROM naver_listings WHERE rent_monthly BETWEEN 5 AND 2000 AND lat IS NOT NULL"
     ).fetchall()]
     conn.close()
     return out
@@ -110,27 +111,10 @@ def bldg(addr):
     return t[-1] if t else ''
 fine = defaultdict(list); nidx = defaultdict(list)
 for nv in nav:
-    nv['_n'] = norm(nv['articlename'])
-    fine[(round(nv['lat'], 3), round(nv['lon'], 3))].append(nv)
+    nv['_n'] = norm(nv['building_name'])
+    fine[(round(nv['lat'], 3), round(nv['lng'], 3))].append(nv)
     if nv['_n']: nidx[nv['dong']].append(nv)
 def dist(a, b, x, y): return math.hypot((a-x)*111000, (b-y)*88800)
-
-
-def _parse_nav_floor(floorinfo):
-    """네이버 floorInfo '중/18' or '12/20' → (floor_num, total, category)"""
-    if not floorinfo: return None, None, None
-    parts = str(floorinfo).split('/')
-    cat, floor_num, total = None, None, None
-    f = parts[0].strip()
-    if f in ('저', '중', '고'):
-        cat = f
-    else:
-        try: floor_num = int(f)
-        except: pass
-    if len(parts) >= 2:
-        try: total = int(parts[1].strip())
-        except: pass
-    return floor_num, total, cat
 
 
 def _parse_sam_floor(name):
@@ -139,23 +123,11 @@ def _parse_sam_floor(name):
     return int(m.group(1)) if m else None
 
 
-def _floor_category(n, total):
-    if not n or not total or total <= 0: return None
-    if n > total: return 'impossible'
-    r = n / total
-    return '저' if r <= 0.33 else ('중' if r <= 0.67 else '고')
-
-
-def _floor_ok(nav_floorinfo, sam_floor):
+def _floor_ok(floor_current, sam_floor):
     """층 호환 여부. 한쪽이라도 층 정보 없으면 True(통과)."""
-    if not sam_floor: return True
-    nav_num, nav_total, nav_cat = _parse_nav_floor(nav_floorinfo)
-    if nav_num is not None:
-        return abs(nav_num - sam_floor) <= 3
-    if nav_cat and nav_total:
-        sam_cat = _floor_category(sam_floor, nav_total)
-        return sam_cat == nav_cat if sam_cat and sam_cat != 'impossible' else (sam_cat != 'impossible')
-    return True
+    if not sam_floor or floor_current is None:
+        return True
+    return abs(floor_current - sam_floor) <= 3
 
 
 def strict_match(s):
@@ -175,7 +147,7 @@ def strict_match(s):
         # 건물명 매칭: 같은 동 내 이름 일치 + 500m 이내 sanity
         for nv in nidx.get(s.get('town', ''), []):
             if nv['_n'] == sb or (len(sb) >= 4 and (sb in nv['_n'] or nv['_n'] in sb)):
-                if dist(slat, slon, nv['lat'], nv['lon']) <= 500:
+                if dist(slat, slon, nv['lat'], nv['lng']) <= 500:
                     cands[id(nv)] = nv
     else:
         # 건물명 없음: GPS 15m 이내만 (같은 건물 출입구 오차 수준)
@@ -183,14 +155,14 @@ def strict_match(s):
         for dla in (-0.001, 0, 0.001):
             for dlo in (-0.001, 0, 0.001):
                 for nv in fine.get((round(ca+dla, 3), round(co+dlo, 3)), []):
-                    if dist(slat, slon, nv['lat'], nv['lon']) <= 15:
+                    if dist(slat, slon, nv['lat'], nv['lng']) <= 15:
                         cands[id(nv)] = nv
 
     bldg_all = list(cands.values())
     # 면적 ±15% 상대값 필터
-    area_ok = [nv for nv in bldg_all if nv['area_m2'] and abs(nv['area_m2']-s_m2)/s_m2 <= AREA_PCT]
+    area_ok = [nv for nv in bldg_all if nv['area_exclusive_m2'] and abs(nv['area_exclusive_m2']-s_m2)/s_m2 <= AREA_PCT]
     # 층수 필터 (둘 다 층 정보 있을 때만)
-    hits = [nv for nv in area_ok if _floor_ok(nv.get('floorinfo'), sam_floor)]
+    hits = [nv for nv in area_ok if _floor_ok(nv.get('floor_current'), sam_floor)]
     return hits, bldg_all
 
 rows = []
@@ -199,13 +171,13 @@ for s in valid:
     if not hits: continue
     pure = [h for h in hits if (h['deposit'] or 0) <= PURE_DEP_MAN]
     use = pure if pure else sorted(hits, key=lambda h: (h['deposit'] or 0))[:1]
-    rent = statistics.median([h['rent'] for h in use])
+    rent = statistics.median([h['rent_monthly'] for h in use])
     dep = statistics.median([(h['deposit'] or 0) for h in use])
-    mgs = [h['mgmt'] for h in hits if h['mgmt'] not in (None, -1) and h['mgmt'] > 0]
-    navmgmt = man(statistics.median(mgs)) if mgs else round(int(s['pyeong'])*2.0, 1)
+    mgs = [h['maintenance_monthly'] for h in hits if h['maintenance_monthly'] not in (None, -1) and h['maintenance_monthly'] > 0]
+    navmgmt = statistics.median(mgs) if mgs else round(int(s['pyeong'])*2.0, 1)
     mgmt_known = 1 if mgs else 0
-    rep = min(use, key=lambda h: abs(h['rent']-rent))
-    nv_url = f"https://new.land.naver.com/offices?articleNo={rep['articleno']}"
+    rep = min(use, key=lambda h: abs(h['rent_monthly']-rent))
+    nv_url = rep.get('url') or f"https://new.land.naver.com/offices?articleNo={rep['article_no']}"
     nav_tot = rent + navmgmt
     sam_week = man((s.get('fee') or 0) + (s.get('mgmt') or 0))
     sam_month = round(sam_week*WEEKS, 1)
@@ -215,7 +187,7 @@ for s in valid:
     dong_key = (s.get('state', ''), s.get('province', ''), s.get('town', ''))
     sam_nearby = dong_count[dong_key] - 1
     # 건물 전체 통계 (면적·층수 필터 전 bldg_all 기준)
-    bldg_rents = [nv['rent'] for nv in bldg_all if nv['rent']]
+    bldg_rents = [nv['rent_monthly'] for nv in bldg_all if nv['rent_monthly']]
     bldg_cnt = len(bldg_all)
     bldg_rent_min = round(min(bldg_rents), 1) if bldg_rents else ''
     bldg_rent_max = round(max(bldg_rents), 1) if bldg_rents else ''
@@ -226,7 +198,7 @@ for s in valid:
         'prov': s.get('province', ''), 'town': s.get('town', ''), 'pyeong': int(s['pyeong']),
         'sam_week': sam_week, 'sam_month': sam_month, 'bk': s['bk'], 'ds': s['ds'],
         'realized': realized, 'rent': rent, 'dep': dep, 'navmgmt': navmgmt, 'nav_tot': nav_tot,
-        'n': len(use), 'mgmt_known': mgmt_known, 'nv_url': nv_url, 'nv_bldg': rep['articlename'],
+        'n': len(use), 'mgmt_known': mgmt_known, 'nv_url': nv_url, 'nv_bldg': rep['building_name'],
         'eff': round(nav_tot/sam_week, 2) if sam_week else 0,
         'real_eff': round(realized/nav_tot, 2) if nav_tot else 0,
         'real_eff_rent': round(realized/rent, 2) if rent else 0,
