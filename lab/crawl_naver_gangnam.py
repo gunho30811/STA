@@ -59,18 +59,24 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--max-pages", type=int, default=60,
                     help="타입당 페이지 상한(20건/p, production 기본값과 동일)")
+    ap.add_argument("--types", default="all",
+                    help="콤마구분 타입코드(예: APT,OPST,VL,OR,DDDGG) 또는 'all'(기본, 6종 전부)")
     ap.add_argument("--show", action="store_true")
     args = ap.parse_args()
+    type_codes = list(TYPES) if args.types == "all" else [c.strip() for c in args.types.split(",") if c.strip()]
+    unknown = [c for c in type_codes if c not in TYPES]
+    if unknown:
+        ap.error(f"알 수 없는 타입 코드: {unknown} (가능: {list(TYPES)})")
 
     nl = NaverLand(headless=not args.show)
     seen = set()
     by_type_ok = Counter()
     try:
         dongs = build_region_tree(nl, ROOTS, only_sido="서울시", only_gu="강남구")
-        print(f"[{now()}] 강남구 동 수: {len(dongs)}")
+        print(f"[{now()}] 강남구 동 수: {len(dongs)}, 대상 타입: {[TYPES[c] for c in type_codes]}")
 
         jobs = [(cno, sido, sigungu, dong, code)
-                for cno, sido, sigungu, dong, lat, lon in dongs for code in TYPES]
+                for cno, sido, sigungu, dong, lat, lon in dongs for code in type_codes]
 
         with open(OUT, "w", encoding="utf-8") as f:
             for ji, (cno, sido, sigungu, dong, code) in enumerate(jobs, 1):
@@ -101,7 +107,7 @@ def main():
         nl.close()
 
     print(f"\n[{now()}] 완료. 타입별 적재 건수:")
-    for code in TYPES:
+    for code in type_codes:
         print(f"  {TYPES[code]}: {by_type_ok[code]}")
     print(f"총 {sum(by_type_ok.values())}건 -> {OUT}")
 
