@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-네이버페이 부동산(new.land.naver.com) 오피스텔 '월세' 매물 크롤러.
+네이버페이 부동산(new.land.naver.com) '월세' 매물 크롤러.
 
 직접 requests 접근은 TLS 핑거프린팅으로 차단되므로 Playwright(실제 크롬)로
 new.land 를 띄워 Authorization 토큰을 확보하고, 브라우저 컨텍스트 내부에서
@@ -8,14 +8,17 @@ fetch() 로 비공개 API(/api/regions, /api/articles)를 호출한다.
 
   - 지역: 서울시(1100000000) / 경기도(4100000000) / 인천시(2800000000)
           를 시/군/구/동 단위까지 재귀 드릴다운.
-  - 매물: realEstateType=OPST(오피스텔), tradeType=B2(월세).
-  - 저장: SQLite (db.py 스키마). 동 단위로 진행상태를 기록해 재개 가능.
+  - 매물: tradeType=B2(월세) 고정. realEstateType은 --types 로 선택
+          (기본 OPST=오피스텔, 기존 동작과 동일). TYPES 딕셔너리 참고
+          (APT 아파트 / OPST 오피스텔 / VL 빌라 / OR 원룸 / DDDGG 단독·다가구 / SG 상가).
+  - 저장: Supabase listings 테이블 (db.py 스키마). 동×타입 단위로 진행상태를 기록해 재개 가능
+          (단, 기존 호환을 위해 OPST는 동 단위로만 기록 — 아래 crawl_dong 의 state_key 참고).
 
 사용:
-  python crawler.py                 # 서울/경기/인천 전체 (오래 걸림)
-  python crawler.py --sido 서울시    # 특정 시/도만
-  python crawler.py --sido 서울시 --gu 강남구   # 특정 구만
-  python crawler.py --limit-dongs 5  # 동 N개만 (테스트용)
+  python crawler.py                              # 서울/경기/인천 오피스텔(기본값, 기존과 동일)
+  python crawler.py --sido 서울시 --gu 강남구       # 특정 구만
+  python crawler.py --types APT,OPST,VL,OR,DDDGG,SG  # 6개 타입 전부
+  python crawler.py --limit-dongs 5               # 동 N개만 (테스트용)
 """
 import argparse
 import base64
@@ -35,6 +38,16 @@ ROOTS = [
     ("경기도", "4100000000"),
     ("인천시", "2800000000"),
 ]
+
+# 네이버 realEstateType 코드 (라이브 API 호출로 확인, SCHEMA.md 참고)
+TYPES = {
+    "APT": "아파트",
+    "OPST": "오피스텔",
+    "VL": "빌라",
+    "OR": "원룸",
+    "DDDGG": "단독/다가구",
+    "SG": "상가",
+}
 
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -163,11 +176,11 @@ class NaverLand:
         j = self.api(f"https://new.land.naver.com/api/regions/list?cortarNo={cortarNo}")
         return (j or {}).get("regionList", [])
 
-    def articles_page(self, cortarNo, page):
+    def articles_page(self, cortarNo, page, real_estate_type="OPST"):
         url = (
             "https://new.land.naver.com/api/articles"
             f"?cortarNo={cortarNo}&order=rank"
-            "&realEstateType=OPST&tradeType=B2"
+            f"&realEstateType={real_estate_type}&tradeType=B2"
             "&tag=%3A%3A%3A%3A%3A%3A%3A%3A"
             "&rentPriceMin=0&rentPriceMax=900000000"
             "&priceMin=0&priceMax=900000000"
@@ -226,10 +239,14 @@ def save_regions(dongs):
 
 # ----------------------------------------------------------------------------- listings
 
-def crawl_dong(nl, cortarNo, sido, sigungu, dong, max_pages=60):
+def crawl_dong(nl, cortarNo, sido, sigungu, dong, max_pages=60, real_estate_type="OPST"):
+    # 진행상태 키: OPST는 기존 동작 그대로 cortarNo 단독(이미 done인 동 재크롤 방지),
+    # 그 외 타입은 "cortarNo:타입코드"로 따로 기록(동 하나에 타입별로 진행상태가 갈림).
+    state_key = cortarNo if real_estate_type == "OPST" else f"{cortarNo}:{real_estate_type}"
+
     conn = db.connect()
     state = conn.execute("SELECT status FROM crawl_state WHERE cortarNo=?",
-                         (cortarNo,)).fetchone()
+                         (state_key,)).fetchone()
     if state and state["status"] == "done":
         conn.close()
         return 0  # 이미 완료
@@ -237,7 +254,7 @@ def crawl_dong(nl, cortarNo, sido, sigungu, dong, max_pages=60):
     total = 0
     page = 1
     while page <= max_pages:
-        j = nl.articles_page(cortarNo, page)
+        j = nl.articles_page(cortarNo, page, real_estate_type)
         if not j:
             break
         arts = j.get("articleList", [])
@@ -277,7 +294,7 @@ def crawl_dong(nl, cortarNo, sido, sigungu, dong, max_pages=60):
 
     conn.execute(
         "INSERT OR REPLACE INTO crawl_state(cortarNo,status,n_articles,updated_at) VALUES(?,?,?,?)",
-        (cortarNo, "done", total, now()))
+        (state_key, "done", total, now()))
     conn.commit()
     conn.close()
     return total
@@ -289,7 +306,14 @@ def main():
     ap.add_argument("--gu", help="특정 구/시 이름 필터 (예: 강남구)")
     ap.add_argument("--limit-dongs", type=int, default=0, help="동 N개만 (테스트)")
     ap.add_argument("--show", action="store_true", help="브라우저 표시")
+    ap.add_argument("--types", default="OPST",
+                    help="콤마구분 realEstateType 코드(예: APT,OPST,VL,OR,DDDGG,SG) "
+                         "또는 'all'. 기본 OPST(기존 동작과 동일, GH Actions 주간 크롤 영향 없음)")
     args = ap.parse_args()
+    type_codes = list(TYPES) if args.types == "all" else [c.strip() for c in args.types.split(",") if c.strip()]
+    unknown = [c for c in type_codes if c not in TYPES]
+    if unknown:
+        ap.error(f"알 수 없는 타입 코드: {unknown} (가능: {list(TYPES)})")
 
     db.init_db()
 
@@ -319,19 +343,23 @@ def main():
         if args.limit_dongs:
             dongs = dongs[:args.limit_dongs]
 
+        print(f"[{now()}] 대상 타입: {[TYPES[c] for c in type_codes]}")
+        jobs = [(cno, sido, sigungu, dong, code)
+                for cno, sido, sigungu, dong, lat, lon in dongs for code in type_codes]
+
         grand = 0
-        for i, (cno, sido, sigungu, dong, lat, lon) in enumerate(dongs, 1):
+        for i, (cno, sido, sigungu, dong, code) in enumerate(jobs, 1):
             try:
-                n = crawl_dong(nl, cno, sido, sigungu, dong)
+                n = crawl_dong(nl, cno, sido, sigungu, dong, real_estate_type=code)
             except Exception as e:
-                print(f"[{now()}] 동 처리 실패 {sido} {sigungu} {dong}: {repr(e)[:80]}")
+                print(f"[{now()}] 동 처리 실패 {sido} {sigungu} {dong} {TYPES[code]}: {repr(e)[:80]}")
                 try:
                     nl.restart()
                 except Exception:
                     pass
                 continue
             grand += n
-            print(f"[{now()}] ({i}/{len(dongs)}) {sido} {sigungu} {dong}: {n}건 (누적 {grand})")
+            print(f"[{now()}] ({i}/{len(jobs)}) {sido} {sigungu} {dong} {TYPES[code]}: {n}건 (누적 {grand})")
             if i % 150 == 0:        # 메모리 누적 방지: 주기적 재시작
                 nl.restart()
         print(f"[{now()}] 완료. 총 {grand}건 수집.")

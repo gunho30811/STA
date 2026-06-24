@@ -37,7 +37,7 @@ def haversine_m(lat1, lon1, lat2, lon2):
 
 
 def nearest_station(lat, lng):
-    """가장 가까운 역 1개. {'station': 역명, 'distance_m': 정수 미터} (없으면 None)."""
+    """가장 가까운 역 1개. {'station': 역명(N역), 'distance_m': 정수 미터} (없으면 None)."""
     if lat is None or lng is None:
         return None
     best = min(((haversine_m(lat, lng, y, x), n) for n, y, x in _load()),
@@ -45,15 +45,15 @@ def nearest_station(lat, lng):
     if not best:
         return None
     d, name = best
-    return {"station": name, "distance_m": round(d)}
+    return {"station": f"{name}역", "distance_m": round(d)}
 
 
 def stations_within(lat, lng, radius_m):
-    """반경 radius_m 안의 역명 리스트(가까운 순)."""
+    """반경 radius_m 안의 역명(N역) 리스트(가까운 순)."""
     if lat is None or lng is None:
         return []
     hits = sorted((haversine_m(lat, lng, y, x), n) for n, y, x in _load())
-    return [n for d, n in hits if d <= radius_m]
+    return [f"{n}역" for d, n in hits if d <= radius_m]
 
 
 if __name__ == "__main__":

@@ -90,10 +90,14 @@ dong_count = Counter((o.get('state', ''), o.get('province', ''), o.get('town', '
 # ── 네이버(전국 오피스텔) 인덱스: Supabase 단일 쿼리 ──
 def load_nav():
     conn = db.connect()
+    # naver_listings 는 이제 6개 타입(아파트/오피스텔/빌라/원룸/단독다가구/상가)이 섞여 들어올 수 있음.
+    # 삼삼 쪽은 오피스텔/원룸 단기임대만 다루므로, 엉뚱한 타입(아파트/상가 등)과 잘못 매칭되지 않도록
+    # 오피스텔만 사용 (기존 동작 유지). TODO: 삼삼 btype_map 의 비오피스텔 분류와 맞춰 타입별 매칭 확장.
     out = [dict(r) for r in conn.execute(
         "SELECT article_no,url,building_name,area_exclusive_m2,rent_monthly,deposit,"
         "maintenance_monthly,floor_current,lat,lng,dong"
         " FROM naver_listings WHERE rent_monthly BETWEEN 5 AND 2000 AND lat IS NOT NULL"
+        " AND building_type_code = 'OPST'"
     ).fetchall()]
     conn.close()
     return out
