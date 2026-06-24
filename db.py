@@ -14,6 +14,7 @@ _PK = {
     'crawl_state': 'cortarNo',
     'listings': 'articleNo',
     'naver_listings': 'article_no',
+    'samsam_listings': 'room_id',
 }
 
 
@@ -242,6 +243,44 @@ def init_db():
         cortarno                      TEXT,
         crawled_at                    TEXT
     )""")
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS samsam_listings (
+        room_id               INTEGER PRIMARY KEY,
+        url                   TEXT,
+        name                  TEXT,
+        building_type         TEXT,
+        road_address          TEXT,
+        jibun_address         TEXT,
+        building_name         TEXT,
+        floor                 INTEGER,
+        lat                   REAL,
+        lng                   REAL,
+        area_m2               REAL,
+        area_pyeong           INTEGER,
+        rooms                 INTEGER,
+        bathrooms             INTEGER,
+        kitchens              INTEGER,
+        living_rooms          INTEGER,
+        elevator              BOOLEAN,
+        parking               BOOLEAN,
+        basic_options         TEXT,
+        extra_options         TEXT,
+        rent_weekly           INTEGER,
+        maintenance_weekly    INTEGER,
+        rent_total_weekly     INTEGER,
+        booked_days_1m        INTEGER,
+        booked_days_2m        INTEGER,
+        booked_days_3m        INTEGER,
+        blocked_days_1m       INTEGER,
+        station_500m_count    INTEGER,
+        station_500m_names    TEXT,
+        station_1km_count     INTEGER,
+        station_1km_names     TEXT,
+        sido                  TEXT,
+        sigungu               TEXT,
+        dong                  TEXT,
+        collected_at          TEXT
+    )""")
     for idx in [
         "CREATE INDEX IF NOT EXISTS ix_l_region ON listings(sido,sigungu,dong)",
         "CREATE INDEX IF NOT EXISTS ix_l_deposit ON listings(deposit)",
@@ -251,6 +290,9 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS ix_nl_region ON naver_listings(sido,sigungu,dong)",
         "CREATE INDEX IF NOT EXISTS ix_nl_rent ON naver_listings(rent_monthly)",
         "CREATE INDEX IF NOT EXISTS ix_nl_building ON naver_listings(building_name)",
+        "CREATE INDEX IF NOT EXISTS ix_sl_region ON samsam_listings(sido,sigungu,dong)",
+        "CREATE INDEX IF NOT EXISTS ix_sl_rent ON samsam_listings(rent_total_weekly)",
+        "CREATE INDEX IF NOT EXISTS ix_sl_building ON samsam_listings(building_name)",
     ]:
         conn.execute(idx)
     conn.commit()
