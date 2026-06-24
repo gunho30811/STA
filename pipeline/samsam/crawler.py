@@ -392,21 +392,22 @@ def main():
     targets = [(rid, pt) for rid, pt in rids.items() if rid not in done]
     log(f"수집 대상: {len(targets)}건 (전체 {len(rids)}건)")
 
-    if args.limit:
-        targets = targets[:args.limit]
-        log(f"--limit {args.limit} 적용")
-
     sigungu_filter = args.sigungu.strip()
     if sigungu_filter:
         log(f"시군구 필터: {sigungu_filter}")
+    if args.limit:
+        log(f"--limit {args.limit} (적재 목표 건수)")
 
     batch, ok, fail = [], 0, 0
     for i, (rid, pt) in enumerate(targets, 1):
+        if args.limit and ok >= args.limit:
+            break
+
         detail = fetch_detail(session, rid)
         if not detail:
             fail += 1
             if i % 100 == 0:
-                log(f"[{i}/{len(targets)}] ok={ok} fail={fail}")
+                log(f"[시도{i}] 적재{ok} 실패{fail}")
             continue
 
         # 시군구 필터: 도로명/지번 주소에 포함 여부 체크
@@ -423,7 +424,7 @@ def main():
         if len(batch) >= BATCH:
             upsert_batch(conn, batch)
             ok += len(batch)
-            log(f"[{i}/{len(targets)}] {ok}건 적재")
+            log(f"[시도{i}] {ok}건 적재")
             batch = []
 
         if i % 150 == 0:
