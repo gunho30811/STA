@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>강남구 네이버 매물 뷰어</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Pretendard","Malgun Gothic","맑은 고딕",sans-serif;background:#f3f5f7;color:#1f2937}
+  header{background:linear-gradient(120deg,#0f172a,#1e293b);color:#fff;padding:18px 24px}
+  header h1{margin:0;font-size:20px;font-weight:800}
+  header p{margin:5px 0 0;font-size:12.5px;color:#94a3b8}
+  .wrap{padding:18px 24px;max-width:1400px;margin:0 auto}
+  .cards{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:13px 18px;min-width:130px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+  .card .lbl{font-size:12px;color:#6b7280}
+  .card .val{font-size:23px;font-weight:800;margin-top:3px}
+  .card .val small{font-size:12px;color:#9ca3af;font-weight:500}
+  .typechips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .chip{font-size:11.5px;padding:3px 9px;border-radius:999px;background:#eef2ff;color:#3730a3;font-weight:700}
+  .panel{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:15px;margin-bottom:16px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+  .filters{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
+  .fg{display:flex;flex-direction:column;gap:4px}
+  .fg label{font-size:11px;font-weight:700;color:#4b5563}
+  .fg input,.fg select{padding:7px 9px;border:1px solid #d1d5db;border-radius:7px;font-size:13px;background:#fff}
+  .fg input[type=number]{width:84px}
+  .typebtns{display:flex;gap:5px;flex-wrap:wrap}
+  .typebtns button{border:1px solid #d1d5db;background:#fff;color:#475569;border-radius:999px;padding:6px 13px;font-size:12.5px;cursor:pointer;font-weight:600}
+  .typebtns button.on{background:#2563eb;color:#fff;border-color:#2563eb}
+  .btn{cursor:pointer;border:none;border-radius:7px;padding:8px 18px;font-size:13px;font-weight:700}
+  .btn-go{background:#2563eb;color:#fff}.btn-reset{background:#e5e7eb;color:#374151}
+  .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+  .toolbar .cnt{font-size:13.5px;color:#475569}.toolbar .cnt b{color:#111827;font-size:15px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+  .lst{background:#fff;border:1px solid #e8eaed;border-radius:13px;padding:15px;cursor:pointer;transition:.12s;position:relative;overflow:hidden}
+  .lst:hover{box-shadow:0 6px 18px rgba(0,0,0,.09);transform:translateY(-2px);border-color:#c7d2fe}
+  .lst .badge{position:absolute;top:0;right:0;font-size:11px;font-weight:800;color:#fff;padding:4px 11px;border-bottom-left-radius:10px}
+  .b-APT{background:#2563eb}.b-OPST{background:#7c3aed}.b-VL{background:#059669}.b-OR{background:#ea580c}.b-DDDGG{background:#0891b2}.b-SG{background:#64748b}
+  .lst .nm{font-size:15.5px;font-weight:800;margin:0 60px 2px 0;line-height:1.3}
+  .lst .addr{font-size:12px;color:#9ca3af;margin-bottom:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .price{font-size:18px;font-weight:800;color:#111827;margin-bottom:10px}
+  .price .dep{color:#475569;font-weight:700}.price em{font-style:normal;color:#dc2626}
+  .specs{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+  .spec{font-size:11.5px;background:#f1f5f9;color:#475569;padding:3px 8px;border-radius:6px;font-weight:600}
+  .sub{font-size:12px;color:#0369a1;font-weight:700;margin-bottom:8px}
+  .sub::before{content:"🚇 ";}
+  .smry{font-size:11.5px;color:#94a3b8;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pager{display:flex;justify-content:center;gap:6px;padding:20px 0;flex-wrap:wrap}
+  .pager button{background:#fff;border:1px solid #d1d5db;border-radius:7px;min-width:36px;padding:7px;cursor:pointer}
+  .pager button.on{background:#2563eb;color:#fff;border-color:#2563eb}
+  .empty{text-align:center;color:#9ca3af;padding:60px 0;font-size:14px}
+  /* modal */
+  .overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow:auto}
+  .overlay.on{display:flex}
+  .modal{background:#fff;border-radius:16px;max-width:760px;width:100%;padding:0;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  .mhead{padding:20px 24px;border-bottom:1px solid #eef0f2;position:sticky;top:0;background:#fff;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:flex-start}
+  .mhead h2{margin:0;font-size:19px;font-weight:800}
+  .mhead .ma{font-size:12.5px;color:#9ca3af;margin-top:4px}
+  .mhead .x{cursor:pointer;font-size:24px;color:#94a3b8;border:none;background:none;line-height:1}
+  .mbody{padding:18px 24px 24px}
+  .mprice{font-size:22px;font-weight:800;margin-bottom:16px}
+  .mprice em{font-style:normal;color:#dc2626}.mprice .dep{color:#475569}
+  .sec{margin-bottom:18px}
+  .sec h3{font-size:12px;font-weight:800;color:#2563eb;margin:0 0 8px;text-transform:uppercase;letter-spacing:.03em}
+  .kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:7px 18px}
+  .kv .row{display:flex;justify-content:space-between;gap:10px;font-size:13px;border-bottom:1px dashed #eef0f2;padding-bottom:5px}
+  .kv .k{color:#94a3b8}.kv .v{color:#1f2937;font-weight:600;text-align:right;word-break:break-all}
+  .mlink{display:inline-block;margin-top:6px;background:#03c75a;color:#fff;text-decoration:none;padding:9px 18px;border-radius:8px;font-weight:700;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🏙️ 강남구 네이버부동산 매물 뷰어</h1>
+  <p>네이버부동산 강남구 전수 수집 · 아파트/오피스텔/빌라/원룸/단독·다가구 · 카드 클릭 시 상세 전체 보기 · 단위 만원</p>
+</header>
+
+<div class="wrap">
+  <div class="cards">
+    <div class="card"><div class="lbl">총 매물수</div><div class="val" id="c-total">-</div></div>
+    <div class="card"><div class="lbl">수집 동</div><div class="val" id="c-dong">-<small> 개동</small></div></div>
+    <div class="card"><div class="lbl">월세 중앙값</div><div class="val" id="c-rent">-<small> 만원</small></div></div>
+    <div class="card" style="flex:1;min-width:260px"><div class="lbl">타입별 분포</div><div class="typechips" id="c-types"></div></div>
+  </div>
+
+  <div class="panel">
+    <div class="fg" style="margin-bottom:13px">
+      <label>매물 타입 (복수 선택)</label>
+      <div class="typebtns" id="f-types"></div>
+    </div>
+    <div class="filters">
+      <div class="fg"><label>동</label><select id="f-dong"><option value="">전체</option></select></div>
+      <div class="fg"><label>키워드(건물/요약/주소/역)</label><input id="f-kw" placeholder="예: 래미안, 역세권"></div>
+      <div class="fg"><label>보증금(만)</label><div style="display:flex;gap:4px"><input type="number" id="f-depmin" placeholder="최소"><input type="number" id="f-depmax" placeholder="최대"></div></div>
+      <div class="fg"><label>월세(만)</label><div style="display:flex;gap:4px"><input type="number" id="f-rentmin" placeholder="최소"><input type="number" id="f-rentmax" placeholder="최대"></div></div>
+      <div class="fg"><label>평수</label><div style="display:flex;gap:4px"><input type="number" id="f-pmin" placeholder="최소"><input type="number" id="f-pmax" placeholder="최대"></div></div>
+      <div class="fg"><label>정렬</label><select id="f-sort">
+        <option value="recent">최신순</option>
+        <option value="rent_asc">월세 낮은순</option>
+        <option value="rent_desc">월세 높은순</option>
+        <option value="deposit_asc">보증금 낮은순</option>
+        <option value="deposit_desc">보증금 높은순</option>
+        <option value="area_desc">면적 넓은순</option>
+        <option value="area_asc">면적 좁은순</option>
+      </select></div>
+      <div class="fg"><label>&nbsp;</label><button class="btn btn-go" onclick="search(1)">검색</button></div>
+      <div class="fg"><label>&nbsp;</label><button class="btn btn-reset" onclick="resetF()">초기화</button></div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="cnt">검색결과 <b id="r-count">-</b> 건</div>
+  </div>
+  <div class="grid" id="grid"></div>
+  <div class="pager" id="pager"></div>
+</div>
+
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeM()">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+const TYPES = {APT:"아파트",OPST:"오피스텔",VL:"빌라",OR:"원룸",DDDGG:"단독/다가구",SG:"상가"};
+let selTypes = new Set();
+let curItems = [];
+
+// 상세 모달 필드 그룹 (있는 값만 표시)
+const GROUPS = [
+  ["가격", [["deposit","보증금","만원"],["rent_monthly","월세","만원"],["maintenance_monthly","관리비","만원"],["maintenance_type","관리비유형"]]],
+  ["면적·구조", [["pyeong","전용","평"],["area_exclusive_m2","전용","㎡"],["area_contract_m2","계약","㎡"],["exclusive_ratio","전용률","%"],["rooms","방","개"],["bathrooms","욕실","개"],["floor_current","현재층"],["floor_total","총층"],["direction","향"],["duplex","복층"],["entrance_type","현관구조"],["heating","난방"]]],
+  ["위치", [["jibun_address","지번주소"],["road_address","도로명"],["dong","동"],["bldg_dong","동/관"],["lat","위도"],["lng","경도"]]],
+  ["지하철", [["subway_station","최근접역"],["subway_distance_m","거리","m"],["subway_walk_min","도보","분"],["subway_500m","500m내"],["subway_1km","1km내"]]],
+  ["건물·단지", [["building_name","건물명"],["building_type","유형"],["building_use","용도"],["approval_date","사용승인"],["building_age","연식","년"],["households","세대수"],["households_same_area","동일면적세대"],["dong_count","동수"],["parking_total","총주차"],["parking_per_household","세대당주차"],["floor_area_ratio","용적률","%"],["building_coverage_ratio","건폐율","%"],["builder","건설사"],["same_building_same_area_count","동일건물동일면적매물"]]],
+  ["학교", [["school_name","배정초교"],["school_type","구분"],["school_walk_min","도보","분"],["school_student_per_teacher","교사1인당학생"]]],
+  ["중개사", [["agent_name","중개사"],["agent_office","사무소"],["agent_phone","연락처"],["agent_reg_no","등록번호"],["agent_address","주소"],["agent_owner_confirmed_3m","3개월집주인확인"]]],
+  ["기타", [["broker_fee_max","중개보수상한","만원"],["broker_fee_rate","요율","%"],["move_in","입주"],["confirmed_at","확인일"],["posted_at","등록일"],["tags","태그"],["facilities","시설"]]],
+];
+
+function won(v){ if(v==null) return "-"; return Number(v).toLocaleString(); }
+function jarr(v){ // jsonl엔 list가 문자열("[...]")로 저장된 경우가 있음
+  if(Array.isArray(v)) return v;
+  if(typeof v==="string" && v.startsWith("[")){ try{ return JSON.parse(v); }catch(e){} }
+  return v;
+}
+function fmt(v){
+  v = jarr(v);
+  if(v==null||v==="") return null;
+  if(Array.isArray(v)) return v.length? v.join(", ") : null;
+  if(v===true) return "예"; if(v===false) return "아니오";
+  if(typeof v==="number") return v.toLocaleString();
+  return String(v);
+}
+
+async function init(){
+  const f = await (await fetch('/api/facets')).json();
+  const tb = document.getElementById('f-types');
+  f.types.forEach(t=>{
+    const b=document.createElement('button'); b.textContent=t.name; b.dataset.code=t.code;
+    b.onclick=()=>{ b.classList.toggle('on'); if(selTypes.has(t.code))selTypes.delete(t.code); else selTypes.add(t.code); };
+    tb.appendChild(b);
+  });
+  const ds=document.getElementById('f-dong');
+  f.dongs.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;ds.appendChild(o);});
+
+  const s = await (await fetch('/api/stats')).json();
+  document.getElementById('c-total').textContent = s.total.toLocaleString();
+  document.getElementById('c-dong').innerHTML = s.dong_count + '<small> 개동</small>';
+  document.getElementById('c-rent').innerHTML = (s.rent_median??'-') + '<small> 만원</small>';
+  const tc=document.getElementById('c-types');
+  s.by_type.forEach(t=>{const e=document.createElement('span');e.className='chip';e.textContent=`${t.name} ${t.count.toLocaleString()}`;tc.appendChild(e);});
+
+  search(1);
+}
+function v(id){return document.getElementById(id).value.trim();}
+async function search(page){
+  const p=new URLSearchParams();
+  if(selTypes.size)p.set('types',[...selTypes].join(','));
+  if(v('f-dong'))p.set('dongs',v('f-dong'));
+  if(v('f-kw'))p.set('keyword',v('f-kw'));
+  if(v('f-depmin'))p.set('deposit_min',v('f-depmin'));
+  if(v('f-depmax'))p.set('deposit_max',v('f-depmax'));
+  if(v('f-rentmin'))p.set('rent_min',v('f-rentmin'));
+  if(v('f-rentmax'))p.set('rent_max',v('f-rentmax'));
+  if(v('f-pmin'))p.set('pyeong_min',v('f-pmin'));
+  if(v('f-pmax'))p.set('pyeong_max',v('f-pmax'));
+  p.set('sort',v('f-sort'));p.set('page',page);p.set('size',24);
+  const r=await (await fetch('/api/listings?'+p)).json();
+  curItems=r.items;
+  document.getElementById('r-count').textContent=r.total.toLocaleString();
+  renderGrid(r.items);renderPager(r);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function renderGrid(items){
+  const g=document.getElementById('grid');g.innerHTML='';
+  if(!items.length){g.innerHTML='<div class="empty" style="grid-column:1/-1">조건에 맞는 매물이 없습니다.</div>';return;}
+  items.forEach((x,i)=>{
+    const tc=x.building_type_code||'';
+    const title = x.building_name || TYPES[tc] || '매물';
+    const addr = x.jibun_address || x.road_address || '';
+    const dep = won(x.deposit), rent=x.rent_monthly;
+    const rentTxt = rent? `<em>${won(rent)}</em>` : '매매/기타';
+    const specs=[];
+    if(x.pyeong)specs.push(`${x.pyeong}평`);
+    if(x.area_exclusive_m2)specs.push(`전용 ${x.area_exclusive_m2}㎡`);
+    if(x.floor_current!=null)specs.push(`${x.floor_current}층`);
+    if(x.rooms!=null)specs.push(`방${x.rooms}`);
+    if(x.direction)specs.push(x.direction.replace(' (거실 기준)',''));
+    const sub = x.subway_station ? `${x.subway_station} ${x.subway_distance_m?x.subway_distance_m+'m':''}` : '';
+    const smry = fmt(x.summary) || '';
+    const d=document.createElement('div');d.className='lst';d.onclick=()=>openM(i);
+    d.innerHTML=`
+      <span class="badge b-${tc}">${TYPES[tc]||tc}</span>
+      <div class="nm">${title}</div>
+      <div class="addr">${addr}</div>
+      <div class="price"><span class="dep">보증 ${dep}</span> / 월 ${rentTxt}</div>
+      <div class="specs">${specs.map(s=>`<span class="spec">${s}</span>`).join('')}</div>
+      ${sub?`<div class="sub">${sub}</div>`:''}
+      ${smry?`<div class="smry">${smry}</div>`:''}`;
+    g.appendChild(d);
+  });
+}
+function renderPager(r){
+  const pg=document.getElementById('pager');pg.innerHTML='';
+  if(r.pages<=1)return;const cur=r.page;
+  const add=(n,l,on)=>{const b=document.createElement('button');b.textContent=l||n;if(on)b.className='on';b.onclick=()=>search(n);pg.appendChild(b);};
+  if(cur>1)add(cur-1,'‹');
+  let s=Math.max(1,cur-3),e=Math.min(r.pages,cur+3);
+  if(s>1)add(1,'1');if(s>2)pg.appendChild(document.createTextNode('…'));
+  for(let i=s;i<=e;i++)add(i,null,i===cur);
+  if(e<r.pages-1)pg.appendChild(document.createTextNode('…'));if(e<r.pages)add(r.pages,String(r.pages));
+  if(cur<r.pages)add(cur+1,'›');
+}
+function openM(i){
+  const x=curItems[i];const tc=x.building_type_code||'';
+  const title=x.building_name||TYPES[tc]||'매물';
+  const rent=x.rent_monthly?`월 <em>${won(x.rent_monthly)}</em>`:'매매/기타';
+  let html=`<div class="mhead"><div><h2>${title} <span class="chip">${TYPES[tc]||tc}</span></h2>
+      <div class="ma">${x.jibun_address||''} ${x.road_address?'· '+x.road_address:''}</div></div>
+      <button class="x" onclick="closeM()">&times;</button></div>
+    <div class="mbody">
+      <div class="mprice"><span class="dep">보증금 ${won(x.deposit)}</span> / ${rent} <span style="font-size:13px;color:#9ca3af">${x.maintenance_monthly?'· 관리비 '+won(x.maintenance_monthly):''}</span></div>`;
+  GROUPS.forEach(([gname,fields])=>{
+    const rows=[];
+    fields.forEach(([key,label,unit])=>{
+      const val=fmt(x[key]); if(val==null) return;
+      rows.push(`<div class="row"><span class="k">${label}</span><span class="v">${val}${unit?' '+unit:''}</span></div>`);
+    });
+    if(rows.length) html+=`<div class="sec"><h3>${gname}</h3><div class="kv">${rows.join('')}</div></div>`;
+  });
+  if(x.url) html+=`<a class="mlink" href="${x.url}" target="_blank">네이버부동산에서 보기 →</a>`;
+  html+=`</div>`;
+  document.getElementById('modal').innerHTML=html;
+  document.getElementById('overlay').classList.add('on');
+}
+function closeM(){document.getElementById('overlay').classList.remove('on');}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeM();});
+function resetF(){
+  selTypes.clear();document.querySelectorAll('#f-types button').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('.panel input').forEach(i=>i.value='');
+  document.getElementById('f-dong').value='';document.getElementById('f-sort').value='recent';
+  search(1);
+}
+document.getElementById('f-kw').addEventListener('keydown',e=>{if(e.key==='Enter')search(1);});
+init();
+</script>
+</body>
+</html>
