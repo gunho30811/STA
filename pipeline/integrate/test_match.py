@@ -65,6 +65,7 @@ def main():
         f"SELECT article_no, building_name, area_exclusive_m2, rent_monthly,"
         f" deposit, maintenance_monthly, floor_current, lat, lng, dong, url"
         f" FROM naver_listings WHERE rent_monthly BETWEEN 5 AND 2000 AND lat IS NOT NULL"
+        f" AND building_type_code = 'OPST'"
         f"{nav_where}",
         nav_params or None,
     ).fetchall()]
