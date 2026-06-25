@@ -5,6 +5,7 @@
 DB·네트워크 비의존. crawl_detail.py 가 3개 API를 받아 이 함수로 행을 만든다.
 SCHEMA.md 의 naver_listings 컬럼 정의를 그대로 따른다.
 """
+import datetime as dt
 import json
 from subway import nearest_station, stations_within
 
@@ -85,12 +86,14 @@ def map_row(detail, complex_detail, schools, *, region=None):
     return {
         "article_no": _int(no),
         "url": f"https://new.land.naver.com/offices?articleNo={no}",
+        "building_type_code": AD.get("realestateTypeCode"),
         "building_type": AD.get("realestateTypeName"),
         "confirmed_at": _ymd(AD.get("articleConfirmYMD")),
         "posted_at": _ymd(AD.get("exposeStartYMD")),
         "summary": summary or None,
         "summary_tags": json.dumps([t.strip() for t in summary.split(",") if t.strip()],
                                    ensure_ascii=False) if summary else None,
+        "tags": json.dumps(AD.get("tagList"), ensure_ascii=False) if AD.get("tagList") else None,
         # 가격(만원)
         "deposit": _int(PR.get("warrantPrice")),
         "rent_monthly": _int(PR.get("rentPrice")),
@@ -114,11 +117,12 @@ def map_row(detail, complex_detail, schools, *, region=None):
         "road_address": road,
         "jibun_address": jibun,
         "building_name": CD.get("complexName") or AD.get("aptName"),
+        "bldg_dong": AD.get("buildingName") or ADD.get("buildingName"),
         "lat": lat,
         "lng": lng,
         "building_use": AD.get("principalUse"),
         "approval_date": approve,
-        "building_age": (2026 - int(approve[:4])) if approve else None,
+        "building_age": (dt.datetime.now().year - int(approve[:4])) if approve else None,
         "households": _int(CD.get("totalHouseholdCount") or AD.get("aptHouseholdCount")),
         "households_same_area": _int(AD.get("householdCountByPtp")),
         "heating": (f"{AD.get('aptHeatMethodTypeName')} / {AD.get('aptHeatFuelTypeName')}"
@@ -162,12 +166,12 @@ def map_row(detail, complex_detail, schools, *, region=None):
 
 # naver_listings 컬럼 순서 (DDL/INSERT 와 1:1)
 COLUMNS = [
-    "article_no", "url", "building_type", "confirmed_at", "posted_at",
-    "summary", "summary_tags", "deposit", "rent_monthly", "maintenance_monthly",
+    "article_no", "url", "building_type_code", "building_type", "confirmed_at", "posted_at",
+    "summary", "summary_tags", "tags", "deposit", "rent_monthly", "maintenance_monthly",
     "maintenance_type", "area_contract_m2", "area_exclusive_m2", "exclusive_ratio",
     "floor_current", "floor_total", "rooms", "bathrooms", "direction", "entrance_type",
     "duplex", "move_in", "facilities", "road_address", "jibun_address", "building_name",
-    "lat", "lng", "building_use", "approval_date", "building_age", "households",
+    "bldg_dong", "lat", "lng", "building_use", "approval_date", "building_age", "households",
     "households_same_area", "heating", "parking_total", "parking_per_household",
     "floor_area_ratio", "building_coverage_ratio", "builder", "dong_count",
     "agent_office", "agent_name", "agent_phone", "agent_address", "agent_reg_no",

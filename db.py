@@ -181,11 +181,13 @@ def init_db():
     CREATE TABLE IF NOT EXISTS naver_listings (
         article_no                    BIGINT PRIMARY KEY,
         url                           TEXT,
+        building_type_code            TEXT,
         building_type                 TEXT,
         confirmed_at                  TEXT,
         posted_at                     TEXT,
         summary                       TEXT,
         summary_tags                  TEXT,
+        tags                          TEXT,
         deposit                       INTEGER,
         rent_monthly                  INTEGER,
         maintenance_monthly           INTEGER,
@@ -205,6 +207,7 @@ def init_db():
         road_address                  TEXT,
         jibun_address                 TEXT,
         building_name                 TEXT,
+        bldg_dong                     TEXT,
         lat                           REAL,
         lng                           REAL,
         building_use                  TEXT,
@@ -243,6 +246,10 @@ def init_db():
         cortarno                      TEXT,
         crawled_at                    TEXT
     )""")
+    # 기존(이미 생성된) Supabase 테이블엔 CREATE TABLE IF NOT EXISTS 가 새 컬럼을 추가해주지 않으므로 별도 ALTER.
+    conn.execute("ALTER TABLE naver_listings ADD COLUMN IF NOT EXISTS building_type_code TEXT")
+    conn.execute("ALTER TABLE naver_listings ADD COLUMN IF NOT EXISTS tags TEXT")
+    conn.execute("ALTER TABLE naver_listings ADD COLUMN IF NOT EXISTS bldg_dong TEXT")
     conn.execute("""
     CREATE TABLE IF NOT EXISTS samsam_listings (
         room_id               INTEGER PRIMARY KEY,

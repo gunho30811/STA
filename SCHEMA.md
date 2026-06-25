@@ -87,20 +87,31 @@
 
 ---
 
-## 2. `naver_listings` — 네이버부동산 오피스텔 월세
+## 2. `naver_listings` — 네이버부동산 매물 월세
 
 기준 예시: 부천 소사구 오피스텔 월세 500/42 매물 (매물번호 2633302891)
+
+**대상 매물종류 (6종, 전부 `tradeType=B2` 월세 한정)**: 아파트(`APT`) · 오피스텔(`OPST`) ·
+빌라(`VL`) · 원룸(`OR`) · 단독/다가구(`DDDGG`) · 상가(`SG`).
+
+> **단지형 vs 비단지형**: 네이버 상세 API가 단지번호(`hscpNo`)를 주는 매물(아파트/오피스텔, `isComplex=true`)과
+> 안 주는 매물(빌라/원룸/단독다가구/상가, `isComplex=false`)은 채워지는 컬럼이 다르다. 비단지형은
+> `complexes/{c}`·`complexes/{c}/schools` API 자체를 호출할 대상(`hscpNo`)이 없어서 **단지 기반 컬럼이 전부
+> NULL**이 된다 — 아래 각 표에 `[단지형만]` 표시. (직접 API 호출로 확인: VL/OR/DDDGG/SG 샘플 모두
+> `hscpNo=None`, `articleExistTabs`에 `schools` 없음.)
 
 ### 2.1 식별 / 기본
 | 컬럼 | 타입 | 설명 | 예시 |
 |------|------|------|------|
 | `article_no` ★ | bigint PK | 네이버 매물번호 | `2633302891` |
 | `url` | text | 상세 URL | — |
-| `building_type` | text | 매물 종류 | `오피스텔` |
+| `building_type_code` ★ | text | 매물종류 코드(`realestateTypeCode`) | `OPST` |
+| `building_type` | text | 매물 종류명 | `오피스텔` |
 | `confirmed_at` | date | 확인매물 날짜 | `2026-06-20` |
 | `posted_at` | date | 최초 게재일 | `2026-06-20` |
 | `summary` ★ | text | **매물 한줄 소개(요약 칸 원문 전체)** — 절대 자르거나 누락하지 말 것 | `풀옵션,복층형원룸오피스텔,역곡역 도보3분,역곡남부의 모든 생활인프라집중.` |
 | `summary_tags` | jsonb | `summary`를 쉼표로 분리한 태그 배열(선택) | `["풀옵션","복층형원룸오피스텔","역곡역 도보3분","역곡남부의 모든 생활인프라집중"]` |
+| `tags` | jsonb | 네이버 매물 구조화 태그(`tagList`) — `summary_tags`와 별개 출처 | `["25년이상","올수리","화장실한개","소형평수"]` |
 | `description` | jsonb | 게재 메타(제공처·게재일 등 구조화 항목만). 긴 자유 서술 본문은 제외 | `{"제공":"매경부동산","최초게재":"2026-06-20"}` |
 
 ### 2.2 가격 (단위: 만원)
@@ -129,24 +140,25 @@
 ### 2.4 주소 / 단지 정보
 | 컬럼 | 타입 | 설명 | 예시 |
 |------|------|------|------|
-| `jibun_address` ★ | text | 위치(지번) | `경기도 부천시 소사구 괴안동 113-6` |
-| `road_address` ★ | text | 위치(도로명) | `경기도 부천시 소사구 경인로 509` |
+| `jibun_address` ★ | text | 위치(지번). 단지형은 `complexes/{c}`의 지번, 비단지형은 `exposureAddress` 그대로(번지 없이 동까지만 노출되는 경우도 있음, 예: 상가) | `경기도 부천시 소사구 괴안동 113-6` |
+| `road_address` ★ | text | 위치(도로명). **`[단지형만]`** — 비단지형은 도로명 자체를 안 줘서 NULL | `경기도 부천시 소사구 경인로 509` |
 | `building_name` ★ | text | 단지/건물명 (있으면) | `우남타워` |
+| `bldg_dong` | text | 건물 내 동(棟) 라벨 (있으면, 단지 전체 동수인 `dong_count`와 다름) | `301동` |
 | `lat` ★ | double | 위도 | — |
 | `lng` ★ | double | 경도 | — |
-| `building_use` | text | 건축물용도 | `업무시설` |
-| `approval_date` | date | 사용승인일 | `2002-04-19` |
-| `building_age` | int | 연차 | `25` |
-| `households` | int | 세대수 | `48` |
-| `households_same_area` | int | 해당 면적 세대수 | `6` |
-| `entrance_type` | text | 현관구조 | `복도식` |
-| `heating` | text | 난방 | `개별난방 / 도시가스` |
-| `parking_total` | int | 총 주차대수 | `48` |
-| `parking_per_household` | double | 세대당 주차 | `1` |
-| `floor_area_ratio` | int | 용적률(%) | `775` |
-| `building_coverage_ratio` | int | 건폐율(%) | `79` |
-| `builder` | text | 건설사 | `우남건설(주)` |
-| `dong_count` | int | 동수 | `1` |
+| `building_use` | text | 건축물용도. `[단지형만]` | `업무시설` |
+| `approval_date` | date | 사용승인일. `[단지형만]` | `2002-04-19` |
+| `building_age` | int | 연차. `[단지형만]` | `25` |
+| `households` | int | 세대수. `[단지형만]` | `48` |
+| `households_same_area` | int | 해당 면적 세대수. `[단지형만]` | `6` |
+| `entrance_type` | text | 현관구조. 비단지형은 보통 NULL(샘플 확인: 빌라/원룸/단독다가구/상가 전부 None) | `복도식` |
+| `heating` | text | 난방. `[단지형만]` | `개별난방 / 도시가스` |
+| `parking_total` | int | 총 주차대수. `[단지형만]` | `48` |
+| `parking_per_household` | double | 세대당 주차. `[단지형만]` | `1` |
+| `floor_area_ratio` | int | 용적률(%). `[단지형만]` | `775` |
+| `building_coverage_ratio` | int | 건폐율(%). `[단지형만]` | `79` |
+| `builder` | text | 건설사. `[단지형만]` | `우남건설(주)` |
+| `dong_count` | int | 동수. `[단지형만]` | `1` |
 
 ### 2.5 중개사
 | 컬럼 | 타입 | 설명 | 예시 |
@@ -163,13 +175,14 @@
 ### 2.6 학교 / 교통
 | 컬럼 | 타입 | 설명 | 예시 |
 |------|------|------|------|
-| `school_name` | text | 배정 초등학교 | `부천부안초등학교` |
-| `school_type` | text | 공립/사립 | `공립` |
-| `school_distance_m` | int | 거리(m) | `821` |
-| `subway_station` ★ | text | 가장 가까운 지하철역 | `언주` |
+| `school_name` | text | 배정 초등학교. `[단지형만]` — 비단지형은 `articleExistTabs`에 `schools` 탭 자체가 없어 호출 대상 없음 | `부천부안초등학교` |
+| `school_type` | text | 공립/사립. `[단지형만]` | `공립` |
+| `school_walk_min` | int | 도보 분(네이버 API 제공). `[단지형만]` | `11` |
+| `school_student_per_teacher` | double | 교사 1인당 학생수. `[단지형만]` | `14.2` |
+| `subway_station` ★ | text | 가장 가까운 지하철역(`N역` 형태) | `언주역` |
 | `subway_distance_m` | int | 거리(m) | `406` |
-| `subway_500m` | jsonb | 반경 500m 내 역명 | `["언주"]` |
-| `subway_1km` | jsonb | 반경 1km 내 역명 | `["언주","선정릉","역삼","학동"]` |
+| `subway_500m` | jsonb | 반경 500m 내 역명(`N역` 형태) | `["언주역"]` |
+| `subway_1km` | jsonb | 반경 1km 내 역명(`N역` 형태) | `["언주역","선정릉역","역삼역","학동역"]` |
 | `subway_walk_min` | int | (참고) 네이버 도보 분 | `6` |
 
 > **지하철 출처**: 네이버 상세 API는 역명/거리(m)를 안 주고 `walkingTimeToNearSubway`(도보 분)만 준다.
@@ -180,13 +193,17 @@
 ### 2.7 같은 건물 통계 (수집/통합 단계 계산)
 | 컬럼 | 타입 | 설명 | 예시 |
 |------|------|------|------|
-| `same_building_same_area_count` ★ | int | 같은 건물(`building_name`)에서 **같은 면적**으로 올라온 매물 수 | `3` |
+| `same_building_same_area_count` ★ | int | 같은 건물(`building_name`)에서 **같은 면적**으로 올라온 매물 수. 비단지형은 단지 그룹이 없어 항상 `1` | `3` |
 
 > **"같은 면적" 정의**: 면적차 **≤ 1평(약 3.3㎡)** 이면 같은 면적으로 취급한다.
 > 기준 면적은 `area_exclusive_m2`(전용면적). 즉 `abs(전용면적 − 다른매물 전용면적) ≤ 3.3㎡`.
 >
-> **출처(확인됨)**: 네이버 매물탭 API `/api/articles/complex/{단지번호}` 가 주는 `sameAddrCnt`.
-> 같은 건물이라도 **평형별로 카운트가 따로** 잡힌다(예: 상지카일룸블랙 72OD=3건, 57OC=33건). 그대로 읽으면 됨.
+> **출처**: `articleAddition.sameAddrCnt` (상세 API). 같은 건물이라도 **평형별로 카운트가 따로** 잡힌다
+> (예: 상지카일룸블랙 72OD=3건, 57OC=33건). 그대로 읽으면 됨.
+> 단지형(아파트/오피스텔)은 `hscpNo` 기준으로 잡히는 걸로 보이지만, 비단지형(빌라/원룸/단독다가구/상가)도
+> `hscpNo` 없이 **지번/주소 기준으로 같이 카운트되는 듯** — 100건씩 샘플 검증 결과 비단지형도 2~5인 경우가
+> 적지 않음(예: 빌라 17%, 상가 16%가 1 아님). ~~"비단지형은 항상 1"~~ 은 1건짜리 샘플로 잘못 판단한 것이었음
+> (2026-06-25 정정). 정확한 카운트 기준(주소 매칭 알고리즘)은 네이버가 비공개라 추정만 가능.
 
 ---
 
@@ -195,7 +212,15 @@
 - 그 외 **긴** 자유 서술(매물 상세 설명 본문 등)은 컬럼으로 넣지 않는다. 구조화 가능한 메타 항목만 `description`(jsonb)으로.
 - 실거래가 위젯, 광고/배너, 안내 문구는 수집 대상 아님.
 - 오류 데이터(예: 월세 100억) 가드는 통합 단계에서 `rent BETWEEN 5 AND 2000` 등으로 거른다.
+  단, 상가(`SG`)는 보증금/월세 분포가 주거용과 달라서 같은 상한을 그대로 적용하면 안 될 수 있음 — 통합
+  단계에서 `building_type_code`별로 가드 값을 분리할지 검토 필요.
 
 ## 4. 변경 이력
 - 2026-06-23: 최초 작성. 네이버/삼삼 수집 목표 스키마 정의(target schema).
   현 Supabase 스키마와 차이가 있을 수 있으며, 수집 코드가 이 계약에 맞춰 채워가는 것이 목표.
+- 2026-06-25: `naver_listings` 대상을 오피스텔 월세 단일종에서 **아파트/오피스텔/빌라/원룸/단독다가구/상가**
+  6종(전부 월세)으로 확장. `building_type_code` 컬럼 추가. 단지형(아파트/오피스텔, `hscpNo` 있음)과
+  비단지형(빌라/원룸/단독다가구/상가, `hscpNo` 없음)의 컬럼 채움 여부 차이를 실제 API 호출로 확인해서
+  각 표에 `[단지형만]` 표시 추가 (`road_address`/`building_age`/`households`/`parking_*`/
+  `floor_area_ratio`/`building_coverage_ratio`/`builder`/`dong_count`/`school_*`/`same_building_same_area_count`
+  실질값). `lab/crawl_gangnam_all_types.py`(강남구 시범 수집)로 검증.
