@@ -47,18 +47,28 @@ def get_cookies():
             with sync_playwright() as p:
                 b = p.chromium.launch(headless=True, args=['--disable-blink-features=AutomationControlled'])
                 ctx = b.new_context(user_agent=UA, locale='ko-KR'); pg = ctx.new_page()
-                pg.goto(f'{BASE}/sign-in', wait_until='domcontentloaded', timeout=40000)
+                pg.goto(f'{BASE}/sign-in', wait_until='networkidle', timeout=40000)
                 pg.wait_for_selector('input[type="email"], input[name="email"]', timeout=15000)
-                pg.wait_for_timeout(1000)
-                pg.fill('input[type="email"], input[name="email"]', EMAIL)
-                pg.fill('input[type="password"]', PASSWORD)
-                pg.click('button[type="submit"], button:has-text("로그인")'); pg.wait_for_timeout(3000)
+                pg.wait_for_timeout(500)
+
+                email_input = pg.locator('input[type="email"], input[name="email"]').first
+                email_input.click(); email_input.fill(''); email_input.type(EMAIL, delay=50)
+                pw_input = pg.locator('input[type="password"]').first
+                pw_input.click(); pw_input.fill(''); pw_input.type(PASSWORD, delay=50)
+                pg.wait_for_timeout(300)
+
+                pg.locator('button[type="submit"], button:has-text("로그인")').first.click()
+                try:
+                    pg.wait_for_url(lambda url: '/sign-in' not in url, timeout=10000)
+                except Exception:
+                    pg.wait_for_load_state('networkidle', timeout=8000)
+
                 ok = '/sign-in' not in pg.url; cks = ctx.cookies(); b.close()
             if ok:
                 log("로그인 성공"); return cks
-            log(f"로그인 후 잔류, 재시도 {attempt+1}")
+            log(f"로그인 실패(잔류), 재시도 {attempt+1}")
         except Exception as e:
-            log(f"로그인 실패({repr(e)[:40]}), {BLOCK_WAIT}s 대기"); time.sleep(BLOCK_WAIT)
+            log(f"로그인 예외({repr(e)[:60]}), 재시도 {attempt+1}"); time.sleep(3)
     raise RuntimeError("로그인 실패")
 
 
