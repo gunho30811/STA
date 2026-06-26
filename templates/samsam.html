@@ -79,6 +79,7 @@
   <div class="tabs2">
     <button id="tab-option" class="on" onclick="switchView('option')">옵션 영향</button>
     <button id="tab-building" onclick="switchView('building')">건물 인기</button>
+    <button id="tab-trend" onclick="switchView('trend')">지역 트렌드</button>
   </div>
 
   <div id="view-option">
@@ -132,6 +133,23 @@
         <table>
           <thead><tr id="b-h"></tr></thead>
           <tbody id="b-b"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="view-trend" style="display:none">
+    <div class="panel">
+      <h2 class="sec">지역(동) 예약률 트렌드 📈 — 매주 스냅샷으로 인기 오르는/내리는 동네 추적</h2>
+      <p class="hint">
+        매주 크롤 직후 <code>snapshot.py</code> 실행분이 쌓여요. <b>최신예약률</b>·<b>전주대비 Δ</b>(▲상승=수요↑, ▼하락) + 주차별 값.
+        스냅샷이 1개뿐이면 현재값만 보이고, 2주차부터 변화가 나타나요. 위 시/도·시군구 필터 적용.
+      </p>
+      <div id="trend-empty" class="empty" style="display:none">아직 스냅샷이 없어요. 크롤 후 <code>python pipeline/samsam/snapshot.py</code> 실행하면 첫 데이터가 쌓여요.</div>
+      <div class="scroll">
+        <table>
+          <thead><tr id="tr-h"></tr></thead>
+          <tbody id="tr-b"></tbody>
         </table>
       </div>
     </div>
@@ -318,16 +336,49 @@ function renderListBody(){
     tb.appendChild(tr);
   });
 }
-// ── 뷰 전환 (옵션 영향 / 건물 인기) ──
+// ── 뷰 전환 (옵션 영향 / 건물 인기 / 지역 트렌드) ──
 let currentView='option';
-function runView(){ currentView==='option'?analyze():loadBuildings(); }
+function runView(){ currentView==='option'?analyze():(currentView==='building'?loadBuildings():loadTrend()); }
 function switchView(v){
   currentView=v;
-  document.getElementById('tab-option').classList.toggle('on',v==='option');
-  document.getElementById('tab-building').classList.toggle('on',v==='building');
-  document.getElementById('view-option').style.display=v==='option'?'':'none';
-  document.getElementById('view-building').style.display=v==='building'?'':'none';
+  ['option','building','trend'].forEach(t=>{
+    document.getElementById('tab-'+t).classList.toggle('on',t===v);
+    document.getElementById('view-'+t).style.display=(t===v)?'':'none';
+  });
   runView();
+}
+// ── 지역 트렌드 ──
+let TRD={dates:[],items:[]}, trdSort={col:'latest',dir:'desc'};
+async function loadTrend(){
+  const p=new URLSearchParams();
+  if(v('f-sido'))p.set('sido',v('f-sido'));
+  if(v('f-sigungu'))p.set('sigungu',v('f-sigungu'));
+  TRD=await (await fetch('/api/trend?'+p)).json();
+  renderTrend();
+}
+function renderTrend(){
+  const empty=document.getElementById('trend-empty');
+  empty.style.display=TRD.items.length?'none':'';
+  const cols=[{k:'dong',t:'동',l:true},{k:'sigungu',t:'시군구',l:true},{k:'n',t:'매물수'},
+    {k:'latest',t:'최신예약률%'},{k:'delta',t:'전주대비Δ'}];
+  TRD.dates.forEach(d=>cols.push({k:'d:'+d,t:d.slice(5),date:true}));
+  const h=document.getElementById('tr-h');h.innerHTML='';
+  cols.forEach(c=>{const th=document.createElement('th');if(c.l)th.className='l';th.style.cursor='pointer';
+    th.textContent=c.t+(c.k===trdSort.col?(trdSort.dir==='asc'?' ▲':' ▼'):'');
+    th.onclick=()=>{if(trdSort.col===c.k)trdSort.dir=trdSort.dir==='asc'?'desc':'asc';else{trdSort.col=c.k;trdSort.dir='desc';}renderTrend();};
+    h.appendChild(th);});
+  const val=(x,k)=>k.startsWith('d:')?(x.series[k.slice(2)]??null):x[k];
+  const k=trdSort.col, isNum=(k!=='dong'&&k!=='sigungu');
+  const rows=[...TRD.items].sort((a,b)=>{let av=val(a,k),bv=val(b,k);
+    if(isNum){av=av==null?-Infinity:av;bv=bv==null?-Infinity:bv;return trdSort.dir==='asc'?av-bv:bv-av;}
+    return trdSort.dir==='asc'?String(av).localeCompare(String(bv),'ko'):String(bv).localeCompare(String(av),'ko');});
+  const b=document.getElementById('tr-b');
+  b.innerHTML=rows.map(x=>{
+    const dcell=x.delta==null?'<span class="mut">-</span>':(x.delta>0?`<span class="bad">▲${x.delta}</span>`:(x.delta<0?`<span style="color:#2563eb;font-weight:700">▼${Math.abs(x.delta)}</span>`:'0'));
+    const dates=TRD.dates.map(d=>`<td class="mut">${x.series[d]??'-'}</td>`).join('');
+    return `<tr><td class="l" style="font-weight:700">${x.dong}</td><td class="l">${x.sigungu}</td>
+      <td>${x.n}</td><td class="occ">${x.latest??'-'}%</td><td>${dcell}</td>${dates}</tr>`;
+  }).join('');
 }
 let BLD=[], bSort={col:'occ_avg',dir:'desc'};
 const BCOLS=[
