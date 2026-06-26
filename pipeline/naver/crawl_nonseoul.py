@@ -56,6 +56,13 @@ def collect_dongs(nl):
 
 
 def main():
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--types", default="OPST",
+                    help="콤마구분 realEstateType (예: APT,OPST,VL,OR,DDDGG,SG). 기본 OPST")
+    args = ap.parse_args()
+    type_codes = [c.strip() for c in args.types.split(",") if c.strip()]
+
     db.init_db()
     nl = NaverLand(headless=True)
     try:
@@ -66,19 +73,20 @@ def main():
             "INSERT OR REPLACE INTO regions(cortarNo,sido,sigungu,dong,lat,lon) VALUES(?,?,?,?,?,?)",
             dongs)
         conn.commit(); conn.close()
-        print(f"[{now()}] 타겟 동 수: {len(dongs)}")
+        print(f"[{now()}] 타겟 동 수: {len(dongs)} / 타입: {type_codes}")
 
+        jobs = [(d, code) for d in dongs for code in type_codes]
         grand = 0
-        for i, (cno, sido, sigungu, dong, lat, lon) in enumerate(dongs, 1):
+        for i, ((cno, sido, sigungu, dong, lat, lon), code) in enumerate(jobs, 1):
             try:
-                n = crawl_dong(nl, cno, sido, sigungu, dong)
+                n = crawl_dong(nl, cno, sido, sigungu, dong, real_estate_type=code)
             except Exception as e:
-                print(f"[{now()}] 실패 {sido} {sigungu} {dong}: {repr(e)[:70]}")
+                print(f"[{now()}] 실패 {sido} {sigungu} {dong} {code}: {repr(e)[:70]}")
                 try: nl.restart()
                 except Exception: pass
                 continue
             grand += n
-            print(f"[{now()}] ({i}/{len(dongs)}) {sido} {sigungu} {dong}: {n}건 (누적 {grand})")
+            print(f"[{now()}] ({i}/{len(jobs)}) {sido} {sigungu} {dong} {code}: {n}건 (누적 {grand})")
             if i % 150 == 0:
                 nl.restart()
         print(f"[{now()}] 비수도권 크롤 완료. 총 {grand}건.")
