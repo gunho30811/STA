@@ -81,9 +81,9 @@
   <div class="panel">
     <h2 class="sec">옵션별 예약률 영향 — 옵션을 클릭하면 그 옵션 <span class="badge2">없는 집</span> 목록이 아래에 떠요</h2>
     <p class="hint">
-      <b>단순차이</b>=전체 평균 비교(평수·가격 안 맞춰서 교란 가능, 참고용). <b>★보정차이</b>=<b>같은 평수대(2평)·같은 가격대(주당 10만)끼리만</b>
-      옵션 유무 예약률을 비교한 값(교란 제거) — <b>이게 진짜 옵션 효과</b>. 보정차이가 <b>작거나 음수면 그 옵션 없어도 잘 나간다</b>(굳이 안 갖춰도 됨).
-      <b>보정표본</b>이 작으면 신뢰도 낮음. 끝의 <b>평수·주당(있/없)</b>으로 두 그룹이 실제 비슷한지 눈으로 확인 가능. 옵션 클릭 시 그 옵션 없는 집 목록.
+      <b>판정</b>으로 먼저 봐: <span style="color:#7c3aed;font-weight:700">사실상 필수</span>=보유율 95%+라 거의 다 갖춤 → <b>효과를 데이터로 못 잼(없는 집이 없으니까)</b>, 그냥 갖춰야 하는 옵션.
+      <span style="color:#2563eb;font-weight:700">측정가능</span>=있는집·없는집 둘 다 충분 → <b>보정차이</b>(같은 평수·가격대끼리 비교)가 신뢰할 만함: 크면 중요, 작거나 음수면 없어도 잘 나감.
+      <span style="color:#9ca3af;font-weight:700">표본부족</span>=비교 대상이 적어 숫자 못 믿음. · <b>단순차이</b>는 평수·가격 교란이 섞인 참고값. 끝의 평수·주당(있/없)으로 두 그룹이 실제 비슷한지 확인.
     </p>
     <div class="scroll">
       <table id="tbl">
@@ -115,19 +115,24 @@
 </div>
 
 <script>
-let TREE={}, curOption="", curMode="none", curSort={col:"adj",dir:"desc"};
+let TREE={}, curOption="", curMode="none", curSort={col:null,dir:"desc"};
 const COLS=[
   {k:"name",t:"옵션",l:true},
-  {k:"have_n",t:"있는집수"},
-  {k:"none_n",t:"없는집수"},
-  {k:"have_occ",t:"있을때 예약률%"},
-  {k:"none_occ",t:"없을때 예약률%"},
+  {k:"verdict",t:"판정",l:true},
+  {k:"adoption",t:"보유율%"},
+  {k:"have_n",t:"있는집"},
+  {k:"none_n",t:"없는집"},
   {k:"diff",t:"단순차이"},
   {k:"adj",t:"보정차이(같은평수·가격)"},
   {k:"adjn",t:"보정표본"},
   {k:"py",t:"평수(있/없)"},
   {k:"wk",t:"주당(있/없)"},
 ];
+const VERDICT={
+  measurable:{t:"측정가능",c:"#2563eb"},
+  essential:{t:"사실상 필수",c:"#7c3aed"},
+  lowsample:{t:"표본부족",c:"#9ca3af"},
+};
 let TABLE=[];
 
 function v(id){return document.getElementById(id).value;}
@@ -171,29 +176,36 @@ function renderThead(){
     tr.appendChild(th);
   });
 }
-function flat(r){return {option:r.option,name:r.name||r.option,have_n:r.have.n,have_occ:r.have.occ,
-  none_n:r.none.n,none_occ:r.none.occ,diff:r.diff,adj:r.adj,adjn:r.adjn,
+function flat(r){return {option:r.option,name:r.name||r.option,verdict:r.verdict,adoption:r.adoption,
+  have_n:r.have.n,none_n:r.none.n,diff:r.diff,adj:r.adj,adjn:r.adjn,
   have_py:r.have.pyeong,none_py:r.none.pyeong,have_wk:r.have.week,none_wk:r.none.week};}
 function sval(x,k){ // 정렬용 값
-  if(k==='name')return x.name; if(k==='py')return x.have_py; if(k==='wk')return x.have_wk; return x[k];
+  if(k==='name'||k==='verdict')return x[k]; if(k==='py')return x.have_py; if(k==='wk')return x.have_wk; return x[k];
 }
 function renderTable(){
   const tb=document.getElementById('tbody');tb.innerHTML='';
-  const rows=TABLE.map(flat);
-  const k=curSort.col, num=k!=='name';
-  const pres=rows.filter(x=>sval(x,k)!=null&&sval(x,k)!==''), mis=rows.filter(x=>sval(x,k)==null||sval(x,k)==='');
-  pres.sort((a,b)=>{const av=sval(a,k),bv=sval(b,k);const c=num?(av-bv):String(av).localeCompare(String(bv),'ko');return curSort.dir==='asc'?c:-c;});
-  [...pres,...mis].forEach(x=>{
+  let rows=TABLE.map(flat);
+  // 사용자가 헤더로 직접 정렬한 경우만 재정렬, 아니면 서버 순서(판정 그룹) 유지
+  if(curSort.col){
+    const k=curSort.col, num=(k!=='name'&&k!=='verdict');
+    const pres=rows.filter(x=>sval(x,k)!=null&&sval(x,k)!==''), mis=rows.filter(x=>sval(x,k)==null||sval(x,k)==='');
+    pres.sort((a,b)=>{const av=sval(a,k),bv=sval(b,k);const c=num?(av-bv):String(av).localeCompare(String(bv),'ko');return curSort.dir==='asc'?c:-c;});
+    rows=[...pres,...mis];
+  }
+  rows.forEach(x=>{
     const tr=document.createElement('tr');
     if(x.option===curOption)tr.className='on';
-    // 보정차이 기준 색: 작거나 음수=없어도 됨(초록), 크면 중요(빨강)
-    const acls=x.adj==null?'mut':(x.adj<=2?'good':'bad');
     const sgn=v=>v==null?'-':(v>0?'+':'')+v;
+    const vd=VERDICT[x.verdict]||{t:x.verdict,c:'#666'};
+    // 측정가능일 때만 보정차이에 의미 색(작거나 음수=없어도됨 초록, 크면 중요 빨강). 그 외엔 회색.
+    const meas=x.verdict==='measurable';
+    const acls=!meas?'mut':(x.adj==null?'mut':(x.adj<=2?'good':'bad'));
     tr.innerHTML=`<td class="l"><span class="opt">${x.name}</span></td>
+      <td class="l"><span style="font-size:11px;font-weight:800;color:#fff;background:${vd.c};padding:2px 8px;border-radius:999px">${vd.t}</span></td>
+      <td>${x.adoption}%</td>
       <td>${x.have_n}</td><td>${x.none_n}</td>
-      <td>${pct(x.have_occ)}</td><td>${pct(x.none_occ)}</td>
       <td class="mut">${sgn(x.diff)}</td>
-      <td class="${acls}" style="font-weight:800">${sgn(x.adj)}</td>
+      <td class="${acls}" style="font-weight:800">${meas?sgn(x.adj):'<span class="mut">'+sgn(x.adj)+'</span>'}</td>
       <td class="mut">${x.adjn||0}</td>
       <td class="mut">${x.have_py??'-'}/${x.none_py??'-'}</td>
       <td class="mut">${x.have_wk??'-'}/${x.none_wk??'-'}</td>`;
