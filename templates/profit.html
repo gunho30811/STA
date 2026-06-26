@@ -85,9 +85,12 @@
         <div class="fg"><label>&nbsp;</label><button class="btn btn-reset" onclick="resetF()">초기화</button></div>
       </div>
       <div class="legend">
-        <b>순수익</b>=1달실현수익−(네이버월세+관리비) · <b>1달실현수익</b>=삼삼주당×(예약일/7) · <b>네이버÷삼삼주당</b>=네이버월총÷삼삼주당 ·
-        <b>현실효율</b>=1달실현÷네이버월세 · <b>구공실률/구경쟁매물수</b>=같은 시군구의 삼삼 평균 공실률·매물수(구별 공실률 탭 기준) ·
-        <b>동삼삼매물수</b>=같은 동의 삼삼 매물수(자기 제외, 직접 계산) ·
+        <b>환산월세</b>=네이버월세+보증금×6%/12 (보증금 정규화 — 보증금 크기에 따른 순수익 왜곡 제거) ·
+        <b>네이버월총</b>=환산월세+관리비 · <b>순수익</b>=1달실현수익−네이버월총 ·
+        <b>1달실현수익</b>=삼삼주당×(예약일/7) · <b>네이버÷삼삼주당</b>=네이버월총÷삼삼주당 ·
+        <b>현실효율</b>=1달실현÷환산월세 ·
+        <b>동삼삼매물수</b>=같은 동의 삼삼 매물수(자기 제외) · <b>건물삼삼수</b>=같은 건물(오피스텔)에 올라온 삼삼 매물수(자기 포함) ·
+        <b>구공실률/구경쟁매물수</b>=같은 시군구의 삼삼 평균 공실률·매물수(구별 공실률 탭 기준) ·
         <b>역공실률/역경쟁매물수</b>=같은 인근역의 삼삼 평균 공실률·매물수(역별 공실률 탭 기준, 매물수 3개 미만은 '-') ·
         관리비 미표기는 평당 2만원 추정 · 헤더 클릭 시 정렬, 다시 클릭하면 오름차순/내림차순 토글
       </div>
@@ -119,6 +122,7 @@ const COLS = [
   {k:"guVacancy", t:"구공실률%"},
   {k:"guCompetitors", t:"구경쟁매물수"},
   {k:"samNearby", t:"동삼삼매물수"},
+  {k:"samBldg", t:"건물삼삼수"},
   {k:"station", t:"인근역", l:true},
   {k:"stVacancy", t:"역공실률%"},
   {k:"stCompetitors", t:"역경쟁매물수"},
@@ -132,6 +136,7 @@ const COLS = [
   {k:"wk", t:"삼삼주당"},
   {k:"nTotal", t:"네이버월총"},
   {k:"nRent", t:"네이버월세"},
+  {k:"nEquiv", t:"환산월세"},
   {k:"nDep", t:"보증금"},
   {k:"matches", t:"매칭수"},
   {k:"bldgCnt", t:"건물매물수"},
@@ -206,6 +211,7 @@ function renderRows(items){
       <td>${x.guVacancy!=null?x.guVacancy+'%':'-'}</td>
       <td>${num(x.guCompetitors)}</td>
       <td>${num(x.samNearby)}</td>
+      <td>${num(x.samBldg)}</td>
       <td class="l">${x.station||''}</td>
       <td>${x.stVacancy!=null?x.stVacancy+'%':'-'}</td>
       <td>${num(x.stCompetitors)}</td>
@@ -216,6 +222,7 @@ function renderRows(items){
       <td>${x.realEff!=null?x.realEff:'-'}</td>
       <td>${num(x.bk)}</td><td>${num(x.blk)}</td>
       <td>${num(x.wk)}</td><td>${num(x.nTotal)}</td><td>${num(x.nRent)}</td>
+      <td>${num(x.nEquiv)}</td>
       <td>${num(x.nDep)}</td><td>${num(x.matches)}</td>
       <td>${num(x.bldgCnt)}</td><td>${num(x.bldgRentMin)}</td><td>${num(x.bldgRentMed)}</td><td>${num(x.bldgRentMax)}</td>
       <td class="l">

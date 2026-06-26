@@ -35,20 +35,23 @@ def _num(v):
 PROFIT_MAP = {
     "삼삼ID": "id", "매물명": "name", "건물유형": "btype", "방수": "rooms",
     "시도": "sido", "시군구": "sigungu", "동": "dong", "인근역": "station",
-    "동삼삼매물수": "samNearby", "평수": "pyeong",
+    "동삼삼매물수": "samNearby", "삼삼동일건물매물수": "samBldg", "평수": "pyeong",
     "삼삼주당_만원": "wk", "삼삼월환산_만원": "mEq",
     "1달예약일": "bk", "1달막힘일": "blk", "1달실현수익_만원": "realized",
-    "네이버월세_만원": "nRent", "네이버관리비_만원": "nMgmt", "관리비표기여부": "mgmtFlag",
+    "네이버월세_만원": "nRent", "네이버환산월세_만원": "nEquiv",
+    "네이버관리비_만원": "nMgmt", "관리비표기여부": "mgmtFlag",
     "네이버월총_만원": "nTotal", "네이버보증금_만원": "nDep", "매칭매물수": "matches",
     "네이버월총÷삼삼주당": "mult", "실현효율(1달실현÷네이버월총)": "eff",
-    "현실효율(1달실현÷네이버월세)": "realEff", "순수익_만원(1달실현−월세−관리비)": "profit",
+    # 구·신 헤더 동시 지원(현실효율/순수익은 환산 도입으로 헤더 문구가 바뀜)
+    "현실효율(1달실현÷네이버월세)": "realEff", "현실효율(1달실현÷네이버환산월세)": "realEff",
+    "순수익_만원(1달실현−월세−관리비)": "profit", "순수익_만원(1달실현−환산월세−관리비)": "profit",
     "건물네이버매물수": "bldgCnt", "건물월세최저_만원": "bldgRentMin",
     "건물월세중간_만원": "bldgRentMed", "건물월세최고_만원": "bldgRentMax",
     "네이버건물": "bldg", "네이버링크": "naverUrl", "삼삼링크": "samUrl",
 }
-NUM_FIELDS = {"pyeong", "wk", "mEq", "bk", "blk", "realized", "nRent", "nMgmt",
+NUM_FIELDS = {"pyeong", "wk", "mEq", "bk", "blk", "realized", "nRent", "nEquiv", "nMgmt",
               "nTotal", "nDep", "matches", "mult", "eff", "realEff", "profit",
-              "guVacancy", "guCompetitors", "samNearby", "stVacancy", "stCompetitors",
+              "guVacancy", "guCompetitors", "samNearby", "samBldg", "stVacancy", "stCompetitors",
               "bldgCnt", "bldgRentMin", "bldgRentMed", "bldgRentMax"}
 EXTRA_FIELDS = {"guVacancy", "guCompetitors", "stVacancy", "stCompetitors"}
 
@@ -97,8 +100,12 @@ def load_profit():
         path = os.path.join(DATA, "net_profit_strict.csv")
     with open(path, encoding="utf-8-sig") as f:
         for r in csv.DictReader(f):
-            o = {}
+            # 모든 키 기본값 초기화 후, CSV에 실제 존재하는 컬럼만 채운다.
+            # (현실효율/순수익은 구·신 헤더가 같은 키에 매핑돼 있어, 없는 헤더가 값을 덮어쓰지 않게 함)
+            o = {key: (None if key in NUM_FIELDS else "") for key in PROFIT_MAP.values()}
             for kr, key in PROFIT_MAP.items():
+                if kr not in r:
+                    continue
                 v = r.get(kr)
                 o[key] = _num(v) if key in NUM_FIELDS else (v or "")
             gu = GU_VACANCY.get((o["sido"], o["sigungu"]), {})
