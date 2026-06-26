@@ -49,6 +49,10 @@
   .toggle button:first-child{border-radius:7px 0 0 7px}.toggle button:last-child{border-radius:0 7px 7px 0;border-left:none}
   .toggle button.on{background:#2563eb;color:#fff;border-color:#2563eb}
   .empty{text-align:center;color:#9ca3af;padding:40px 0}
+  .tabs2{display:flex;gap:6px;margin-bottom:12px}
+  .tabs2 button{border:1px solid #d1d5db;background:#fff;color:#475569;padding:8px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
+  .tabs2 button.on{background:#2563eb;color:#fff;border-color:#2563eb}
+  .occ{font-weight:700;color:#0369a1}
 </style>
 </head>
 <body>
@@ -67,10 +71,16 @@
       <div class="fg"><label>건물유형</label><select id="f-btype"><option value="">전체</option></select></div>
       <div class="fg"><label>평수</label><div style="display:flex;gap:4px"><input type="number" id="f-pmin" placeholder="최소" style="width:64px"><input type="number" id="f-pmax" placeholder="최대" style="width:64px"></div></div>
       <div class="fg"><label>주당(만원)</label><div style="display:flex;gap:4px"><input type="number" id="f-wmin" placeholder="최소" style="width:64px"><input type="number" id="f-wmax" placeholder="최대" style="width:64px"></div></div>
-      <div class="fg"><label>&nbsp;</label><button class="btn btn-go" onclick="analyze()">분석</button></div>
+      <div class="fg"><label>&nbsp;</label><button class="btn btn-go" onclick="runView()">분석</button></div>
     </div>
   </div>
 
+  <div class="tabs2">
+    <button id="tab-option" class="on" onclick="switchView('option')">옵션 영향</button>
+    <button id="tab-building" onclick="switchView('building')">건물 인기</button>
+  </div>
+
+  <div id="view-option">
   <div class="cards">
     <div class="card"><div class="lbl">대상 매물수</div><div class="val" id="c-n">-</div></div>
     <div class="card"><div class="lbl">평균 예약률</div><div class="val" id="c-occ">-<small> %</small></div></div>
@@ -106,6 +116,23 @@
         <thead><tr id="list-h"></tr></thead>
         <tbody id="list-b"></tbody>
       </table>
+    </div>
+  </div>
+  </div><!-- /view-option -->
+
+  <div id="view-building" style="display:none">
+    <div class="panel">
+      <h2 class="sec">건물(오피스텔) 인기 순위 — 한 건물에 삼삼 여러 채가 <b>다 잘 나가면</b> 검증된 건물 🔥</h2>
+      <p class="hint">
+        <b>매물수</b>=그 건물의 삼삼 매물 수. <b>최저예약률</b>이 높으면 <b>전 호실이 다 잘 나간다</b>는 뜻(대박 후보). 위 필터(지역/유형/평수/주당) 적용됨.
+        최소 매물수 <select id="b-minn" onchange="loadBuildings()"><option>2</option><option>1</option><option>3</option><option>5</option></select>채 이상 · 헤더 클릭 정렬.
+      </p>
+      <div class="scroll">
+        <table>
+          <thead><tr id="b-h"></tr></thead>
+          <tbody id="b-b"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
@@ -288,6 +315,48 @@ function renderListBody(){
       <td class="l"><a class="lnk" href="${x.url}" target="_blank">삼삼</a></td>`;
     tb.appendChild(tr);
   });
+}
+// ── 뷰 전환 (옵션 영향 / 건물 인기) ──
+let currentView='option';
+function runView(){ currentView==='option'?analyze():loadBuildings(); }
+function switchView(v){
+  currentView=v;
+  document.getElementById('tab-option').classList.toggle('on',v==='option');
+  document.getElementById('tab-building').classList.toggle('on',v==='building');
+  document.getElementById('view-option').style.display=v==='option'?'':'none';
+  document.getElementById('view-building').style.display=v==='building'?'':'none';
+  runView();
+}
+let BLD=[], bSort={col:'occ_avg',dir:'desc'};
+const BCOLS=[
+  {k:'building',t:'건물명',l:true},{k:'dong',t:'동',l:true},{k:'btype',t:'유형',l:true},
+  {k:'station',t:'역',l:true},{k:'n',t:'매물수'},{k:'occ_avg',t:'평균예약률%'},
+  {k:'occ_min',t:'최저예약률%'},{k:'occ_max',t:'최고예약률%'},{k:'week_avg',t:'평균주당'},
+];
+async function loadBuildings(){
+  const p=params(); p.set('min_n',document.getElementById('b-minn').value);
+  const r=await (await fetch('/api/buildings?'+p)).json();
+  BLD=r.items; renderBuildings();
+}
+function renderBuildings(){
+  const h=document.getElementById('b-h');h.innerHTML='';
+  BCOLS.forEach(c=>{const th=document.createElement('th');if(c.l)th.className='l';th.style.cursor='pointer';
+    th.textContent=c.t+(c.k===bSort.col?(bSort.dir==='asc'?' ▲':' ▼'):'');
+    th.onclick=()=>{if(bSort.col===c.k)bSort.dir=bSort.dir==='asc'?'desc':'asc';else{bSort.col=c.k;bSort.dir='desc';}renderBuildings();};
+    h.appendChild(th);});
+  const isNum=k=>['n','occ_avg','occ_min','occ_max','week_avg'].includes(k);
+  const k=bSort.col;
+  const rows=[...BLD].sort((a,b)=>{let av=a[k],bv=b[k];
+    if(isNum(k))return bSort.dir==='asc'?av-bv:bv-av;
+    return bSort.dir==='asc'?String(av).localeCompare(String(bv),'ko'):String(bv).localeCompare(String(av),'ko');});
+  const b=document.getElementById('b-b');
+  if(!rows.length){b.innerHTML='<tr><td colspan="9" class="empty">매물수 조건을 만족하는 건물이 없습니다.</td></tr>';return;}
+  b.innerHTML=rows.map(r=>{
+    const minc=r.occ_min>=60?'good':(r.occ_min<30?'bad':'mut');
+    return `<tr><td class="l" style="font-weight:700">${r.building}</td><td class="l">${r.dong}</td><td class="l">${r.btype}</td><td class="l">${r.station||'-'}</td>
+      <td style="font-weight:800">${r.n}</td><td class="occ">${r.occ_avg}%</td>
+      <td class="${minc}" style="font-weight:800">${r.occ_min}%</td><td class="mut">${r.occ_max}%</td><td>${r.week_avg}</td></tr>`;
+  }).join('');
 }
 init();
 </script>

@@ -264,6 +264,43 @@ def api_listings():
     return jsonify({"total": len(items), "items": items, "optionName": ko(option)})
 
 
+@app.route("/api/buildings")
+def api_buildings():
+    """건물(오피스텔) 단위 인기 순위 — 한 건물에 삼삼 매물이 여러 채 있고 그게 다 잘 나가면
+    '검증된 대박 건물'. 매물수(n)·평균예약률·최저예약률(전 호실 다 잘 나가는지)·평균주당."""
+    a = request.args
+    rows = _filtered(a)
+    try:
+        min_n = max(1, int(a.get("min_n", 2)))
+    except ValueError:
+        min_n = 2
+    by = {}
+    for r in rows:
+        bn = (r.get("building_name") or "").strip()
+        if not bn:
+            continue
+        by.setdefault((r.get("sigungu", ""), r.get("dong", ""), bn), []).append(r)
+    out = []
+    for (sg, dong, bn), xs in by.items():
+        if len(xs) < min_n:
+            continue
+        occs = [x["occ"] * 100 for x in xs]
+        out.append({
+            "building": bn, "sigungu": sg, "dong": dong,
+            "btype": xs[0].get("building_type", ""),
+            "n": len(xs),
+            "occ_avg": round(statistics.mean(occs), 1),
+            "occ_min": round(min(occs), 1),
+            "occ_max": round(max(occs), 1),
+            "week_avg": round(statistics.mean(x["sam_week_man"] for x in xs), 1),
+            "station": next((x["station"] for x in xs if x.get("station")), ""),
+            "room_ids": [x["room_id"] for x in xs],
+        })
+    # 평균예약률 높고 매물 많은 순. (최저예약률도 높으면 전 호실 검증된 건물)
+    out.sort(key=lambda r: (-r["occ_avg"], -r["n"]))
+    return jsonify({"total": len(out), "items": out})
+
+
 if __name__ == "__main__":
     import socket
     try:
