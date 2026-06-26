@@ -76,8 +76,14 @@ def source_articles(args):
     p = []
     if args.sido:
         q += " AND sido LIKE ?"; p.append(f"%{args.sido}%")
+    sidos = [s.strip() for s in (args.sidos or "").split(",") if s.strip()]
+    if sidos:
+        q += f" AND sido IN ({','.join('?' * len(sidos))})"; p += sidos
     if args.gu:
         q += " AND sigungu LIKE ?"; p.append(f"%{args.gu}%")
+    inc = [t.strip() for t in (args.types or "").split(",") if t.strip()]
+    if inc:
+        q += f" AND realEstateType IN ({','.join('?' * len(inc))})"; p += inc
     ex = [t.strip() for t in (args.exclude_types or "").split(",") if t.strip()]
     if ex:
         q += f" AND (realEstateType IS NULL OR realEstateType NOT IN ({','.join('?' * len(ex))}))"
@@ -95,6 +101,8 @@ def source_articles(args):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sido")
+    ap.add_argument("--sidos", default="", help="콤마구분 시도 정확매칭(예: 서울시,경기도,인천시)")
+    ap.add_argument("--types", default="", help="콤마구분 포함 타입(한글, 예: 오피스텔). 비우면 전체")
     ap.add_argument("--gu")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--redo", action="store_true")
