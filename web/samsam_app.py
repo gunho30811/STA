@@ -49,6 +49,12 @@ def ko(code):
     return OPTION_KO.get(code, code)
 
 
+# 판정 임계값: '없는 집'·보정표본이 이만큼은 돼야 보정차이를 신뢰. 보유율 95%+는 필수재로 분류.
+MIN_NONE = 20
+MIN_ADJ = 15
+ESSENTIAL_ADOPTION = 95
+
+
 def _parse_list(v):
     if isinstance(v, list):
         return v
@@ -199,6 +205,7 @@ def api_analyze():
     """지역/유형으로 거른 집합의 전체 통계 + 옵션별 있음/없음 예약률 비교 표."""
     rows = _filtered(request.args)
     overall = _grp(rows)
+    total = len(rows)
     opts = sorted({o for r in rows for o in r["options"]})
     table = []
     for o in opts:
@@ -208,10 +215,25 @@ def api_analyze():
         diff = (round(gh["occ"] - gn["occ"], 1)
                 if gh["occ"] is not None and gn["occ"] is not None else None)
         adj, adjn = _adj_diff(rows, o)   # 같은 평수·가격대 보정 차이
+        adoption = round(len(have) / total * 100, 1) if total else 0
+        # 판정: 보유율 95%+ = 필수재(거의 다 보유 → 효과 측정 불가). 그 외엔 없는집/보정표본이
+        # 충분해야 측정 가능. 둘 다 아니면 표본부족.
+        if adoption >= ESSENTIAL_ADOPTION:
+            verdict = "essential"      # 사실상 필수
+        elif len(none) >= MIN_NONE and adjn >= MIN_ADJ:
+            verdict = "measurable"     # 측정 가능(보정차이 신뢰)
+        else:
+            verdict = "lowsample"      # 표본부족
         table.append({"option": o, "name": ko(o), "have": gh, "none": gn,
-                      "diff": diff, "adj": adj, "adjn": adjn})
-    # 보정 차이(같은 평수·가격대 기준) 큰 순. 보정값 없으면(표본부족) 뒤로.
-    table.sort(key=lambda x: (x["adj"] is None, -(x["adj"] or 0)))
+                      "diff": diff, "adj": adj, "adjn": adjn,
+                      "adoption": adoption, "verdict": verdict})
+
+    def _key(x):
+        # 측정가능(보정차이 큰 순) → 필수재(보유율 순) → 표본부족
+        rank = {"measurable": 0, "essential": 1, "lowsample": 2}[x["verdict"]]
+        second = -(x["adj"] or 0) if x["verdict"] == "measurable" else -x["adoption"]
+        return (rank, second)
+    table.sort(key=_key)
     return jsonify({"overall": overall, "table": table})
 
 
