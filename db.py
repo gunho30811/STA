@@ -2,9 +2,22 @@
 import os
 import re
 
-import psycopg2
-import psycopg2.extras
 from dotenv import load_dotenv
+
+# psycopg2 우선. 빌드 불가 환경(예: Python 3.15 알파, 휠 없음)에선 순수파이썬 pg8000으로 폴백.
+try:
+    import psycopg2
+    import psycopg2.extras
+    _DRIVER = 'psycopg2'
+except ImportError:
+    psycopg2 = None
+    try:
+        import ssl
+        import urllib.parse
+        import pg8000.dbapi
+        _DRIVER = 'pg8000'
+    except ImportError:
+        _DRIVER = None
 
 load_dotenv()
 
@@ -42,7 +55,9 @@ class _Row:
     __slots__ = ('_d', '_v')
 
     def __init__(self, description, values):
-        self._d = {d.name: v for d, v in zip(description, values)}
+        # psycopg2 description은 .name 속성, pg8000은 (name, ...) 튜플.
+        self._d = {(d.name if hasattr(d, 'name') else d[0]): v
+                   for d, v in zip(description, values)}
         self._v = tuple(values)
 
     def __getitem__(self, key):
@@ -93,23 +108,56 @@ class _Cursor:
         return self._cur.rowcount
 
 
+def _pg8000_connect(url):
+    """pg8000으로 Postgres 연결. Supabase 풀러는 자체 CA를 써서 공개 CA로는 검증 불가."""
+    u = urllib.parse.urlparse(url)
+    ca = os.environ.get('DB_SSL_CA')
+    if ca:
+        ctx = ssl.create_default_context(cafile=ca)   # CA 파일 지정 시 정식 검증
+    else:
+        # psycopg2 기본 sslmode와 동일하게 '암호화하되 CA 검증 생략'.
+        # 정식 검증을 원하면 환경변수 DB_SSL_CA 에 Supabase CA 인증서 경로를 지정.
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+    return pg8000.dbapi.connect(
+        user=urllib.parse.unquote(u.username or ''),
+        password=urllib.parse.unquote(u.password or ''),
+        host=u.hostname, port=u.port or 5432,
+        database=(u.path or '/').lstrip('/'),
+        ssl_context=ctx, timeout=30,
+    )
+
+
 class _Conn:
-    """psycopg2 connection with a sqlite3-compatible interface."""
+    """Postgres connection with a sqlite3-compatible interface (psycopg2 또는 pg8000)."""
 
     def __init__(self):
         url = os.environ.get('DATABASE_URL')
         if not url:
             raise RuntimeError('DATABASE_URL 환경변수를 설정하세요 (.env 또는 Railway 환경변수).')
-        self._conn = psycopg2.connect(url)
+        if _DRIVER == 'psycopg2':
+            self._conn = psycopg2.connect(url)
+        elif _DRIVER == 'pg8000':
+            self._conn = _pg8000_connect(url)
+        else:
+            raise RuntimeError('Postgres 드라이버가 없습니다 (psycopg2 또는 pg8000 설치 필요).')
 
     def execute(self, sql, params=()):
         cur = self._conn.cursor()
-        cur.execute(_to_pg(sql), params or None)
+        if params:
+            cur.execute(_to_pg(sql), params)
+        else:
+            cur.execute(_to_pg(sql))
         return _Cursor(cur)
 
     def executemany(self, sql, seq):
         cur = self._conn.cursor()
-        psycopg2.extras.execute_batch(cur, _to_pg(sql), seq, page_size=500)
+        sql = _to_pg(sql)
+        if _DRIVER == 'psycopg2':
+            psycopg2.extras.execute_batch(cur, sql, seq, page_size=500)
+        else:
+            cur.executemany(sql, list(seq))
         return _Cursor(cur)
 
     def commit(self):

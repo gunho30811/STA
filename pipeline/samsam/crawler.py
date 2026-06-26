@@ -206,7 +206,11 @@ def _get(session, url, params=None):
 
 
 def collect_rids(session):
-    """전체 매물 rid 목록 수집. {rid: property_type} 반환."""
+    """전체 매물 목록 수집. {rid: room(목록객체)} 반환.
+
+    목록 API가 지역(state/province/town)·좌표·주소·가격·평수·방수까지 주므로 room 전체를 보관해
+    상세 호출 없이 지역 사전필터 + 다수 컬럼 매핑에 재사용한다.
+    """
     rids = {}
     for pt in PROPERTY_TYPES:
         page, cnt, empty = 1, 0, 0
@@ -225,7 +229,7 @@ def collect_rids(session):
                 continue
             empty = 0
             for room in content:
-                rids[room['rid']] = pt
+                rids[room['rid']] = room
             cnt += len(content)
             if page % 20 == 0:
                 log(f"  {pt}: {cnt}개...")
@@ -242,52 +246,62 @@ def fetch_detail(session, rid):
 
 
 def fetch_schedules(session, rid):
-    """예약 스케줄. 엔드포인트: GET /v1/use-auth/rooms/{rid}/schedules"""
-    d = _get(session, f'{BASE}/v1/use-auth/rooms/{rid}/schedules',
-             params={'from': TODAY.isoformat(), 'to': D90.isoformat()})
-    time.sleep(REQ_SLEEP)
-    if not d:
-        return {}
-    data = d.get('data', {})
-    # 응답 형태: {schedules: {...}} 또는 {calendars: {...}} 또는 직접 dict
-    return (data.get('schedules') or data.get('calendars') or
-            data.get('schedule') or {})
+    """예약 스케줄 → {날짜:상태} dict. 상태: 'booking'(예약)/'disable'(막힘).
+
+    엔드포인트는 year+month(정수) 필수, 응답은 data.schedules = [{date,status}, ...].
+    오늘~+90일을 덮는 월(보통 3~4개)을 각각 호출해 병합.
+    """
+    out = {}
+    months = {(TODAY.year, TODAY.month)}
+    for off in (30, 60, 90):
+        dd = TODAY + timedelta(days=off)
+        months.add((dd.year, dd.month))
+    for (y, m) in sorted(months):
+        d = _get(session, f'{BASE}/v1/use-auth/rooms/{rid}/schedules',
+                 params={'year': y, 'month': m})
+        time.sleep(REQ_SLEEP)
+        if not d:
+            continue
+        for e in (d.get('data', {}).get('schedules') or []):
+            if e.get('date'):
+                out[e['date']] = e.get('status')
+    return out
 
 
 # ── 행 매핑 ────────────────────────────────────────────────────────────────────
-def map_row(rid, pt, detail, schedules):
-    """API 응답 → samsam_listings 컬럼 dict."""
-    road_raw = detail.get('roadAddress') or detail.get('road_address') or ''
-    jibun_raw = detail.get('jibunAddress') or detail.get('jibun_address') or ''
+_PARK_NO = {None, '', 'IMPOSSIBLE', 'UNAVAILABLE', 'NONE', 'NO'}
 
-    floor = (detail.get('floor')
-             or _parse_floor(road_raw)
-             or _parse_floor(jibun_raw))
-    road_addr = _strip_floor(road_raw)
-    jibun_addr = _strip_floor(jibun_raw)
-    bldg_name = (detail.get('buildingName') or detail.get('building_name')
-                 or _parse_building_name(jibun_raw))
 
-    lat = detail.get('lat') or detail.get('latitude')
-    lng = detail.get('lng') or detail.get('longitude')
+def map_row(rid, room, detail, schedules):
+    """목록(room) + 상세(detail) + 스케줄 → samsam_listings 컬럼 dict.
 
-    area_m2 = (detail.get('exclusiveArea') or detail.get('area_m2')
-               or detail.get('area') or detail.get('supplyArea'))
-    area_py = detail.get('pyeong') or detail.get('area_pyeong')
-    if area_m2 and not area_py:
-        area_py = round(area_m2 / 3.305785)
+    주소·지역·좌표·평수·가격·방수는 목록 API(room)가 직접 주고, 면적·옵션·엘베·주차는 상세(detail).
+    옵션값은 영문 코드(예: TV, REFRIGERATOR) 그대로 저장 — 표시는 뷰어에서 한글 매핑.
+    """
+    room = room or {}
+    detail = detail or {}
 
-    rent_w = (detail.get('fee') or detail.get('rentFee')
-              or detail.get('rent_weekly') or 0)
-    mgmt_w = (detail.get('maintenanceFee') or detail.get('maintenance_fee')
-              or detail.get('maintenance_weekly') or 0)
-    total_w = (detail.get('totalFee') or detail.get('total_fee')
-               or rent_w + mgmt_w)
+    road_raw = room.get('addrStreet') or detail.get('addrStreet') or ''
+    jibun_raw = room.get('addrLot') or detail.get('addrLot') or ''
+    floor = _parse_floor(jibun_raw) or _parse_floor(road_raw)
+    bldg_name = _parse_building_name(jibun_raw)
 
-    jibun_ref = jibun_raw or road_raw
-    sido = _parse_sido(jibun_ref)
-    sigungu = _parse_sigungu(jibun_ref)
-    dong = _parse_dong(jibun_ref)
+    lat = room.get('lat') or detail.get('lat')
+    lng = room.get('lng') or detail.get('lng')
+
+    area_py = room.get('pyeongSize') or detail.get('pyeongSize')
+    area_m2 = detail.get('squareMeterSize')
+    if not area_m2 and area_py:
+        area_m2 = round(area_py * 3.305785, 1)
+
+    rent_w = room.get('usingFee') or detail.get('usingFee') or 0
+    mgmt_w = room.get('mgmtFee') or detail.get('mgmtFee') or 0
+    total_w = rent_w + mgmt_w
+
+    # 지역은 목록 API가 직접 제공(state=시도, province=시군구, town=동). 없으면 주소 파싱 폴백.
+    sido = room.get('state') or _parse_sido(jibun_raw or road_raw)
+    sigungu = room.get('province') or _parse_sigungu(jibun_raw or road_raw)
+    dong = room.get('town') or _parse_dong(jibun_raw or road_raw)
 
     booked = {'booking'}
     blocked = {'disable', 'disabled', 'blocked'}
@@ -301,29 +315,28 @@ def map_row(rid, pt, detail, schedules):
         sub500 = stations_within(lat, lng, 500)
         sub1k = stations_within(lat, lng, 1000)
 
-    basic = detail.get('basicOptions') or detail.get('basic_options') or []
-    extra = detail.get('extraOptions') or detail.get('extra_options') or []
+    basic = detail.get('basicOptions') or []
+    extra = detail.get('additionalOptions') or []
 
     return {
         'room_id': rid,
         'url': f'{BASE}/guest/room/{rid}',
-        'name': detail.get('name') or detail.get('title') or '',
-        'building_type': BTYPE_KO.get(pt, pt),
-        'road_address': road_addr,
-        'jibun_address': jibun_addr,
+        'name': room.get('roomName') or detail.get('roomName') or '',
+        'building_type': room.get('propertyType') or detail.get('propertyType') or '',
+        'road_address': _strip_floor(road_raw),
+        'jibun_address': _strip_floor(jibun_raw),
         'building_name': bldg_name,
         'floor': floor,
         'lat': lat,
         'lng': lng,
         'area_m2': area_m2,
         'area_pyeong': area_py,
-        'rooms': (detail.get('roomCount') or detail.get('rooms') or 1),
-        'bathrooms': (detail.get('bathroomCount') or detail.get('bathrooms') or 0),
-        'kitchens': (detail.get('kitchenCount') or detail.get('kitchens') or 0),
-        'living_rooms': (detail.get('livingRoomCount') or detail.get('living_rooms') or 0),
-        'elevator': bool(detail.get('hasElevator') or detail.get('elevator')),
-        'parking': bool(detail.get('canParking') or detail.get('hasParking')
-                        or detail.get('parking')),
+        'rooms': room.get('roomCnt') or detail.get('roomCnt') or 1,
+        'bathrooms': room.get('bathroomCnt') or detail.get('bathroomCnt') or 0,
+        'kitchens': room.get('cookroomCnt') or detail.get('cookroomCnt') or 0,
+        'living_rooms': room.get('sittingroomCnt') or detail.get('sittingroomCnt') or 0,
+        'elevator': bool(detail.get('hasElevator')),
+        'parking': detail.get('parkingType') not in _PARK_NO,
         'basic_options': json.dumps(basic, ensure_ascii=False),
         'extra_options': json.dumps(extra, ensure_ascii=False),
         'rent_weekly': rent_w,
@@ -389,17 +402,25 @@ def main():
 
     log("매물 목록 수집 중...")
     rids = collect_rids(session)
-    targets = [(rid, pt) for rid, pt in rids.items() if rid not in done]
-    log(f"수집 대상: {len(targets)}건 (전체 {len(rids)}건)")
+    targets = [(rid, room) for rid, room in rids.items() if rid not in done]
 
+    # 시군구 사전필터: 목록 API의 province/state/주소로 상세 호출 전에 거른다(상세 호출 절감).
     sigungu_filter = args.sigungu.strip()
     if sigungu_filter:
-        log(f"시군구 필터: {sigungu_filter}")
+        def _in_region(room):
+            for k in ('province', 'state', 'addrLot', 'addrStreet'):
+                if sigungu_filter in (room.get(k) or ''):
+                    return True
+            return False
+        before = len(targets)
+        targets = [(rid, room) for rid, room in targets if _in_region(room)]
+        log(f"시군구 필터 '{sigungu_filter}': {before} → {len(targets)}건")
+    log(f"수집 대상: {len(targets)}건 (전체 {len(rids)}건)")
     if args.limit:
         log(f"--limit {args.limit} (적재 목표 건수)")
 
     batch, ok, fail = [], 0, 0
-    for i, (rid, pt) in enumerate(targets, 1):
+    for i, (rid, room) in enumerate(targets, 1):
         if args.limit and ok >= args.limit:
             break
 
@@ -411,15 +432,8 @@ def main():
             fail += 1
             continue
 
-        # 시군구 필터: 도로명/지번 주소에 포함 여부 체크
-        if sigungu_filter:
-            road = detail.get('roadAddress') or detail.get('road_address') or ''
-            jibun = detail.get('jibunAddress') or detail.get('jibun_address') or ''
-            if sigungu_filter not in road and sigungu_filter not in jibun:
-                continue
-
         schedules = fetch_schedules(session, rid)
-        row = map_row(rid, pt, detail, schedules)
+        row = map_row(rid, room, detail, schedules)
         batch.append(row)
 
         if len(batch) >= BATCH:
