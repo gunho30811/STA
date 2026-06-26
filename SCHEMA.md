@@ -55,8 +55,12 @@
 ### 1.4 옵션
 | 컬럼 | 타입 | 설명 | 예시 |
 |------|------|------|------|
-| `basic_options` | jsonb | 기본옵션 종류 배열 | `["냉장고","세탁기","에어컨"]` |
-| `extra_options` | jsonb | 추가옵션 종류 배열 | `["전자레인지","건조기"]` |
+| `basic_options` | jsonb | 기본옵션 — 상세 API `basicOptions`. **영문 코드** 배열 | `["REFRIGERATOR","WASHING_MACHINE","TV"]` |
+| `extra_options` | jsonb | 추가옵션 — 상세 API `additionalOptions`. **영문 코드** 배열 | `["MICROWAVE","DRYER"]` |
+
+> 옵션값은 삼삼 API가 주는 **영문 코드**(TV, REFRIGERATOR, AIR_CONDITIONER …) 그대로 저장한다.
+> 한글 표시명 매핑은 뷰어(`web/samsam_app.py` `OPTION_KO`)에서 한다. 상세 API는 `missingOptions`(해당
+> 매물에 **없는** 옵션 코드)도 주지만 현재 적재 안 함 — "옵션 없는 집"은 (관측된 전체 옵션 − 보유 옵션)으로 계산.
 
 ### 1.5 임대료 (단위: 원/주)
 | 컬럼 | 타입 | 설명 | 예시 |

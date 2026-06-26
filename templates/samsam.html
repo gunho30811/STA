@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>삼삼 옵션별 공실/예약률 분석</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Pretendard","Malgun Gothic","맑은 고딕",sans-serif;background:#f3f5f7;color:#1f2937}
+  header{background:linear-gradient(120deg,#0f172a,#1e293b);color:#fff;padding:16px 24px}
+  header h1{margin:0;font-size:19px;font-weight:800}
+  header p{margin:5px 0 0;font-size:12.5px;color:#94a3b8}
+  .src{display:inline-block;margin-top:6px;font-size:11px;padding:2px 9px;border-radius:999px;font-weight:700}
+  .src.db{background:#064e3b;color:#6ee7b7}.src.sample{background:#7c2d12;color:#fed7aa}
+  .wrap{padding:16px 24px;max-width:1280px;margin:0 auto}
+  .panel{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:15px;margin-bottom:16px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+  .filters{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
+  .fg{display:flex;flex-direction:column;gap:4px}
+  .fg label{font-size:11px;font-weight:700;color:#4b5563}
+  .fg select{padding:7px 9px;border:1px solid #d1d5db;border-radius:7px;font-size:13px;background:#fff;min-width:120px}
+  .btn{cursor:pointer;border:none;border-radius:7px;padding:9px 20px;font-size:13px;font-weight:700}
+  .btn-go{background:#2563eb;color:#fff}
+  .cards{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:13px 18px;min-width:140px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+  .card .lbl{font-size:12px;color:#6b7280}
+  .card .val{font-size:23px;font-weight:800;margin-top:3px}
+  .card .val small{font-size:12px;color:#9ca3af;font-weight:500}
+  h2.sec{font-size:14px;margin:0 0 4px;font-weight:800}
+  .hint{font-size:12px;color:#6b7280;margin:0 0 12px;line-height:1.6}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{padding:8px 9px;text-align:right;border-bottom:1px solid #eef0f2;white-space:nowrap}
+  th{background:#f9fafb;position:sticky;top:0;color:#374151;cursor:pointer;user-select:none}
+  th.l,td.l{text-align:left}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:#eff6ff}
+  tbody tr.on{background:#dbeafe}
+  .opt{font-weight:800;color:#111827}
+  .good{color:#059669;font-weight:800}
+  .bad{color:#dc2626;font-weight:800}
+  .mut{color:#9ca3af}
+  .pill{font-size:11px;background:#f1f5f9;color:#475569;padding:2px 7px;border-radius:6px;margin:1px;display:inline-block}
+  .pill.miss{background:#fee2e2;color:#b91c1c;text-decoration:line-through}
+  .lnk{display:inline-block;padding:3px 8px;border-radius:5px;text-decoration:none;font-size:11px;color:#fff;background:#ff5a5f}
+  .scroll{overflow:auto;max-height:60vh}
+  .badge2{font-size:11px;font-weight:800;color:#fff;background:#ff5a5f;border-radius:6px;padding:2px 8px}
+  .flex{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+  .toggle button{border:1px solid #d1d5db;background:#fff;color:#475569;padding:6px 13px;font-size:12px;cursor:pointer;font-weight:700}
+  .toggle button:first-child{border-radius:7px 0 0 7px}.toggle button:last-child{border-radius:0 7px 7px 0;border-left:none}
+  .toggle button.on{background:#2563eb;color:#fff;border-color:#2563eb}
+  .empty{text-align:center;color:#9ca3af;padding:40px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>🛋️ 삼삼 옵션별 공실/예약률 분석</h1>
+  <p>임대인 관점 — "이 옵션 없어도 잘 나갈까?" · 옵션 <b>있는 집</b> vs <b>없는 집</b>의 평균 예약률 비교 · 최근 1달 기준</p>
+  <span id="src" class="src sample">출처 확인 중…</span>
+</header>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="filters">
+      <div class="fg"><label>시/도</label><select id="f-sido"><option value="">전체</option></select></div>
+      <div class="fg"><label>시군구</label><select id="f-sigungu"><option value="">전체</option></select></div>
+      <div class="fg"><label>동</label><select id="f-dong"><option value="">전체</option></select></div>
+      <div class="fg"><label>건물유형</label><select id="f-btype"><option value="">전체</option></select></div>
+      <div class="fg"><label>&nbsp;</label><button class="btn btn-go" onclick="analyze()">분석</button></div>
+    </div>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="lbl">대상 매물수</div><div class="val" id="c-n">-</div></div>
+    <div class="card"><div class="lbl">평균 예약률</div><div class="val" id="c-occ">-<small> %</small></div></div>
+    <div class="card"><div class="lbl">평균 공실률</div><div class="val" id="c-vac">-<small> %</small></div></div>
+    <div class="card"><div class="lbl">평균 주당임대료</div><div class="val" id="c-week">-<small> 만원</small></div></div>
+  </div>
+
+  <div class="panel">
+    <h2 class="sec">옵션별 예약률 영향 — 옵션을 클릭하면 그 옵션 <span class="badge2">없는 집</span> 목록이 아래에 떠요</h2>
+    <p class="hint">
+      <b>차이(있음−없음)</b>가 클수록 그 옵션이 수요(예약률)에 중요. <b>차이가 작거나 음수</b>면 그 옵션 <b>없어도 잘 나간다</b>는 신호 →
+      임대인 입장에선 굳이 안 갖춰도 되는 옵션. (표본 적은 옵션은 신뢰도 낮으니 '집수'도 같이 볼 것)
+    </p>
+    <div class="scroll">
+      <table id="tbl">
+        <thead><tr id="thead"></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel" id="listpanel" style="display:none">
+    <div class="flex">
+      <h2 class="sec" id="list-title">매물 목록</h2>
+      <div class="toggle">
+        <button id="t-none" class="on" onclick="setMode('none')">옵션 없는 집</button>
+        <button id="t-have" onclick="setMode('have')">있는 집</button>
+      </div>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr>
+          <th class="l">매물명 / 건물</th><th class="l">지역</th><th class="l">역</th>
+          <th>평</th><th>주당</th><th>예약일</th><th>막힘</th><th>예약률%</th><th>공실률%</th>
+          <th class="l">옵션</th><th class="l">링크</th>
+        </tr></thead>
+        <tbody id="list-b"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+let TREE={}, curOption="", curMode="none", curSort={col:"diff",dir:"desc"};
+const COLS=[
+  {k:"option",t:"옵션",l:true},
+  {k:"have_n",t:"있는집수"},
+  {k:"have_occ",t:"있을때 예약률%"},
+  {k:"none_n",t:"없는집수"},
+  {k:"none_occ",t:"없을때 예약률%"},
+  {k:"diff",t:"차이(있−없)"},
+  {k:"none_vac",t:"없을때 공실률%"},
+];
+let TABLE=[];
+
+function v(id){return document.getElementById(id).value;}
+async function init(){
+  const f=await (await fetch('/api/facets')).json();
+  TREE=f.tree;
+  const srcEl=document.getElementById('src');
+  const isDb=f.source && f.source.startsWith('DB');
+  srcEl.className='src '+(isDb?'db':'sample');
+  srcEl.textContent='출처: '+f.source+' · 총 '+f.total.toLocaleString()+'건';
+  const sido=document.getElementById('f-sido');
+  f.sido.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sido.appendChild(o);});
+  sido.onchange=fillSigungu; document.getElementById('f-sigungu').onchange=fillDong;
+  analyze();
+}
+function fillSigungu(){
+  const s=v('f-sido'), sg=document.getElementById('f-sigungu');
+  sg.innerHTML='<option value="">전체</option>';
+  document.getElementById('f-dong').innerHTML='<option value="">전체</option>';
+  if(s&&TREE[s])Object.keys(TREE[s]).sort().forEach(g=>{const o=document.createElement('option');o.value=g;o.textContent=g;sg.appendChild(o);});
+}
+function fillDong(){
+  const s=v('f-sido'), g=v('f-sigungu'), d=document.getElementById('f-dong');
+  d.innerHTML='<option value="">전체</option>';
+  if(s&&g&&TREE[s]&&TREE[s][g])TREE[s][g].forEach(x=>{const o=document.createElement('option');o.value=x;o.textContent=x;d.appendChild(o);});
+}
+function params(){
+  const p=new URLSearchParams();
+  ['sido','sigungu','dong','btype'].forEach(k=>{const val=v('f-'+(k==='btype'?'btype':k));if(val)p.set(k==='btype'?'building_type':k,val);});
+  return p;
+}
+function pct(x){return x==null?'<span class="mut">-</span>':x+'%';}
+function renderThead(){
+  const tr=document.getElementById('thead');tr.innerHTML='';
+  COLS.forEach(c=>{
+    const th=document.createElement('th');if(c.l)th.className='l';
+    th.textContent=c.t+(c.k===curSort.col?(curSort.dir==='asc'?' ▲':' ▼'):'');
+    th.onclick=()=>{if(curSort.col===c.k)curSort.dir=curSort.dir==='asc'?'desc':'asc';else{curSort.col=c.k;curSort.dir='desc';}renderTable();};
+    tr.appendChild(th);
+  });
+}
+function flat(r){return {option:r.option,name:r.name||r.option,have_n:r.have.n,have_occ:r.have.occ,none_n:r.none.n,none_occ:r.none.occ,diff:r.diff,none_vac:r.none.vac};}
+function renderTable(){
+  const tb=document.getElementById('tbody');tb.innerHTML='';
+  const rows=TABLE.map(flat);
+  const k=curSort.col, num=k!=='option';
+  const pres=rows.filter(x=>x[k]!=null&&x[k]!==''), mis=rows.filter(x=>x[k]==null||x[k]==='');
+  pres.sort((a,b)=>{const c=num?(a[k]-b[k]):String(a[k]).localeCompare(String(b[k]),'ko');return curSort.dir==='asc'?c:-c;});
+  [...pres,...mis].forEach(x=>{
+    const tr=document.createElement('tr');
+    if(x.option===curOption)tr.className='on';
+    const dcls=x.diff==null?'mut':(x.diff<=2?'good':'bad');
+    tr.innerHTML=`<td class="l"><span class="opt">${x.name}</span></td>
+      <td>${x.have_n}</td><td>${pct(x.have_occ)}</td>
+      <td>${x.none_n}</td><td>${pct(x.none_occ)}</td>
+      <td class="${dcls}">${x.diff==null?'-':(x.diff>0?'+':'')+x.diff}</td>
+      <td>${pct(x.none_vac)}</td>`;
+    tr.onclick=()=>loadList(x.option);
+    tb.appendChild(tr);
+  });
+}
+async function analyze(){
+  const r=await (await fetch('/api/analyze?'+params())).json();
+  const o=r.overall;
+  document.getElementById('c-n').textContent=o.n.toLocaleString();
+  document.getElementById('c-occ').innerHTML=(o.occ??'-')+'<small> %</small>';
+  document.getElementById('c-vac').innerHTML=(o.vac??'-')+'<small> %</small>';
+  document.getElementById('c-week').innerHTML=(o.week??'-')+'<small> 만원</small>';
+  TABLE=r.table; curOption="";
+  document.getElementById('listpanel').style.display='none';
+  renderThead();renderTable();
+}
+function setMode(m){curMode=m;document.getElementById('t-none').classList.toggle('on',m==='none');document.getElementById('t-have').classList.toggle('on',m==='have');if(curOption)loadList(curOption,true);}
+async function loadList(option, keep){
+  curOption=option; if(!keep)curMode='none';
+  document.getElementById('t-none').classList.toggle('on',curMode==='none');
+  document.getElementById('t-have').classList.toggle('on',curMode==='have');
+  renderTable();
+  const p=params();p.set('option',option);p.set('mode',curMode);
+  const r=await (await fetch('/api/listings?'+p)).json();
+  const oname=r.optionName||option;
+  document.getElementById('listpanel').style.display='';
+  document.getElementById('list-title').innerHTML=`"${oname}" ${curMode==='none'?'없는':'있는'} 집 — ${r.total.toLocaleString()}건 (공실률 높은 순)`;
+  const tb=document.getElementById('list-b');tb.innerHTML='';
+  if(!r.items.length){tb.innerHTML='<tr><td colspan="11" class="empty">해당 매물이 없습니다.</td></tr>';return;}
+  r.items.forEach(x=>{
+    const tr=document.createElement('tr');tr.style.cursor='default';
+    const pills=x.options.map(o=>`<span class="pill">${o}</span>`).join('')
+      + (curMode==='none'?`<span class="pill miss">${oname}</span>`:'');
+    tr.innerHTML=`<td class="l">${x.name}<br><span class="mut">${x.building_name}</span></td>
+      <td class="l">${x.sigungu} ${x.dong}</td><td class="l">${x.station||'-'}</td>
+      <td>${x.pyeong??'-'}</td><td>${x.week}</td><td>${x.booked}</td><td>${x.blocked}</td>
+      <td>${x.occ}%</td><td>${x.vac}%</td>
+      <td class="l" style="white-space:normal;max-width:280px">${pills}</td>
+      <td class="l"><a class="lnk" href="${x.url}" target="_blank">삼삼</a></td>`;
+    tb.appendChild(tr);
+  });
+  document.getElementById('listpanel').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+init();
+</script>
+</body>
+</html>

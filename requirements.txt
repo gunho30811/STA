@@ -1,6 +1,7 @@
 # 웹 뷰어 + 파이프라인 공통 (필수)
 flask>=3.0
-psycopg2-binary>=2.9
+psycopg2-binary>=2.9   # Postgres 드라이버(기본)
+pg8000>=1.31           # psycopg2 빌드 불가 환경(예: Python 3.15 알파, 휠 없음) 폴백 — db.py가 자동 사용
 python-dotenv>=1.0
 
 # 데이터 갱신(재크롤)에 필요 (선택 — 뷰어만 볼 거면 불필요)
