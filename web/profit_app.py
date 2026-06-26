@@ -65,8 +65,9 @@ def load_profit():
                     o[key] = _num(r[kr]) if key in NUM else (r[kr] or "")
             # 파생: 예약률 / 순수익(최대 기준)
             bk, bl = o.get("bk") or 0, o.get("bl") or 0
-            avail = max(30 - bl, 1)
-            o["occ"] = round(bk / avail * 100, 1)              # 예약률(%)
+            # 수집 윈도우가 오늘~+30일 = 31일(양끝 포함)이라 분모도 31. 예약일+막힘일 ≤ 31 이라 ≤100%.
+            avail = max(31 - bl, 1)
+            o["occ"] = min(100.0, round(bk / avail * 100, 1))   # 예약률(%)
             if o.get("maxRev") is not None and o.get("nTotal") is not None:
                 o["net"] = round(o["maxRev"] - o["nTotal"], 1)  # 순수익(최대−월총)
             else:

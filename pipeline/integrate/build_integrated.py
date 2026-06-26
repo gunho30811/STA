@@ -188,8 +188,8 @@ def build_rows(sam, nav, max_deposit=None):
 
         booked = s['booked_days_1m'] or 0
         blocked = s['blocked_days_1m'] or 0
-        avail = max(30 - blocked, 1)
-        occ = booked / avail
+        avail = max(31 - blocked, 1)   # 수집 윈도우 오늘~+30일=31일(양끝 포함) → 예약률 ≤100%
+        occ = min(1.0, booked / avail)
         realized = round(sam_week * occ * 30 / 7, 1)
 
         bldg_rents = [nv['rent_monthly'] for nv in bldg_all if nv['rent_monthly']]
