@@ -222,12 +222,18 @@ function showDetail(x){
 }
 function renderPager(r){
   const pg=document.getElementById('pager');pg.innerHTML='';
-  if(r.pages<=1)return;const cur=r.page;
-  const add=(i,l,on)=>{const b=document.createElement('button');b.textContent=l||i;if(on)b.className='on';b.onclick=()=>search(i);pg.appendChild(b);};
-  if(cur>1)add(cur-1,'‹');
-  let s=Math.max(1,cur-3),e=Math.min(r.pages,cur+3);
-  if(s>1)add(1,'1');for(let i=s;i<=e;i++)add(i,null,i===cur);if(e<r.pages)add(r.pages,String(r.pages));
-  if(cur<r.pages)add(cur+1,'›');
+  if(r.pages<=1)return;
+  const cur=r.page,last=r.pages;
+  const add=(i,l,on,dis)=>{const b=document.createElement('button');b.textContent=l||i;
+    if(on)b.className='on';
+    if(dis){b.disabled=true;b.style.opacity=.4;}else b.onclick=()=>search(i);
+    pg.appendChild(b);};
+  const ell=()=>{const s=document.createElement('span');s.textContent='…';s.style.padding='0 4px';s.style.color='#9ca3af';pg.appendChild(s);};
+  add(cur-1,'‹',false,cur===1);
+  const want=[...new Set([1,2,cur-1,cur,cur+1,last-1,last])].filter(p=>p>=1&&p<=last).sort((a,b)=>a-b);
+  let prev=0;
+  want.forEach(p=>{if(p-prev>1)ell();add(p,null,p===cur);prev=p;});
+  add(cur+1,'›',false,cur===last);
 }
 function resetF(){
   document.querySelectorAll('#t-list input').forEach(i=>i.value='');
