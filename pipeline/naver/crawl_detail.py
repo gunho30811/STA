@@ -103,6 +103,7 @@ def main():
     ap.add_argument("--sido")
     ap.add_argument("--sidos", default="", help="콤마구분 시도 정확매칭(예: 서울시,경기도,인천시)")
     ap.add_argument("--types", default="", help="콤마구분 포함 타입(한글, 예: 오피스텔). 비우면 전체")
+    ap.add_argument("--exclude-types", default="", help="콤마구분 제외 타입(한글, 예: 상가)")
     ap.add_argument("--gu")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--redo", action="store_true")
