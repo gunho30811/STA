@@ -317,6 +317,48 @@ def api_buildings():
     return jsonify({"total": len(out), "items": out})
 
 
+@app.route("/api/trend")
+def api_trend():
+    """주간 스냅샷(samsam_snapshots)으로 지역(동)별 예약률 추이 + 전주대비 변화(Δ)."""
+    a = request.args
+    rows = []
+    try:
+        import db
+        conn = db.connect()
+        where, params = [], []
+        if a.get("sido"):
+            where.append("sido=%s"); params.append(a["sido"])
+        if a.get("sigungu"):
+            where.append("sigungu=%s"); params.append(a["sigungu"])
+        w = (" WHERE " + " AND ".join(where)) if where else ""
+        rows = [dict(r) for r in conn.execute(
+            "SELECT snapshot_date, sido, sigungu, dong, n, avg_occ_1m"
+            f" FROM samsam_snapshots{w}", params).fetchall()]
+        conn.close()
+    except Exception as e:
+        return jsonify({"dates": [], "items": [], "error": str(e)[:80]})
+
+    dates = sorted({r["snapshot_date"] for r in rows})
+    agg = {}   # (sigungu,dong) -> {date: [sum n*occ, sum n]}
+    for r in rows:
+        key = (r["sigungu"] or "", r["dong"] or "")
+        cell = agg.setdefault(key, {}).setdefault(r["snapshot_date"], [0.0, 0])
+        cell[0] += (r["avg_occ_1m"] or 0) * (r["n"] or 0)
+        cell[1] += r["n"] or 0
+
+    out = []
+    for (sg, dong), dd in agg.items():
+        series = {d: (round(v[0] / v[1], 1) if v[1] else None) for d, v in dd.items()}
+        latest = series.get(dates[-1]) if dates else None
+        prev = series.get(dates[-2]) if len(dates) >= 2 else None
+        delta = round(latest - prev, 1) if (latest is not None and prev is not None) else None
+        n_latest = dd.get(dates[-1], [0, 0])[1] if dates else 0
+        out.append({"sigungu": sg, "dong": dong, "series": series,
+                    "latest": latest, "delta": delta, "n": n_latest})
+    out.sort(key=lambda r: (r["latest"] is None, -(r["latest"] or 0)))
+    return jsonify({"dates": dates, "items": out})
+
+
 if __name__ == "__main__":
     import socket
     try:
