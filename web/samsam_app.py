@@ -41,6 +41,7 @@ OPTION_KO = {
     "RICE_COOKER": "밥솥", "SOFA": "소파", "WATER_PURIFIER": "정수기", "VANITY": "화장대",
     "BATHTUB": "욕조", "DRYER": "건조기", "BALCONY": "발코니", "DRESSING_ROOM": "드레스룸",
     "AIR_PURIFIER": "공기청정기", "GAS_RANGE": "가스레인지", "ELECTRIC_RANGE": "전기레인지",
+    "CURTAINS": "커튼", "CABLE_TV": "케이블TV", "BIDET": "비데",
 }
 
 
