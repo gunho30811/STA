@@ -78,6 +78,10 @@ def source_articles(args):
         q += " AND sido LIKE ?"; p.append(f"%{args.sido}%")
     if args.gu:
         q += " AND sigungu LIKE ?"; p.append(f"%{args.gu}%")
+    ex = [t.strip() for t in (args.exclude_types or "").split(",") if t.strip()]
+    if ex:
+        q += f" AND (realEstateType IS NULL OR realEstateType NOT IN ({','.join('?' * len(ex))}))"
+        p += ex
     out = []
     for r in conn.execute(q, p):
         no = r[0]
