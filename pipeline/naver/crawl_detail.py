@@ -95,6 +95,8 @@ def main():
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--redo", action="store_true")
     ap.add_argument("--show", action="store_true")
+    ap.add_argument("--sleep", type=float, default=0.4,
+                    help="매물당 대기(초). 차단 방지로 전국 대량 수집 시 0.8~1.2 권장")
     args = ap.parse_args()
 
     db.init_db()
@@ -125,7 +127,7 @@ def main():
             if len(buf) >= 50:
                 save(buf); buf = []
                 print(f"[{now()}] ({i}/{len(todo)}) 누적 {done}건 저장")
-            time.sleep(0.4)
+            time.sleep(args.sleep)
             if i % 150 == 0:
                 nl.restart()
         save(buf)
