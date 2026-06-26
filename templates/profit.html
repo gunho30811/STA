@@ -3,284 +3,261 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>삼삼엠투 × 네이버 단기임대 수익성</title>
+<title>삼삼 × 네이버 단기임대 수익성</title>
 <style>
   *{box-sizing:border-box}
-  body{margin:0;font-family:"Malgun Gothic","맑은 고딕",sans-serif;background:#f3f5f7;color:#1f2937}
-  header{background:#111827;color:#fff;padding:14px 22px}
-  header h1{margin:0;font-size:18px}
-  header p{margin:4px 0 0;font-size:12.5px;color:#9ca3af}
-  .tabs{display:flex;gap:4px;padding:10px 22px 0;background:#111827}
-  .tabs button{background:#1f2937;color:#cbd5e1;border:none;padding:9px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-size:13px;font-weight:bold}
+  body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;background:#f3f5f7;color:#1f2937}
+  header{background:linear-gradient(120deg,#0f172a,#1e293b);color:#fff;padding:15px 22px}
+  header h1{margin:0;font-size:18px;font-weight:800}
+  header p{margin:4px 0 0;font-size:12px;color:#94a3b8}
+  .tabs{display:flex;gap:4px;padding:8px 22px 0;background:#1e293b}
+  .tabs button{background:#334155;color:#cbd5e1;border:none;padding:9px 18px;border-radius:8px 8px 0 0;cursor:pointer;font-size:13px;font-weight:700}
   .tabs button.on{background:#f3f5f7;color:#111827}
-  .wrap{padding:16px 22px}
-  .cards{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap}
-  .card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px 16px;min-width:150px}
-  .card .lbl{font-size:12px;color:#6b7280}
-  .card .val{font-size:22px;font-weight:bold;margin-top:3px}
-  .card .val small{font-size:12px;color:#9ca3af;font-weight:normal}
-  .panel{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-bottom:14px}
-  .filters{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
-  .fg{display:flex;flex-direction:column;gap:4px}
-  .fg label{font-size:11px;font-weight:bold;color:#4b5563}
-  .fg input,.fg select{padding:7px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px}
-  .fg input[type=number]{width:90px}
-  .btn{cursor:pointer;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:bold}
+  .wrap{padding:14px 22px}
+  .cards{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px 16px;min-width:130px}
+  .card .lbl{font-size:11.5px;color:#6b7280}.card .val{font-size:21px;font-weight:800;margin-top:2px}
+  .card .val small{font-size:11px;color:#9ca3af;font-weight:500}
+  .panel{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:12px}
+  .filters{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .fg{display:flex;flex-direction:column;gap:3px}
+  .fg label{font-size:11px;font-weight:700;color:#4b5563}
+  .fg select,.fg input{padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;background:#fff}
+  .fg input[type=number]{width:80px}
+  .btn{cursor:pointer;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:700}
   .btn-go{background:#2563eb;color:#fff}.btn-reset{background:#e5e7eb;color:#374151}
-  .legend{font-size:11.5px;color:#6b7280;margin-top:10px;line-height:1.6}
-  table{width:100%;border-collapse:collapse;font-size:12.5px}
-  th,td{padding:7px 8px;text-align:right;border-bottom:1px solid #eef0f2;white-space:nowrap}
-  th{background:#f9fafb;position:sticky;top:0;cursor:pointer;user-select:none;color:#374151}
-  th:hover{background:#eef2ff}
-  td.l,th.l{text-align:left}
-  tbody tr:hover{background:#f8fafc}
-  .pos{color:#dc2626;font-weight:bold}.neg{color:#2563eb}
-  .mult{font-weight:bold;color:#7c3aed}
-  .name{font-weight:bold}.sub{color:#9ca3af;font-size:11px}
-  .lnk{display:inline-block;padding:3px 7px;border-radius:4px;text-decoration:none;font-size:11px;color:#fff;margin-left:3px}
-  .lnk.n{background:#03c75a}.lnk.s{background:#ff5a5f}
-  .pager{display:flex;justify-content:center;gap:6px;padding:14px 0;flex-wrap:wrap}
-  .pager button{background:#fff;border:1px solid #d1d5db;border-radius:6px;min-width:34px;padding:6px;cursor:pointer}
+  .legend{font-size:11.5px;color:#6b7280;margin-top:9px;line-height:1.6}
+  /* 마스터-디테일 */
+  .md{display:flex;gap:12px;align-items:flex-start}
+  .listcol{flex:1;min-width:0;background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:auto;max-height:72vh}
+  .detail{width:360px;flex-shrink:0;background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px;position:sticky;top:10px;max-height:78vh;overflow:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:8px 10px;text-align:right;border-bottom:1px solid #eef0f2;white-space:nowrap}
+  th{background:#f9fafb;position:sticky;top:0;cursor:pointer;user-select:none;color:#374151;font-size:12px}
+  th.l,td.l{text-align:left}
+  tbody tr{cursor:pointer}tbody tr:hover{background:#f1f5f9}tbody tr.on{background:#dbeafe}
+  .name{font-weight:700}.sub{color:#9ca3af;font-size:11px}
+  .pos{color:#dc2626;font-weight:800}.neg{color:#2563eb;font-weight:700}
+  .occ{font-weight:700;color:#0369a1}
+  .pager{display:flex;justify-content:center;gap:6px;padding:12px 0;flex-wrap:wrap}
+  .pager button{background:#fff;border:1px solid #d1d5db;border-radius:6px;min-width:32px;padding:6px;cursor:pointer}
   .pager button.on{background:#2563eb;color:#fff;border-color:#2563eb}
-  .scroll{overflow:auto;max-height:70vh}
+  /* detail */
+  .d-empty{color:#9ca3af;text-align:center;padding:40px 0;font-size:13px}
+  .d-title{font-size:16px;font-weight:800;margin:0}
+  .d-sub{font-size:12px;color:#9ca3af;margin:3px 0 10px}
+  .d-net{font-size:13px;color:#6b7280;margin-bottom:12px}
+  .d-net b{font-size:24px;color:#dc2626}
+  .d-sec{margin-bottom:12px}
+  .d-sec h4{font-size:11.5px;color:#2563eb;margin:0 0 6px;font-weight:800;text-transform:uppercase;letter-spacing:.03em}
+  .d-kv{display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;border-bottom:1px dashed #eef0f2}
+  .d-kv .k{color:#94a3b8}.d-kv .v{font-weight:700}
+  .lnk{display:inline-block;padding:7px 14px;border-radius:7px;text-decoration:none;font-size:12.5px;color:#fff;font-weight:700;margin-right:6px}
+  .lnk.n{background:#03c75a}.lnk.s{background:#ff5a5f}
+  .rankwrap{display:flex;gap:12px;flex-wrap:wrap}
+  .rankwrap .panel{flex:1;min-width:340px}
 </style>
 </head>
 <body>
 <header>
-  <h1>🏠 삼삼엠투 × 네이버부동산 단기임대 수익성</h1>
-  <p>임대인 관점 — "1달 기준 공실 반영 실현 순수익이 크고 보증금 작은(싼데 잘 파는) 매물" · 전국 삼삼 오피스텔 × 네이버 월세 엄격매칭 · 단위 만원</p>
+  <h1>🏠 삼삼 × 네이버 단기임대 수익성</h1>
+  <p>삼삼 단기임대 풀가동 시 네이버 장기월세 대비 최대수익·순수익 + 동/역 수요(예약률) · 단위 만원 · 행 클릭 시 오른쪽 상세</p>
 </header>
 <div class="tabs">
-  <button class="on" data-tab="profit" onclick="tab('profit')">매물 수익성</button>
-  <button data-tab="dong" onclick="tab('dong')">동별 베스트</button>
-  <button data-tab="gu" onclick="tab('gu')">구별 공실률</button>
-  <button data-tab="station" onclick="tab('station')">역별 공실률</button>
+  <button class="on" data-tab="list" onclick="tab('list')">매물 수익성</button>
+  <button data-tab="rank" onclick="tab('rank')">순위 (동·역 베스트)</button>
 </div>
 
 <div class="wrap">
-  <!-- 매물 수익성 탭 -->
-  <div id="t-profit">
+  <!-- 매물 탭 -->
+  <div id="t-list">
     <div class="cards">
       <div class="card"><div class="lbl">매물 수</div><div class="val" id="c-cnt">-</div></div>
-      <div class="card"><div class="lbl">순수익 중앙값</div><div class="val" id="c-med">-<small> 만원</small></div></div>
-      <div class="card"><div class="lbl">순수익 최대</div><div class="val pos" id="c-max">-<small> 만원</small></div></div>
-      <div class="card"><div class="lbl">네이버÷삼삼주당 중앙값</div><div class="val mult" id="c-mult">-<small> 배</small></div></div>
+      <div class="card"><div class="lbl">순수익 중앙값</div><div class="val" id="c-net">-<small> 만원</small></div></div>
+      <div class="card"><div class="lbl">순수익 최대</div><div class="val pos" id="c-netmax">-<small> 만원</small></div></div>
+      <div class="card"><div class="lbl">예약률 중앙값</div><div class="val occ" id="c-occ">-<small> %</small></div></div>
     </div>
     <div class="panel">
       <div class="filters">
-        <div class="fg"><label>건물유형</label><select id="f-btype"><option value="">전체</option></select></div>
-        <div class="fg"><label>방수</label><select id="f-rooms"><option value="">전체</option><option>원룸</option><option>투룸</option><option>쓰리룸+</option></select></div>
         <div class="fg"><label>시/도</label><select id="f-sido"><option value="">전체</option></select></div>
         <div class="fg"><label>시군구</label><select id="f-sigungu"><option value="">전체</option></select></div>
-        <div class="fg"><label>동 포함</label><input id="f-dong" placeholder="예: 삼성동"></div>
-        <div class="fg"><label>키워드(매물/건물)</label><input id="f-kw" placeholder="예: 역, 풀옵션"></div>
-        <div class="fg"><label>순수익 ≥</label><input type="number" id="f-profit" placeholder="만원"></div>
-        <div class="fg"><label>네이버÷삼삼주당 ≥</label><input type="number" id="f-mult" step="0.1" placeholder="배"></div>
-        <div class="fg"><label>1달예약일 ≥</label><input type="number" id="f-bk" placeholder="일"></div>
+        <div class="fg"><label>동</label><select id="f-dong"><option value="">전체</option></select></div>
+        <div class="fg"><label>건물유형</label><select id="f-btype"><option value="">전체</option></select></div>
+        <div class="fg"><label>방수</label><select id="f-rooms"><option value="">전체</option><option>원룸</option><option>투룸</option><option>쓰리룸+</option></select></div>
+        <div class="fg"><label>키워드</label><input id="f-kw" placeholder="매물/건물"></div>
+        <div class="fg"><label>순수익 ≥</label><input type="number" id="f-net" placeholder="만원"></div>
+        <div class="fg"><label>최대수익 ≥</label><input type="number" id="f-maxrev" placeholder="만원"></div>
+        <div class="fg"><label>예약률 ≥</label><input type="number" id="f-occ" placeholder="%"></div>
+        <div class="fg"><label>동예약률 ≥</label><input type="number" id="f-dongocc" placeholder="%"></div>
         <div class="fg"><label>보증금 ≤</label><input type="number" id="f-dep" placeholder="만원"></div>
-        <div class="fg"><label>구공실률 ≤</label><input type="number" id="f-vacancy" step="0.1" placeholder="%"></div>
-        <div class="fg"><label>역공실률 ≤</label><input type="number" id="f-st-vacancy" step="0.1" placeholder="%"></div>
-        <div class="fg"><label>평수</label><div style="display:flex;gap:4px"><input type="number" id="f-pmin" placeholder="최소" style="width:64px"><input type="number" id="f-pmax" placeholder="최대" style="width:64px"></div></div>
+        <div class="fg"><label>평수</label><div style="display:flex;gap:4px"><input type="number" id="f-pmin" placeholder="최소" style="width:60px"><input type="number" id="f-pmax" placeholder="최대" style="width:60px"></div></div>
         <div class="fg"><label>&nbsp;</label><button class="btn btn-go" onclick="search(1)">검색</button></div>
         <div class="fg"><label>&nbsp;</label><button class="btn btn-reset" onclick="resetF()">초기화</button></div>
       </div>
       <div class="legend">
-        <b>환산월세</b>=네이버월세+보증금×6%/12 (보증금 정규화 — 보증금 크기에 따른 순수익 왜곡 제거) ·
-        <b>네이버월총</b>=환산월세+관리비 · <b>순수익</b>=1달실현수익−네이버월총 ·
-        <b>1달실현수익</b>=삼삼주당×(예약일/7) · <b>네이버÷삼삼주당</b>=네이버월총÷삼삼주당 ·
-        <b>현실효율</b>=1달실현÷환산월세 ·
-        <b>동삼삼매물수</b>=같은 동의 삼삼 매물수(자기 제외) · <b>건물삼삼수</b>=같은 건물(오피스텔)에 올라온 삼삼 매물수(자기 포함) ·
-        <b>구공실률/구경쟁매물수</b>=같은 시군구의 삼삼 평균 공실률·매물수(구별 공실률 탭 기준) ·
-        <b>역공실률/역경쟁매물수</b>=같은 인근역의 삼삼 평균 공실률·매물수(역별 공실률 탭 기준, 매물수 3개 미만은 '-') ·
-        관리비 미표기는 평당 2만원 추정 · 헤더 클릭 시 정렬, 다시 클릭하면 오름차순/내림차순 토글
+        <b>최대수익</b>=삼삼 풀가동 월매출(주당×4.345) · <b>순수익</b>=최대수익−네이버월총(환산월세+관리비) ·
+        <b>예약률</b>=1달 예약일/(30−막힘일), 높을수록 수요↑ · <b>동예약률</b>=같은 동 평균 예약률 · <b>환산월세</b>=네이버월세+보증금×6%/12
       </div>
     </div>
-    <div class="panel scroll">
-      <table id="tbl">
-        <thead><tr id="thead"></tr></thead>
-        <tbody id="tbody"></tbody>
-      </table>
+    <div class="md">
+      <div class="listcol">
+        <table><thead><tr id="thead"></tr></thead><tbody id="tbody"></tbody></table>
+      </div>
+      <div class="detail" id="detail"><div class="d-empty">왼쪽 매물을 클릭하면<br>여기에 상세가 떠요</div></div>
     </div>
     <div class="pager" id="pager"></div>
   </div>
 
-  <!-- 보조 탭 -->
-  <div id="t-dong" style="display:none"><div class="panel scroll"><table><thead id="dong-h"></thead><tbody id="dong-b"></tbody></table></div></div>
-  <div id="t-gu" style="display:none"><div class="panel scroll"><table><thead id="gu-h"></thead><tbody id="gu-b"></tbody></table></div></div>
-  <div id="t-station" style="display:none"><div class="panel scroll"><table><thead id="station-h"></thead><tbody id="station-b"></tbody></table></div></div>
+  <!-- 순위 탭 -->
+  <div id="t-rank" style="display:none">
+    <p class="legend" style="margin:0 0 10px">평균 <b>순수익</b> 높은 순 = 그 동/역에서 단기임대가 장기월세 대비 가장 유리. 평균 예약률·최대수익·매칭수도 함께. 헤더 클릭 정렬.</p>
+    <div class="rankwrap">
+      <div class="panel"><h3 style="margin:2px 0 8px;font-size:14px">🏘️ 동별 베스트</h3><div style="overflow:auto;max-height:70vh"><table><thead><tr id="dh"></tr></thead><tbody id="db"></tbody></table></div></div>
+      <div class="panel"><h3 style="margin:2px 0 8px;font-size:14px">🚇 역별 베스트</h3><div style="overflow:auto;max-height:70vh"><table><thead><tr id="sh"></tr></thead><tbody id="sb"></tbody></table></div></div>
+    </div>
+  </div>
 </div>
 
 <script>
-let curSort = "profit";
-const COLS = [
-  {k:"name", t:"매물명 / 건물", l:true},
-  {k:"btype", t:"유형", l:true},
-  {k:"rooms", t:"방수", l:true},
-  {k:"sido", t:"시도", l:true},
-  {k:"sigungu", t:"시군구", l:true},
-  {k:"dong", t:"동", l:true},
-  {k:"guVacancy", t:"구공실률%"},
-  {k:"guCompetitors", t:"구경쟁매물수"},
-  {k:"samNearby", t:"동삼삼매물수"},
-  {k:"samBldg", t:"건물삼삼수"},
-  {k:"station", t:"인근역", l:true},
-  {k:"stVacancy", t:"역공실률%"},
-  {k:"stCompetitors", t:"역경쟁매물수"},
-  {k:"pyeong", t:"평"},
-  {k:"profit", t:"순수익"},
-  {k:"realized", t:"1달실현"},
-  {k:"mult", t:"네이버÷주당"},
-  {k:"realEff", t:"현실효율"},
-  {k:"bk", t:"예약일"},
-  {k:"blk", t:"막힘일"},
-  {k:"wk", t:"삼삼주당"},
-  {k:"nTotal", t:"네이버월총"},
-  {k:"nRent", t:"네이버월세"},
-  {k:"nEquiv", t:"환산월세"},
-  {k:"nDep", t:"보증금"},
-  {k:"matches", t:"매칭수"},
-  {k:"bldgCnt", t:"건물매물수"},
-  {k:"bldgRentMin", t:"건물최저"},
-  {k:"bldgRentMed", t:"건물중간"},
-  {k:"bldgRentMax", t:"건물최고"},
-  {k:"link", t:"링크", l:true},
+let TREE={}, ITEMS=[], curSort={col:"net",dir:"desc"}, selId=null;
+const COLS=[
+  {k:"name",t:"매물명 / 건물",l:true},
+  {k:"dong",t:"동",l:true},
+  {k:"pyeong",t:"평"},
+  {k:"maxRev",t:"최대수익"},
+  {k:"net",t:"순수익"},
+  {k:"occ",t:"예약률%"},
 ];
+function n(x){return x==null?'-':x.toLocaleString();}
+function v(id){return document.getElementById(id).value.trim();}
 
-let curDir = "desc";
+async function init(){
+  const f=await (await fetch('/api/facets')).json();
+  TREE=f.tree;
+  const fill=(id,arr)=>{const s=document.getElementById(id);arr.forEach(x=>{const o=document.createElement('option');o.value=x;o.textContent=x;s.appendChild(o);});};
+  fill('f-sido',f.sido); fill('f-btype',f.btype);
+  document.getElementById('f-sido').onchange=fillSigungu;
+  document.getElementById('f-sigungu').onchange=fillDong;
+  renderThead(); search(1);
+}
+function fillSigungu(){
+  const s=v('f-sido'),sg=document.getElementById('f-sigungu');
+  sg.innerHTML='<option value="">전체</option>';document.getElementById('f-dong').innerHTML='<option value="">전체</option>';
+  if(s&&TREE[s])Object.keys(TREE[s]).sort().forEach(g=>{const o=document.createElement('option');o.value=g;o.textContent=g;sg.appendChild(o);});
+}
+function fillDong(){
+  const s=v('f-sido'),g=v('f-sigungu'),d=document.getElementById('f-dong');
+  d.innerHTML='<option value="">전체</option>';
+  if(s&&g&&TREE[s]&&TREE[s][g])TREE[s][g].forEach(x=>{const o=document.createElement('option');o.value=x;o.textContent=x;d.appendChild(o);});
+}
 function renderThead(){
-  const tr = document.getElementById('thead'); tr.innerHTML='';
+  const tr=document.getElementById('thead');tr.innerHTML='';
   COLS.forEach(c=>{
-    const th=document.createElement('th');
-    th.textContent = c.t + (c.k===curSort ? (curDir==='asc' ? ' ▲' : ' ▼') : '');
-    if(c.l)th.className='l';
-    if(c.k!=='link'){
-      th.onclick=()=>{
-        if(curSort===c.k){curDir = curDir==='asc' ? 'desc' : 'asc';}
-        else {curSort=c.k; curDir='asc';}
-        search(1);
-      };
-      th.title='정렬 (다시 클릭하면 반대로)';
-    }
+    const th=document.createElement('th');if(c.l)th.className='l';
+    th.textContent=c.t+(c.k===curSort.col?(curSort.dir==='asc'?' ▲':' ▼'):'');
+    th.onclick=()=>{if(curSort.col===c.k)curSort.dir=curSort.dir==='asc'?'desc':'asc';else{curSort.col=c.k;curSort.dir='desc';}search(1);};
     tr.appendChild(th);
   });
 }
-async function init(){
-  const fc = await (await fetch('/api/facets')).json();
-  const fill=(id,arr)=>{const sel=document.getElementById(id);arr.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);});};
-  fill('f-sigungu',fc.sigungu); fill('f-sido',fc.sido); fill('f-btype',fc.btype);
-  renderThead();
-  search(1);
-}
-function v(id){return document.getElementById(id).value.trim();}
 async function search(page){
   const p=new URLSearchParams();
-  if(v('f-btype'))p.set('btype',v('f-btype'));
-  if(v('f-rooms'))p.set('rooms',v('f-rooms'));
-  if(v('f-sido'))p.set('sido',v('f-sido'));
-  if(v('f-sigungu'))p.set('sigungu',v('f-sigungu'));
-  if(v('f-dong'))p.set('dong',v('f-dong'));
-  if(v('f-kw'))p.set('keyword',v('f-kw'));
-  if(v('f-profit'))p.set('profit_min',v('f-profit'));
-  if(v('f-mult'))p.set('mult_min',v('f-mult'));
-  if(v('f-bk'))p.set('bk_min',v('f-bk'));
-  if(v('f-dep'))p.set('dep_max',v('f-dep'));
-  if(v('f-vacancy'))p.set('vacancy_max',v('f-vacancy'));
-  if(v('f-st-vacancy'))p.set('station_vacancy_max',v('f-st-vacancy'));
-  if(v('f-pmin'))p.set('pyeong_min',v('f-pmin'));
-  if(v('f-pmax'))p.set('pyeong_max',v('f-pmax'));
-  p.set('sort',curSort);p.set('dir',curDir);p.set('page',page);p.set('size',50);
+  const set=(id,key)=>{if(v(id))p.set(key,v(id));};
+  set('f-sido','sido');set('f-sigungu','sigungu');set('f-dong','dong');set('f-btype','btype');set('f-rooms','rooms');
+  set('f-kw','keyword');set('f-net','net_min');set('f-maxrev','maxrev_min');set('f-occ','occ_min');
+  set('f-dongocc','dongocc_min');set('f-dep','dep_max');set('f-pmin','pyeong_min');set('f-pmax','pyeong_max');
+  p.set('sort',curSort.col);p.set('dir',curSort.dir);p.set('page',page);p.set('size',40);
   renderThead();
   const r=await (await fetch('/api/profit?'+p)).json();
   const s=r.summary;
   document.getElementById('c-cnt').textContent=s.count.toLocaleString();
-  document.getElementById('c-med').innerHTML=(s.profit_med??'-')+'<small> 만원</small>';
-  document.getElementById('c-max').innerHTML=(s.profit_max??'-')+'<small> 만원</small>';
-  document.getElementById('c-mult').innerHTML=(s.mult_med??'-')+'<small> 배</small>';
-  renderRows(r.items);renderPager(r);
+  document.getElementById('c-net').innerHTML=n(s.net_med)+'<small> 만원</small>';
+  document.getElementById('c-netmax').innerHTML=n(s.net_max)+'<small> 만원</small>';
+  document.getElementById('c-occ').innerHTML=n(s.occ_med)+'<small> %</small>';
+  ITEMS=r.items; renderRows(); renderPager(r);
 }
-function num(x){return x==null?'-':x.toLocaleString();}
-function renderRows(items){
+function renderRows(){
   const tb=document.getElementById('tbody');tb.innerHTML='';
-  items.forEach(x=>{
-    const tr=document.createElement('tr');
-    const profCls=(x.profit!=null&&x.profit>=0)?'pos':'neg';
-    tr.innerHTML=`
-      <td class="l"><span class="name">${x.name||''}</span><br><span class="sub">${x.bldg||''}</span></td>
-      <td class="l">${x.btype||''}</td><td class="l">${x.rooms||''}</td>
-      <td class="l">${x.sido||''}</td><td class="l">${x.sigungu||''}</td><td class="l">${x.dong||''}</td>
-      <td>${x.guVacancy!=null?x.guVacancy+'%':'-'}</td>
-      <td>${num(x.guCompetitors)}</td>
-      <td>${num(x.samNearby)}</td>
-      <td>${num(x.samBldg)}</td>
-      <td class="l">${x.station||''}</td>
-      <td>${x.stVacancy!=null?x.stVacancy+'%':'-'}</td>
-      <td>${num(x.stCompetitors)}</td>
-      <td>${num(x.pyeong)}</td>
-      <td class="${profCls}">${num(x.profit)}</td>
-      <td>${num(x.realized)}</td>
-      <td class="mult">${x.mult!=null?x.mult+'배':'-'}</td>
-      <td>${x.realEff!=null?x.realEff:'-'}</td>
-      <td>${num(x.bk)}</td><td>${num(x.blk)}</td>
-      <td>${num(x.wk)}</td><td>${num(x.nTotal)}</td><td>${num(x.nRent)}</td>
-      <td>${num(x.nEquiv)}</td>
-      <td>${num(x.nDep)}</td><td>${num(x.matches)}</td>
-      <td>${num(x.bldgCnt)}</td><td>${num(x.bldgRentMin)}</td><td>${num(x.bldgRentMed)}</td><td>${num(x.bldgRentMax)}</td>
-      <td class="l">
-        ${x.naverUrl?`<a class="lnk n" href="${x.naverUrl}" target="_blank">네이버</a>`:''}
-        ${x.samUrl?`<a class="lnk s" href="${x.samUrl}" target="_blank">삼삼</a>`:''}
-      </td>`;
+  if(!ITEMS.length){tb.innerHTML='<tr><td colspan="6" class="d-empty">조건에 맞는 매물 없음</td></tr>';return;}
+  ITEMS.forEach(x=>{
+    const tr=document.createElement('tr');if(x.id===selId)tr.className='on';
+    const nc=(x.net!=null&&x.net>=0)?'pos':'neg';
+    tr.innerHTML=`<td class="l"><span class="name">${x.name||''}</span><br><span class="sub">${x.bldg||''}</span></td>
+      <td class="l">${x.dong||''}</td><td>${n(x.pyeong)}</td>
+      <td>${n(x.maxRev)}</td><td class="${nc}">${n(x.net)}</td><td class="occ">${n(x.occ)}%</td>`;
+    tr.onclick=()=>{selId=x.id;renderRows();showDetail(x);};
     tb.appendChild(tr);
   });
+}
+function kv(k,val){return `<div class="d-kv"><span class="k">${k}</span><span class="v">${val}</span></div>`;}
+function showDetail(x){
+  const d=document.getElementById('detail');
+  d.innerHTML=`
+    <div class="d-title">${x.name||''}</div>
+    <div class="d-sub">${x.btype||''} · ${x.rooms||''} · ${x.sigungu||''} ${x.dong||''} · ${x.pyeong||'-'}평</div>
+    <div class="d-net">순수익 <b>${n(x.net)}</b> 만원 <span style="font-size:11px">(최대수익−네이버월총)</span></div>
+    <div class="d-sec"><h4>삼삼 단기임대</h4>
+      ${kv('주당 임대료',n(x.wk)+' 만원')}
+      ${kv('최대수익(월환산)',n(x.maxRev)+' 만원')}
+      ${kv('1달 예약일 / 막힘',n(x.bk)+' / '+n(x.bl)+' 일')}
+      ${kv('예약률',n(x.occ)+' %')}</div>
+    <div class="d-sec"><h4>네이버 장기월세 (매칭 기준)</h4>
+      ${kv('보증금',n(x.nDep)+' 만원')}
+      ${kv('월세',n(x.nRent)+' 만원')}
+      ${kv('환산월세',n(x.nEquiv)+' 만원')}
+      ${kv('관리비',n(x.nMgmt)+' 만원 ('+(x.mgmtFlag||'')+')')}
+      ${kv('월총(환산+관리비)',n(x.nTotal)+' 만원')}
+      ${kv('배수(월총÷주당)',n(x.mult))}
+      ${kv('매칭 매물수',n(x.matches))}</div>
+    <div class="d-sec"><h4>건물 · 지역</h4>
+      ${kv('이 건물 삼삼 매물수',n(x.samBldg))}
+      ${kv('동 경쟁(삼삼)',n(x.dongCnt))}
+      ${kv('동 예약률',n(x.dongOcc)+' %')}
+      ${kv('인근역',(x.station||'-')+' (역예약률 '+n(x.stOcc)+'%)')}
+      ${kv('건물 네이버 매물수',n(x.bldgCnt))}
+      ${kv('건물 월세(최저/중간/최고)',n(x.bldgRentMin)+'/'+n(x.bldgRentMed)+'/'+n(x.bldgRentMax))}</div>
+    <div>
+      ${x.naverUrl?`<a class="lnk n" href="${x.naverUrl}" target="_blank">네이버</a>`:''}
+      ${x.samUrl?`<a class="lnk s" href="${x.samUrl}" target="_blank">삼삼</a>`:''}
+    </div>`;
 }
 function renderPager(r){
   const pg=document.getElementById('pager');pg.innerHTML='';
   if(r.pages<=1)return;const cur=r.page;
-  const add=(n,l,on)=>{const b=document.createElement('button');b.textContent=l||n;if(on)b.className='on';b.onclick=()=>search(n);pg.appendChild(b);};
+  const add=(i,l,on)=>{const b=document.createElement('button');b.textContent=l||i;if(on)b.className='on';b.onclick=()=>search(i);pg.appendChild(b);};
   if(cur>1)add(cur-1,'‹');
   let s=Math.max(1,cur-3),e=Math.min(r.pages,cur+3);
-  for(let i=s;i<=e;i++)add(i,null,i===cur);
-  if(e<r.pages)add(r.pages,String(r.pages));
+  if(s>1)add(1,'1');for(let i=s;i<=e;i++)add(i,null,i===cur);if(e<r.pages)add(r.pages,String(r.pages));
   if(cur<r.pages)add(cur+1,'›');
 }
-function resetF(){document.querySelectorAll('#t-profit input').forEach(i=>i.value='');document.querySelectorAll('#t-profit select').forEach(s=>{if(s.id!=='sort'&&s.id!=='size')s.value='';});curSort='profit';curDir='desc';search(1);}
+function resetF(){
+  document.querySelectorAll('#t-list input').forEach(i=>i.value='');
+  ['f-sido','f-sigungu','f-dong','f-btype','f-rooms'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-sigungu').innerHTML='<option value="">전체</option>';
+  document.getElementById('f-dong').innerHTML='<option value="">전체</option>';
+  curSort={col:"net",dir:"desc"};selId=null;
+  document.getElementById('detail').innerHTML='<div class="d-empty">왼쪽 매물을 클릭하면<br>여기에 상세가 떠요</div>';
+  search(1);
+}
+document.getElementById('f-kw').addEventListener('keydown',e=>{if(e.key==='Enter')search(1);});
 
-// ---- 보조 탭 (헤더 클릭 시 정렬, 다시 클릭하면 오름차순/내림차순 토글) ----
-let tableData={}, tableSort={};
-function genTable(rows,hId,bId,name){
-  const h=document.getElementById(hId),b=document.getElementById(bId);
-  if(!rows.length){h.innerHTML='';b.innerHTML='<tr><td>데이터 없음</td></tr>';return;}
-  const cols=Object.keys(rows[0]);
-  const st=tableSort[name]||{col:null,dir:'asc'};
-  h.innerHTML='<tr>'+cols.map(c=>{
-    const arrow = st.col===c ? (st.dir==='asc'?' ▲':' ▼') : '';
-    return `<th class="l" title="정렬 (다시 클릭하면 반대로)" onclick="sortTable('${name}','${c}','${hId}','${bId}')">${c}${arrow}</th>`;
-  }).join('')+'</tr>';
-  b.innerHTML=rows.map(r=>'<tr>'+cols.map(c=>{const val=r[c];const isNum=typeof val==='number';return `<td class="${isNum?'':'l'}">${isNum?val.toLocaleString():(val??'')}</td>`;}).join('')+'</tr>').join('');
-}
-function sortTable(name,col,hId,bId){
-  const rows=tableData[name];
-  let st=tableSort[name]||{col:null,dir:'asc'};
-  st = st.col===col ? {col, dir: st.dir==='asc'?'desc':'asc'} : {col, dir:'asc'};
-  tableSort[name]=st;
-  const present=rows.filter(r=>r[col]!==null&&r[col]!==undefined&&r[col]!=='');
-  const missing=rows.filter(r=>r[col]===null||r[col]===undefined||r[col]==='');
-  present.sort((a,b)=>{
-    const av=a[col],bv=b[col];
-    const cmp=(typeof av==='number'&&typeof bv==='number')?(av-bv):String(av).localeCompare(String(bv),'ko');
-    return st.dir==='asc'?cmp:-cmp;
-  });
-  genTable(present.concat(missing),hId,bId,name);
-}
-let loaded={};
+// ── 순위 탭 ──
+const RANK_COLS=[{k:"name",t:"이름",l:true},{k:"n",t:"매칭수"},{k:"net",t:"평균순수익"},{k:"occ",t:"평균예약률%"},{k:"maxRev",t:"평균최대수익"}];
+let RANK=null, rankSort={dong:{col:"net",dir:"desc"},station:{col:"net",dir:"desc"}};
 async function tab(name){
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===name));
-  ['profit','dong','gu','station'].forEach(t=>document.getElementById('t-'+t).style.display=(t===name?'':'none'));
-  if(name!=='profit'&&!loaded[name]){
-    const api={dong:'/api/best_dong',gu:'/api/vacancy_gu',station:'/api/by_station'}[name];
-    const rows=await (await fetch(api)).json();
-    tableData[name]=rows;
-    genTable(rows,name+'-h',name+'-b',name);loaded[name]=true;
-  }
+  document.getElementById('t-list').style.display=name==='list'?'':'none';
+  document.getElementById('t-rank').style.display=name==='rank'?'':'none';
+  if(name==='rank'){ if(!RANK)RANK=await (await fetch('/api/rank')).json(); renderRank('dong','dh','db'); renderRank('station','sh','sb'); }
+}
+function renderRank(which,hid,bid){
+  const st=rankSort[which], rows=[...RANK[which]];
+  const pres=rows.filter(r=>r[st.col]!=null), mis=rows.filter(r=>r[st.col]==null);
+  pres.sort((a,b)=>{const av=a[st.col],bv=b[st.col];const c=(typeof av==='number')?av-bv:String(av).localeCompare(String(bv),'ko');return st.dir==='asc'?c:-c;});
+  const data=[...pres,...mis];
+  const h=document.getElementById(hid);h.innerHTML='';
+  RANK_COLS.forEach(c=>{const th=document.createElement('th');if(c.l)th.className='l';th.textContent=c.t+(c.k===st.col?(st.dir==='asc'?' ▲':' ▼'):'');th.onclick=()=>{if(st.col===c.k)st.dir=st.dir==='asc'?'desc':'asc';else{st.col=c.k;st.dir='desc';}renderRank(which,hid,bid);};h.appendChild(th);});
+  const b=document.getElementById(bid);
+  b.innerHTML=data.map(r=>`<tr><td class="l">${r.name}</td><td>${n(r.n)}</td><td class="pos">${n(r.net)}</td><td class="occ">${n(r.occ)}%</td><td>${n(r.maxRev)}</td></tr>`).join('');
 }
 init();
 </script>
