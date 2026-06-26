@@ -72,7 +72,7 @@ def _enrich(r):
     r["options"] = opts
     blocked = r.get("blocked_days_1m") or 0
     booked = r.get("booked_days_1m") or 0
-    avail = max(30 - blocked, 1)
+    avail = max(31 - blocked, 1)   # 수집 윈도우 오늘~+30일=31일(양끝 포함)
     r["occ"] = min(1.0, booked / avail)        # 예약률
     r["vac"] = 1 - r["occ"]                     # 공실률
     r["sam_week_man"] = round((r.get("rent_total_weekly") or 0) / 10000, 1)
