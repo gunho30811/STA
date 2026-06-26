@@ -336,6 +336,20 @@ def init_db():
         dong                  TEXT,
         collected_at          TEXT
     )""")
+    # 주간 예약률 스냅샷(지역×유형 집계). 매주 크롤 후 snapshot.py 가 1행씩 적재 → 인기 트렌드 추적.
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS samsam_snapshots (
+        snapshot_date  TEXT,
+        sido           TEXT,
+        sigungu        TEXT,
+        dong           TEXT,
+        building_type  TEXT,
+        n              INTEGER,
+        avg_occ_1m     REAL,
+        avg_occ_3m     REAL,
+        avg_week       REAL,
+        PRIMARY KEY (snapshot_date, sido, sigungu, dong, building_type)
+    )""")
     for idx in [
         "CREATE INDEX IF NOT EXISTS ix_l_region ON listings(sido,sigungu,dong)",
         "CREATE INDEX IF NOT EXISTS ix_l_deposit ON listings(deposit)",
@@ -348,6 +362,8 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS ix_sl_region ON samsam_listings(sido,sigungu,dong)",
         "CREATE INDEX IF NOT EXISTS ix_sl_rent ON samsam_listings(rent_total_weekly)",
         "CREATE INDEX IF NOT EXISTS ix_sl_building ON samsam_listings(building_name)",
+        "CREATE INDEX IF NOT EXISTS ix_ss_date ON samsam_snapshots(snapshot_date)",
+        "CREATE INDEX IF NOT EXISTS ix_ss_region ON samsam_snapshots(sido,sigungu,dong)",
     ]:
         conn.execute(idx)
     conn.commit()

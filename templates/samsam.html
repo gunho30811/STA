@@ -60,6 +60,7 @@
   <h1>🛋️ 삼삼 옵션별 공실/예약률 분석</h1>
   <p>임대인 관점 — "이 옵션 없어도 잘 나갈까?" · 옵션 <b>있는 집</b> vs <b>없는 집</b>의 평균 예약률 비교 · 최근 1달 기준</p>
   <span id="src" class="src sample">출처 확인 중…</span>
+  <span id="occwin" style="display:block;margin-top:6px;font-size:11.5px;color:#cbd5e1"></span>
 </header>
 
 <div class="wrap">
@@ -181,6 +182,7 @@ async function init(){
   const isDb=f.source && f.source.startsWith('DB');
   srcEl.className='src '+(isDb?'db':'sample');
   srcEl.textContent='출처: '+f.source+' · 총 '+f.total.toLocaleString()+'건';
+  if(f.occ_window)document.getElementById('occwin').textContent='🗓 '+f.occ_window;
   const sido=document.getElementById('f-sido');
   f.sido.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sido.appendChild(o);});
   sido.onchange=fillSigungu; document.getElementById('f-sigungu').onchange=fillDong;

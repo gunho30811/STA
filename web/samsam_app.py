@@ -29,7 +29,7 @@ app = Flask(__name__, template_folder=os.path.join(ROOT, "templates"))
 SAM_COLS = ("room_id", "url", "name", "building_type", "building_name",
             "sido", "sigungu", "dong", "area_pyeong", "rent_total_weekly",
             "booked_days_1m", "blocked_days_1m", "basic_options", "extra_options",
-            "station_500m_names")
+            "station_500m_names", "collected_at")
 
 # 삼삼 옵션 영문 코드 → 한글 표시명
 OPTION_KO = {
@@ -197,7 +197,23 @@ def api_facets():
     btypes = sorted({r["building_type"] for r in LISTINGS if r.get("building_type")})
     opts = [{"code": c, "name": ko(c)} for c in sorted({o for r in LISTINGS for o in r["options"]})]
     return jsonify({"sido": sidos, "tree": tree, "building_type": btypes,
-                    "options": opts, "total": len(LISTINGS), "source": SOURCE})
+                    "options": opts, "total": len(LISTINGS), "source": SOURCE,
+                    "occ_window": _occ_window()})
+
+
+def _occ_window():
+    """예약률 산정 구간 안내: 예약률 = 수집일 ~ +30일의 예약 비율."""
+    import datetime as _dt
+    dates = sorted({(r.get("collected_at") or "")[:10] for r in LISTINGS if r.get("collected_at")})
+    if not dates:
+        return "예약률 = 수집일 기준 향후 30일 (수집일 정보 없음)"
+    lo, hi = dates[0], dates[-1]
+    try:
+        end = (_dt.date.fromisoformat(hi) + _dt.timedelta(days=30)).isoformat()
+    except ValueError:
+        end = "+30일"
+    span = lo if lo == hi else f"{lo}~{hi}"
+    return f"예약률 기준: 수집일({span}) ~ 향후 30일(~{end})의 예약 비율"
 
 
 @app.route("/api/analyze")
