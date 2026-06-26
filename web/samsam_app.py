@@ -121,19 +121,59 @@ def _filtered(a):
         v = a.get(key)
         if v:
             rows = [r for r in rows if r.get(key) == v]
+
+    def rng(field, lo, hi, scale=1.0):
+        nonlocal rows
+        if a.get(lo):
+            v = float(a[lo]); rows = [r for r in rows if (r.get(field) or 0) / scale >= v]
+        if a.get(hi):
+            v = float(a[hi]); rows = [r for r in rows if (r.get(field) or 0) / scale <= v]
+
+    rng("area_pyeong", "pyeong_min", "pyeong_max")
+    rng("rent_total_weekly", "week_min", "week_max", scale=10000)   # 만원 기준
     return rows
 
 
 def _grp(rows):
     n = len(rows)
     if not n:
-        return {"n": 0, "occ": None, "vac": None, "week": None}
+        return {"n": 0, "occ": None, "vac": None, "week": None, "pyeong": None}
     return {
         "n": n,
         "occ": round(statistics.mean(r["occ"] for r in rows) * 100, 1),
         "vac": round(statistics.mean(r["vac"] for r in rows) * 100, 1),
         "week": round(statistics.mean(r["sam_week_man"] for r in rows), 1),
+        "pyeong": round(statistics.mean((r.get("area_pyeong") or 0) for r in rows), 1),
     }
+
+
+def _pbucket(r):
+    return int((r.get("area_pyeong") or 0) // 2)        # 2평 단위
+
+
+def _wbucket(r):
+    return int((r.get("sam_week_man") or 0) // 10)      # 주당 10만원 단위
+
+
+def _adj_diff(rows, opt):
+    """같은 평수대(2평)·같은 가격대(주당 10만) 칸 안에서만 옵션 유무 예약률 차이를 비교(가중평균).
+
+    교란(옵션 없는 집이 우연히 더 크거나 비싼 경우)을 제거한 '보정 차이'(%p)와 표본수 반환.
+    """
+    from collections import defaultdict
+    buckets = defaultdict(list)
+    for r in rows:
+        buckets[(_pbucket(r), _wbucket(r))].append(r)
+    num = den = 0
+    for rs in buckets.values():
+        have = [x for x in rs if opt in x["options"]]
+        none = [x for x in rs if opt not in x["options"]]
+        if have and none:
+            d = statistics.mean(x["occ"] for x in have) - statistics.mean(x["occ"] for x in none)
+            w = min(len(have), len(none))   # 두 그룹 중 작은 쪽을 가중치로
+            num += d * w
+            den += w
+    return (round(num / den * 100, 1), den) if den else (None, 0)
 
 
 @app.route("/")
@@ -167,9 +207,11 @@ def api_analyze():
         gh, gn = _grp(have), _grp(none)
         diff = (round(gh["occ"] - gn["occ"], 1)
                 if gh["occ"] is not None and gn["occ"] is not None else None)
-        table.append({"option": o, "name": ko(o), "have": gh, "none": gn, "diff": diff})
-    # 예약률 차이(있음−없음) 큰 순 = 수요에 영향 큰 옵션. None은 뒤로.
-    table.sort(key=lambda x: (x["diff"] is None, -(x["diff"] or 0)))
+        adj, adjn = _adj_diff(rows, o)   # 같은 평수·가격대 보정 차이
+        table.append({"option": o, "name": ko(o), "have": gh, "none": gn,
+                      "diff": diff, "adj": adj, "adjn": adjn})
+    # 보정 차이(같은 평수·가격대 기준) 큰 순. 보정값 없으면(표본부족) 뒤로.
+    table.sort(key=lambda x: (x["adj"] is None, -(x["adj"] or 0)))
     return jsonify({"overall": overall, "table": table})
 
 
