@@ -103,11 +103,7 @@
     </div>
     <div class="scroll">
       <table>
-        <thead><tr>
-          <th class="l">매물명 / 건물</th><th class="l">지역</th><th class="l">역</th>
-          <th>평</th><th>주당</th><th>예약일</th><th>막힘</th><th>예약률%</th><th>공실률%</th>
-          <th class="l">옵션</th><th class="l">링크</th>
-        </tr></thead>
+        <thead><tr id="list-h"></tr></thead>
         <tbody id="list-b"></tbody>
       </table>
     </div>
@@ -134,6 +130,21 @@ const VERDICT={
   lowsample:{t:"표본부족",c:"#9ca3af"},
 };
 let TABLE=[];
+// 매물 목록 정렬
+const LIST_COLS=[
+  {k:"name",t:"매물명 / 건물",l:true,s:false},
+  {k:"sigungu",t:"지역",l:true},
+  {k:"station",t:"역",l:true},
+  {k:"pyeong",t:"평"},
+  {k:"week",t:"주당"},
+  {k:"booked",t:"예약일"},
+  {k:"blocked",t:"막힘"},
+  {k:"occ",t:"예약률%"},
+  {k:"vac",t:"공실률%"},
+  {k:"options",t:"옵션",l:true,s:false},
+  {k:"url",t:"링크",l:true,s:false},
+];
+let LISTITEMS=[], listSort={col:"vac",dir:"desc"}, listOname="";
 
 function v(id){return document.getElementById(id).value;}
 async function init(){
@@ -232,15 +243,43 @@ async function loadList(option, keep){
   renderTable();
   const p=params();p.set('option',option);p.set('mode',curMode);
   const r=await (await fetch('/api/listings?'+p)).json();
-  const oname=r.optionName||option;
+  listOname=r.optionName||option;
+  LISTITEMS=r.items;
+  listSort={col:"vac",dir:"desc"};   // 기본: 공실률 높은 순
   document.getElementById('listpanel').style.display='';
-  document.getElementById('list-title').innerHTML=`"${oname}" ${curMode==='none'?'없는':'있는'} 집 — ${r.total.toLocaleString()}건 (공실률 높은 순)`;
+  document.getElementById('list-title').innerHTML=`"${listOname}" ${curMode==='none'?'없는':'있는'} 집 — ${r.total.toLocaleString()}건 <span class="mut" style="font-size:12px">(헤더 클릭으로 정렬)</span>`;
+  renderListHead();renderListBody();
+  document.getElementById('listpanel').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function renderListHead(){
+  const tr=document.getElementById('list-h');tr.innerHTML='';
+  LIST_COLS.forEach(c=>{
+    const th=document.createElement('th');if(c.l)th.className='l';
+    const sortable=c.s!==false;
+    th.textContent=c.t+(sortable&&c.k===listSort.col?(listSort.dir==='asc'?' ▲':' ▼'):'');
+    if(sortable){th.style.cursor='pointer';th.title='정렬 (다시 클릭하면 반대로)';th.onclick=()=>sortList(c.k);}
+    tr.appendChild(th);
+  });
+}
+function sortList(col){
+  if(listSort.col===col)listSort.dir=listSort.dir==='asc'?'desc':'asc';
+  else{listSort.col=col;listSort.dir='desc';}
+  renderListHead();renderListBody();
+}
+function renderListBody(){
   const tb=document.getElementById('list-b');tb.innerHTML='';
-  if(!r.items.length){tb.innerHTML='<tr><td colspan="11" class="empty">해당 매물이 없습니다.</td></tr>';return;}
-  r.items.forEach(x=>{
+  if(!LISTITEMS.length){tb.innerHTML='<tr><td colspan="11" class="empty">해당 매물이 없습니다.</td></tr>';return;}
+  const k=listSort.dir, col=listSort.col;
+  const numCols={pyeong:1,week:1,booked:1,blocked:1,occ:1,vac:1};
+  const items=[...LISTITEMS].sort((a,b)=>{
+    let av=a[col],bv=b[col];
+    if(numCols[col]){av=av==null?-Infinity:av;bv=bv==null?-Infinity:bv;const c=av-bv;return k==='asc'?c:-c;}
+    const c=String(av==null?'':av).localeCompare(String(bv==null?'':bv),'ko');return k==='asc'?c:-c;
+  });
+  items.forEach(x=>{
     const tr=document.createElement('tr');tr.style.cursor='default';
     const pills=x.options.map(o=>`<span class="pill">${o}</span>`).join('')
-      + (curMode==='none'?`<span class="pill miss">${oname}</span>`:'');
+      + (curMode==='none'?`<span class="pill miss">${listOname}</span>`:'');
     tr.innerHTML=`<td class="l">${x.name}<br><span class="mut">${x.building_name}</span></td>
       <td class="l">${x.sigungu} ${x.dong}</td><td class="l">${x.station||'-'}</td>
       <td>${x.pyeong??'-'}</td><td>${x.week}</td><td>${x.booked}</td><td>${x.blocked}</td>
@@ -249,7 +288,6 @@ async function loadList(option, keep){
       <td class="l"><a class="lnk" href="${x.url}" target="_blank">삼삼</a></td>`;
     tb.appendChild(tr);
   });
-  document.getElementById('listpanel').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 init();
 </script>
