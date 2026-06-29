@@ -363,9 +363,11 @@ def api_buildings():
         bn = (r.get("building_name") or "").strip()
         if not bn:
             continue
-        by.setdefault((r.get("sigungu", ""), r.get("dong", ""), bn), []).append(r)
+        # 같은 건물이라도 평수가 다르면 따로 묶는다(평수 섞어 평균내면 수익이 왜곡됨).
+        py = r.get("area_pyeong")
+        by.setdefault((r.get("sigungu", ""), r.get("dong", ""), bn, py), []).append(r)
     out = []
-    for (sg, dong, bn), xs in by.items():
+    for (sg, dong, bn, py), xs in by.items():
         if len(xs) < min_n:
             continue
         occs = [x["occ"] * 100 for x in xs]
@@ -375,6 +377,7 @@ def api_buildings():
         out.append({
             "building": bn, "sigungu": sg, "dong": dong,
             "btype": xs[0].get("building_type", ""),
+            "pyeong": py,
             "n": len(xs),
             "occ_avg": round(statistics.mean(occs), 1),
             "occ_min": round(min(occs), 1),
