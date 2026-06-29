@@ -38,11 +38,54 @@ def _gen_code():
     return f"{int.from_bytes(os.urandom(3), 'big') % 1000000:06d}"
 
 
+def _smtp_configured():
+    return all(os.environ.get(k) for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASS"))
+
+
 def send_verify_email(email, code):
-    """이메일 인증 코드 발송. 현재는 목(mock): 서버 로그 출력 + DEV면 화면에 노출.
-    실제 발송 전환: 환경변수 SMTP_HOST/SMTP_USER/SMTP_PASS 넣고 이 함수에 SMTP 구현 추가."""
-    print(f"[auth][MOCK EMAIL] {email} 인증코드: {code}", flush=True)
-    return code  # 목 모드에선 코드를 그대로 돌려줘 화면에 보여줌
+    """이메일 인증 코드 발송.
+    - SMTP_HOST/SMTP_USER/SMTP_PASS 가 설정돼 있으면 실제 발송 → None 반환(화면에 코드 미노출).
+    - 미설정 또는 발송 실패 시 목(mock): 서버로그 출력 + 코드 반환(화면에 표시, 개발용).
+
+    환경변수: SMTP_HOST, SMTP_PORT(기본 587), SMTP_USER, SMTP_PASS, SMTP_FROM(기본 SMTP_USER).
+    Gmail 예: SMTP_HOST=smtp.gmail.com, SMTP_PORT=587, SMTP_USER=계정, SMTP_PASS=앱비밀번호."""
+    if not _smtp_configured():
+        print(f"[auth][MOCK EMAIL] {email} 인증코드: {code}", flush=True)
+        return code
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.utils import formataddr
+        from email.header import Header
+
+        host = os.environ["SMTP_HOST"]
+        port = int(os.environ.get("SMTP_PORT", 587))
+        user = os.environ["SMTP_USER"]
+        pw = os.environ["SMTP_PASS"]
+        sender = os.environ.get("SMTP_FROM", user)
+
+        msg = MIMEText(
+            f"안녕하세요.\n\n부동산 단기임대 분석 서비스 이메일 인증 코드입니다.\n\n"
+            f"인증코드: {code}\n\n{CODE_TTL_MIN}분 내에 입력해 주세요.",
+            "plain", "utf-8")
+        msg["Subject"] = Header("[부동산분석] 이메일 인증 코드", "utf-8")
+        msg["From"] = formataddr((str(Header("부동산 단기임대 분석", "utf-8")), sender))
+        msg["To"] = email
+
+        if port == 465:
+            with smtplib.SMTP_SSL(host, port, timeout=15) as s:
+                s.login(user, pw)
+                s.sendmail(sender, [email], msg.as_string())
+        else:
+            with smtplib.SMTP(host, port, timeout=15) as s:
+                s.starttls()
+                s.login(user, pw)
+                s.sendmail(sender, [email], msg.as_string())
+        print(f"[auth][EMAIL] {email} 인증코드 발송 완료", flush=True)
+        return None   # 실제 발송됨 → 화면에 코드 노출 안 함
+    except Exception as e:
+        print(f"[auth][EMAIL][ERROR] {email} 발송 실패({repr(e)[:80]}) → 목 폴백", flush=True)
+        return code
 
 
 def pw_ok(pw):
