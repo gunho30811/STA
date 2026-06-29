@@ -129,7 +129,9 @@
         <b>매물수</b>=그 건물의 삼삼 매물 수. <b>최저예약률</b>이 높으면 <b>전 호실이 다 잘 나간다</b>는 뜻(대박 후보). 위 필터(지역/유형/평수/주당) 적용됨.
         <b>역 검색</b> <input id="b-station" placeholder="예: 강남역" style="width:100px" onkeydown="if(event.key==='Enter')loadBuildings()"> <button class="btn btn-go" style="padding:4px 10px;font-size:12px" onclick="loadBuildings()">검색</button> ·
         최소 매물수 <select id="b-minn" onchange="loadBuildings()"><option>2</option><option>1</option><option>3</option><option>5</option></select>채 이상 ·
-        <b>보증금</b> <input type="number" id="b-deposit" value="1000" style="width:80px" onchange="loadBuildings()"> 만원 기준 <b>월순수익</b>(삼삼월수익−네이버월세@보증금−관리비) · 헤더 클릭 정렬.
+        <b>보증금</b> <input type="number" id="b-deposit" value="1000" style="width:80px" onchange="loadBuildings()"> 만 ·
+        <b>고정비</b>(통신·청소 등) <input type="number" id="b-fixed" value="0" style="width:70px" onchange="loadBuildings()"> 만 빼기 ·
+        <b>월순수익</b>=삼삼월매출−네이버월세@보증금−관리비−고정비 (셀에 마우스 올리면 분해) · 헤더 클릭 정렬.
       </p>
       <div class="scroll">
         <table>
@@ -395,6 +397,7 @@ const BCOLS=[
 async function loadBuildings(){
   const p=params(); p.set('min_n',document.getElementById('b-minn').value);
   const dep=document.getElementById('b-deposit').value; if(dep)p.set('deposit',dep);
+  const fx=document.getElementById('b-fixed').value; if(fx)p.set('fixed',fx);
   const stn=document.getElementById('b-station').value.trim(); if(stn)p.set('station',stn);
   const r=await (await fetch('/api/buildings?'+p)).json();
   BLD=r.items; renderBuildings();
@@ -415,7 +418,14 @@ function renderBuildings(){
   b.innerHTML=rows.map(r=>{
     const minc=r.occ_min>=60?'good':(r.occ_min<30?'bad':'mut');
     const netc=r.net_avg==null?'mut':(r.net_avg>=0?'good':'bad');
-    const netv=r.net_avg==null?'<span class="mut">-</span>':`<span class="${netc}" style="font-weight:800">${r.net_avg}</span>`;
+    let netv='<span class="mut">-</span>';
+    if(r.net_avg!=null){
+      let tip='';
+      if(r.bd){const b=r.bd;
+        tip=`삼삼 월매출 ${b.maxRev}\n− 네이버월세(보증금 ${b.dep}만 기준) ${b.rent}\n− 관리비 ${b.mgmt}`
+          +(b.fixed?`\n− 고정비 ${b.fixed}`:'')+`\n= 월순수익 ${r.net_avg} 만원`;}
+      netv=`<span class="${netc}" style="font-weight:800;cursor:help;border-bottom:1px dotted #94a3b8" title="${tip}">${r.net_avg}</span>`;
+    }
     return `<tr><td class="l" style="font-weight:700">${r.building}</td><td class="l">${r.dong}</td><td class="l">${r.btype}</td><td class="l">${r.station||'-'}</td>
       <td style="font-weight:800">${r.n}</td><td class="occ">${r.occ_avg}%</td>
       <td class="${minc}" style="font-weight:800">${r.occ_min}%</td><td class="mut">${r.occ_max}%</td><td>${r.week_avg}</td>
