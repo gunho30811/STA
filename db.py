@@ -184,8 +184,8 @@ def _seed_admin(conn):
     if row:
         return
     conn.execute(
-        "INSERT INTO members(username,email,password_hash,name,role,email_verified,created_at) "
-        "VALUES(%s,%s,%s,%s,'admin',TRUE,%s)",
+        "INSERT INTO members(username,email,password_hash,name,role,email_verified,approved,created_at) "
+        "VALUES(%s,%s,%s,%s,'admin',TRUE,TRUE,%s)",
         (uname, None, generate_password_hash(pw), '관리자',
          __import__('datetime').datetime.now().isoformat(timespec='seconds')))
     conn.commit()
@@ -380,10 +380,13 @@ def init_db():
         birthdate       TEXT,
         role            TEXT DEFAULT 'member',
         email_verified  BOOLEAN DEFAULT FALSE,
+        approved        BOOLEAN DEFAULT FALSE,
         verify_code     TEXT,
         verify_expires  TEXT,
         created_at      TEXT
     )""")
+    # 기존 테이블에 승인 컬럼 보강(이미 있으면 무시)
+    conn.execute("ALTER TABLE members ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT FALSE")
     _seed_admin(conn)
     for idx in [
         "CREATE INDEX IF NOT EXISTS ix_l_region ON listings(sido,sigungu,dong)",

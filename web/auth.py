@@ -140,14 +140,17 @@ def login():
         pw = request.form.get("password") or ""
         conn = db.connect()
         r = conn.execute(
-            "SELECT id,password_hash,role,email_verified FROM members WHERE username=%s OR email=%s",
+            "SELECT id,password_hash,role,email_verified,approved FROM members WHERE username=%s OR email=%s",
             (lid, lid)).fetchone()
         if not r or not check_password_hash(r["password_hash"], pw):
             msg = '<div class="msg err">아이디(이메일) 또는 비밀번호가 올바르지 않습니다.</div>'
         elif r["role"] != "admin" and not r["email_verified"]:
             msg = '<div class="msg err">이메일 인증이 완료되지 않았습니다.</div>'
+        elif r["role"] != "admin" and not r["approved"]:
+            msg = '<div class="msg err">관리자 승인 대기 중입니다. 승인 후 로그인할 수 있습니다.</div>'
         else:
             session["uid"] = r["id"]
+            session["role"] = r["role"]
             session.permanent = True
             return redirect(request.args.get("next") or "/")
     body = f"""<h1>🔐 로그인</h1><p class="sub">부동산 단기임대 분석 · 회원 전용</p>{msg}
@@ -250,8 +253,9 @@ def verify():
                          (r["id"],))
             conn.commit()
             body = (f'<h1>✅ 인증 완료</h1><p class="sub">{email}</p>'
-                    f'<div class="msg ok">이메일 인증이 완료됐습니다. 로그인해 주세요.</div>'
-                    f'<div class=lnk><a href="{url_for("auth.login")}">로그인하러 가기</a></div>')
+                    f'<div class="msg ok">이메일 인증이 완료됐습니다.<br>'
+                    f'<b>관리자 승인 후</b> 로그인할 수 있습니다. 승인되면 안내해 드립니다.</div>'
+                    f'<div class=lnk><a href="{url_for("auth.login")}">로그인 화면으로</a></div>')
             return _render("인증 완료", body)
     body = f"""<h1>📧 이메일 인증</h1><p class="sub">{email} 로 보낸 6자리 코드를 입력하세요</p>{msg}
     <form method=post><input type=hidden name=email value="{email}">
@@ -304,23 +308,54 @@ def members():
         return redirect(url_for("auth.login", next=request.path))
     conn = db.connect()
     rows = [dict(r) for r in conn.execute(
-        "SELECT id,email,name,birthdate,role,email_verified,created_at "
-        "FROM members ORDER BY created_at DESC NULLS LAST").fetchall()]
+        "SELECT id,email,name,birthdate,role,email_verified,approved,created_at "
+        "FROM members ORDER BY approved ASC, created_at DESC NULLS LAST").fetchall()]
+    pending = sum(1 for r in rows if r["role"] != "admin" and not r["approved"])
     trs = ""
     for r in rows:
         vr = "✅" if r["email_verified"] else "⛔"
-        delbtn = (f'<form method=post action="{url_for("auth.member_delete")}" style="margin:0">'
-                  f'<input type=hidden name=id value="{r["id"]}">'
-                  f'<button class=danger onclick="return confirm(\'삭제?\')">삭제</button></form>'
-                  ) if r["role"] != "admin" else ""
+        if r["role"] == "admin":
+            ap, act = "관리자", ""
+        elif r["approved"]:
+            ap = '<span style="color:#059669;font-weight:700">승인됨</span>'
+            act = _form("auth.member_approve", r["id"], "승인취소", "approve", "0", "#64748b")
+        else:
+            ap = '<span style="color:#dc2626;font-weight:700">대기</span>'
+            act = _form("auth.member_approve", r["id"], "✔ 승인", "approve", "1", "#2563eb")
+        delbtn = _form("auth.member_delete", r["id"], "삭제", confirm=True) if r["role"] != "admin" else ""
         trs += (f"<tr><td>{r['id']}</td><td>{r.get('email') or '-'}</td><td>{r.get('name') or ''}</td>"
-                f"<td>{r.get('birthdate') or ''}</td><td>{r['role']}</td><td>{vr}</td>"
-                f"<td>{(r.get('created_at') or '')[:10]}</td><td>{delbtn}</td></tr>")
+                f"<td>{r.get('birthdate') or ''}</td><td>{vr}</td><td>{ap}</td>"
+                f"<td>{(r.get('created_at') or '')[:10]}</td>"
+                f"<td style='white-space:nowrap'>{act} {delbtn}</td></tr>")
+    note = (f'<div class="msg info">승인 대기 {pending}명</div>' if pending else "")
     body = f"""<h1>👥 회원 관리</h1><p class="sub">관리자: {u['username'] or u['email']} ·
-      <a href="/">뷰어로</a> · <a href="{url_for('auth.logout')}">로그아웃</a></p>
-    <table><thead><tr><th>ID</th><th>이메일</th><th>이름</th><th>생년월일</th><th>권한</th>
-      <th>인증</th><th>가입일</th><th></th></tr></thead><tbody>{trs}</tbody></table>"""
-    return _render("회원 관리", body, boxstyle="max-width:760px")
+      <a href="/">홈</a> · <a href="{url_for('auth.logout')}">로그아웃</a></p>{note}
+    <table><thead><tr><th>ID</th><th>이메일</th><th>이름</th><th>생년월일</th>
+      <th>인증</th><th>승인</th><th>가입일</th><th>관리</th></tr></thead><tbody>{trs}</tbody></table>"""
+    return _render("회원 관리", body, boxstyle="max-width:820px")
+
+
+def _form(endpoint, mid, label, extra_name=None, extra_val=None, color="#dc2626", confirm=False):
+    extra = f'<input type=hidden name={extra_name} value="{extra_val}">' if extra_name else ""
+    onclick = ' onclick="return confirm(\'삭제?\')"' if confirm else ""
+    style = ("border:none;background:none;font-weight:700;cursor:pointer;"
+             f"color:{color}")
+    return (f'<form method=post action="{url_for(endpoint)}" style="display:inline;margin:0">'
+            f'<input type=hidden name=id value="{mid}">{extra}'
+            f'<button style="{style}"{onclick}>{label}</button></form>')
+
+
+@bp.route("/members/approve", methods=["POST"])
+def member_approve():
+    u = current_user()
+    if not u or u["role"] != "admin":
+        return redirect(url_for("auth.login"))
+    val = request.form.get("approve") == "1"
+    conn = db.connect()
+    conn.execute("UPDATE members SET approved=%s WHERE id=%s AND role<>'admin'",
+                 (val, request.form.get("id")))
+    conn.commit()
+    return redirect(url_for("auth.members"))
 
 
 @bp.route("/members/delete", methods=["POST"])
@@ -354,4 +389,34 @@ def init_auth(app):
             return redirect(url_for("auth.login", next=request.path))
         return None
 
+    @app.after_request
+    def _inject_nav(resp):
+        # 로그인 상태의 HTML 풀페이지 상단에 공통 네비게이션 바 주입(템플릿 수정 없이 전 뷰어 공통).
+        try:
+            ct = resp.content_type or ""
+            if (session.get("uid") and ct.startswith("text/html")
+                    and not (request.endpoint or "").startswith("auth.")):
+                html = resp.get_data(as_text=True)
+                i = html.find("<body")
+                if i != -1 and "id=__nav" not in html:
+                    gt = html.find(">", i)
+                    if gt != -1:
+                        html = html[:gt + 1] + _nav_html() + html[gt + 1:]
+                        resp.set_data(html)
+        except Exception:
+            pass
+        return resp
+
     return app
+
+
+def _nav_html():
+    admin = ('<a href="/auth/members">회원관리</a>' if session.get("role") == "admin" else "")
+    return f"""<div id=__nav style="position:sticky;top:0;z-index:9999;background:#0f172a;
+color:#e2e8f0;display:flex;gap:4px;align-items:center;padding:7px 14px;font-size:13px;
+font-family:'Pretendard','Malgun Gothic',sans-serif;box-shadow:0 1px 6px rgba(0,0,0,.2)">
+<a href="/" style="font-weight:800;color:#fff;text-decoration:none;margin-right:8px">🏠 홈</a>
+<a href="/profit/">💰 수익성</a><a href="/samsam/">🛋️ 삼삼분석</a><a href="/gangnam/">🏙️ 강남매물</a>
+<span style="flex:1"></span>{admin}<a href="/auth/logout">로그아웃</a>
+<style>#__nav a{{color:#cbd5e1;text-decoration:none;padding:5px 10px;border-radius:6px;font-weight:600}}
+#__nav a:hover{{background:#1e293b;color:#fff}}</style></div>"""
