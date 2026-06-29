@@ -159,14 +159,23 @@ MATCHES = _load_matches()
 print(f"[samsam_app] 네이버 매칭 {len(MATCHES)}건 로드", flush=True)
 
 
-def net_at_deposit(rid, dep):
-    """보증금 dep(만원) 기준 월 순수익 = 삼삼월수익 − (네이버월세@dep + 관리비).
-    네이버월세@dep = 환산월세 − dep×전환율/12 (보증금 정규화 역산). 매칭 없으면 None."""
+def calc_at_deposit(rid, dep, fixed=0.0):
+    """보증금 dep(만원) 기준 분해값 dict 반환(매칭 없으면 None).
+    월순수익 = 삼삼월수익(최대) − 네이버월세@dep − 관리비 − 고정비(통신비·청소비 등).
+    네이버월세@dep = 환산월세 − dep×전환율/12 (보증금 정규화 역산)."""
     m = MATCHES.get(rid)
     if not m or m.get("maxRev") is None or m.get("nEquiv") is None:
         return None
-    rent = max(0.0, m["nEquiv"] - dep * CONV_PER_MONTH)
-    return round(m["maxRev"] - rent - (m.get("nMgmt") or 0), 1)
+    rent = round(max(0.0, m["nEquiv"] - dep * CONV_PER_MONTH), 1)
+    mgmt = m.get("nMgmt") or 0
+    net = round(m["maxRev"] - rent - mgmt - fixed, 1)
+    return {"maxRev": m["maxRev"], "rent": rent, "mgmt": mgmt, "dep": dep,
+            "fixed": fixed, "net": net}
+
+
+def net_at_deposit(rid, dep, fixed=0.0):
+    c = calc_at_deposit(rid, dep, fixed)
+    return c["net"] if c else None
 
 
 def _filtered(a):
@@ -345,6 +354,10 @@ def api_buildings():
         dep = float(a.get("deposit", 1000) or 1000)   # 보증금 기준(만원), 기본 1000
     except ValueError:
         dep = 1000
+    try:
+        fixed = float(a.get("fixed", 0) or 0)          # 고정비(통신비·청소비 등, 만원/월)
+    except ValueError:
+        fixed = 0.0
     by = {}
     for r in rows:
         bn = (r.get("building_name") or "").strip()
@@ -356,8 +369,9 @@ def api_buildings():
         if len(xs) < min_n:
             continue
         occs = [x["occ"] * 100 for x in xs]
-        nets = [net_at_deposit(x["room_id"], dep) for x in xs]
-        nets = [n for n in nets if n is not None]
+        calcs = [calc_at_deposit(x["room_id"], dep, fixed) for x in xs]
+        calcs = [c for c in calcs if c is not None]
+        avg = (lambda key: round(statistics.mean(c[key] for c in calcs), 1)) if calcs else (lambda key: None)
         out.append({
             "building": bn, "sigungu": sg, "dong": dong,
             "btype": xs[0].get("building_type", ""),
@@ -366,8 +380,11 @@ def api_buildings():
             "occ_min": round(min(occs), 1),
             "occ_max": round(max(occs), 1),
             "week_avg": round(statistics.mean(x["sam_week_man"] for x in xs), 1),
-            "n_matched": len(nets),
-            "net_avg": round(statistics.mean(nets), 1) if nets else None,
+            "n_matched": len(calcs),
+            "net_avg": avg("net"),
+            # 월순수익 분해(보증금 기준 평균): 삼삼매출 − 네이버월세 − 관리비 − 고정비
+            "bd": {"maxRev": avg("maxRev"), "rent": avg("rent"), "mgmt": avg("mgmt"),
+                   "dep": dep, "fixed": fixed} if calcs else None,
             "station": next((x["station"] for x in xs if x.get("station")), ""),
             "room_ids": [x["room_id"] for x in xs],
         })
