@@ -1,6 +1,4 @@
 {
-  "regions": ["icn1"],
   "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }],
-  "installCommand": "pip install flask psycopg2-binary python-dotenv",
-  "functions": { "api/index.py": { "maxDuration": 60, "memory": 1024 } }
+  "installCommand": "pip install flask psycopg2-binary python-dotenv"
 }
