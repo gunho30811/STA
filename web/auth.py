@@ -25,6 +25,7 @@ SPECIAL = r"""!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?~`"""
 PW_RE = re.compile(f"[{re.escape(SPECIAL)}]")
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 CODE_TTL_MIN = 10
+DAILY_SIGNUP_LIMIT = int(os.environ.get("DAILY_SIGNUP_LIMIT", 10))  # 하루 가입 한도(스팸 방지)
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -61,7 +62,7 @@ def send_verify_email(email, code):
         host = os.environ["SMTP_HOST"]
         port = int(os.environ.get("SMTP_PORT", 587))
         user = os.environ["SMTP_USER"]
-        pw = os.environ["SMTP_PASS"]
+        pw = os.environ["SMTP_PASS"].replace(" ", "")  # 앱비번 공백 붙여넣기 허용
         sender = os.environ.get("SMTP_FROM", user)
 
         msg = MIMEText(
@@ -101,7 +102,7 @@ def current_user():
     if not uid:
         return None
     r = db.connect().execute(
-        "SELECT id,username,email,name,role,email_verified FROM users WHERE id=%s", (uid,)
+        "SELECT id,username,email,name,role,email_verified FROM members WHERE id=%s", (uid,)
     ).fetchone()
     return dict(r) if r else None
 
@@ -139,7 +140,7 @@ def login():
         pw = request.form.get("password") or ""
         conn = db.connect()
         r = conn.execute(
-            "SELECT id,password_hash,role,email_verified FROM users WHERE username=%s OR email=%s",
+            "SELECT id,password_hash,role,email_verified FROM members WHERE username=%s OR email=%s",
             (lid, lid)).fetchone()
         if not r or not check_password_hash(r["password_hash"], pw):
             msg = '<div class="msg err">아이디(이메일) 또는 비밀번호가 올바르지 않습니다.</div>'
@@ -186,15 +187,22 @@ def signup():
             err = pw_ok(pw)
         if not err:
             conn = db.connect()
-            if conn.execute("SELECT id FROM users WHERE email=%s", (email,)).fetchone():
+            if conn.execute("SELECT id FROM members WHERE email=%s", (email,)).fetchone():
                 err = "이미 가입된 이메일입니다."
+        if not err:
+            today = _now().date().isoformat()
+            cnt = conn.execute(
+                "SELECT count(*) FROM members WHERE role='member' AND created_at >= %s",
+                (today,)).fetchone()[0]
+            if cnt >= DAILY_SIGNUP_LIMIT:
+                err = f"오늘 가입 한도({DAILY_SIGNUP_LIMIT}명)에 도달했습니다. 내일 다시 시도해 주세요."
         if err:
             msg = f'<div class="msg err">{err}</div>'
         else:
             code = _gen_code()
             exp = (_now() + dt.timedelta(minutes=CODE_TTL_MIN)).isoformat(timespec="seconds")
             conn.execute(
-                "INSERT INTO users(email,password_hash,name,birthdate,role,email_verified,"
+                "INSERT INTO members(email,password_hash,name,birthdate,role,email_verified,"
                 "verify_code,verify_expires,created_at) "
                 "VALUES(%s,%s,%s,%s,'member',FALSE,%s,%s,%s)",
                 (email, generate_password_hash(pw), name, birth, code, exp,
@@ -227,7 +235,7 @@ def verify():
         code = (request.form.get("code") or "").strip()
         conn = db.connect()
         r = conn.execute(
-            "SELECT id,verify_code,verify_expires,email_verified FROM users WHERE email=%s",
+            "SELECT id,verify_code,verify_expires,email_verified FROM members WHERE email=%s",
             (email,)).fetchone()
         if not r:
             msg = '<div class="msg err">가입 정보를 찾을 수 없습니다.</div>'
@@ -238,7 +246,7 @@ def verify():
         elif r["verify_expires"] and r["verify_expires"] < _now().isoformat(timespec="seconds"):
             msg = '<div class="msg err">인증코드가 만료되었습니다. 다시 가입해 주세요.</div>'
         else:
-            conn.execute("UPDATE users SET email_verified=TRUE, verify_code=NULL WHERE id=%s",
+            conn.execute("UPDATE members SET email_verified=TRUE, verify_code=NULL WHERE id=%s",
                          (r["id"],))
             conn.commit()
             body = (f'<h1>✅ 인증 완료</h1><p class="sub">{email}</p>'
@@ -261,7 +269,7 @@ def members():
     conn = db.connect()
     rows = [dict(r) for r in conn.execute(
         "SELECT id,email,name,birthdate,role,email_verified,created_at "
-        "FROM users ORDER BY created_at DESC NULLS LAST").fetchall()]
+        "FROM members ORDER BY created_at DESC NULLS LAST").fetchall()]
     trs = ""
     for r in rows:
         vr = "✅" if r["email_verified"] else "⛔"
@@ -285,7 +293,7 @@ def member_delete():
     if not u or u["role"] != "admin":
         return redirect(url_for("auth.login"))
     conn = db.connect()
-    conn.execute("DELETE FROM users WHERE id=%s AND role<>'admin'",
+    conn.execute("DELETE FROM members WHERE id=%s AND role<>'admin'",
                  (request.form.get("id"),))
     conn.commit()
     return redirect(url_for("auth.members"))
