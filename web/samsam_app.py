@@ -121,6 +121,53 @@ def load_listings():
 LISTINGS, SOURCE = load_listings()
 
 
+# ── 네이버 매칭 결과(net_profit_integrated.csv) → room_id별 수익 정보 ──
+MATCH_CSV = os.path.join(ROOT, "data", "net_profit_integrated.csv")
+CONV_PER_MONTH = 0.06 / 12   # 전월세 전환율(월). 보증금 D → 월세환산 = 환산월세 − D×CONV
+
+
+def _load_matches():
+    import csv
+    out = {}
+    if not os.path.exists(MATCH_CSV):
+        return out
+
+    def num(v):
+        v = (v or "").replace(",", "")
+        try:
+            return float(v)
+        except ValueError:
+            return None
+    with open(MATCH_CSV, encoding="utf-8-sig") as f:
+        for r in csv.DictReader(f):
+            try:
+                rid = int(r["삼삼ID"])
+            except (KeyError, ValueError):
+                continue
+            out[rid] = {
+                "maxRev": num(r.get("삼삼월환산_만원")),
+                "nRent": num(r.get("네이버월세_만원")),
+                "nMgmt": num(r.get("네이버관리비_만원")),
+                "nDep": num(r.get("네이버보증금_만원")),
+                "nEquiv": num(r.get("네이버환산월세_만원")),
+            }
+    return out
+
+
+MATCHES = _load_matches()
+print(f"[samsam_app] 네이버 매칭 {len(MATCHES)}건 로드", flush=True)
+
+
+def net_at_deposit(rid, dep):
+    """보증금 dep(만원) 기준 월 순수익 = 삼삼월수익 − (네이버월세@dep + 관리비).
+    네이버월세@dep = 환산월세 − dep×전환율/12 (보증금 정규화 역산). 매칭 없으면 None."""
+    m = MATCHES.get(rid)
+    if not m or m.get("maxRev") is None or m.get("nEquiv") is None:
+        return None
+    rent = max(0.0, m["nEquiv"] - dep * CONV_PER_MONTH)
+    return round(m["maxRev"] - rent - (m.get("nMgmt") or 0), 1)
+
+
 def _filtered(a):
     rows = LISTINGS
     for key in ("sido", "sigungu", "dong", "building_type"):
@@ -290,6 +337,10 @@ def api_buildings():
         min_n = max(1, int(a.get("min_n", 2)))
     except ValueError:
         min_n = 2
+    try:
+        dep = float(a.get("deposit", 1000) or 1000)   # 보증금 기준(만원), 기본 1000
+    except ValueError:
+        dep = 1000
     by = {}
     for r in rows:
         bn = (r.get("building_name") or "").strip()
@@ -301,6 +352,8 @@ def api_buildings():
         if len(xs) < min_n:
             continue
         occs = [x["occ"] * 100 for x in xs]
+        nets = [net_at_deposit(x["room_id"], dep) for x in xs]
+        nets = [n for n in nets if n is not None]
         out.append({
             "building": bn, "sigungu": sg, "dong": dong,
             "btype": xs[0].get("building_type", ""),
@@ -309,6 +362,8 @@ def api_buildings():
             "occ_min": round(min(occs), 1),
             "occ_max": round(max(occs), 1),
             "week_avg": round(statistics.mean(x["sam_week_man"] for x in xs), 1),
+            "n_matched": len(nets),
+            "net_avg": round(statistics.mean(nets), 1) if nets else None,
             "station": next((x["station"] for x in xs if x.get("station")), ""),
             "room_ids": [x["room_id"] for x in xs],
         })

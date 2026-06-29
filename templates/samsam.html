@@ -127,7 +127,8 @@
       <h2 class="sec">건물(오피스텔) 인기 순위 — 한 건물에 삼삼 여러 채가 <b>다 잘 나가면</b> 검증된 건물 🔥</h2>
       <p class="hint">
         <b>매물수</b>=그 건물의 삼삼 매물 수. <b>최저예약률</b>이 높으면 <b>전 호실이 다 잘 나간다</b>는 뜻(대박 후보). 위 필터(지역/유형/평수/주당) 적용됨.
-        최소 매물수 <select id="b-minn" onchange="loadBuildings()"><option>2</option><option>1</option><option>3</option><option>5</option></select>채 이상 · 헤더 클릭 정렬.
+        최소 매물수 <select id="b-minn" onchange="loadBuildings()"><option>2</option><option>1</option><option>3</option><option>5</option></select>채 이상 ·
+        <b>보증금</b> <input type="number" id="b-deposit" value="1000" style="width:80px" onchange="loadBuildings()"> 만원 기준 <b>월순수익</b>(삼삼월수익−네이버월세@보증금−관리비) · 헤더 클릭 정렬.
       </p>
       <div class="scroll">
         <table>
@@ -385,9 +386,11 @@ const BCOLS=[
   {k:'building',t:'건물명',l:true},{k:'dong',t:'동',l:true},{k:'btype',t:'유형',l:true},
   {k:'station',t:'역',l:true},{k:'n',t:'매물수'},{k:'occ_avg',t:'평균예약률%'},
   {k:'occ_min',t:'최저예약률%'},{k:'occ_max',t:'최고예약률%'},{k:'week_avg',t:'평균주당'},
+  {k:'net_avg',t:'월순수익'},{k:'n_matched',t:'매칭수'},
 ];
 async function loadBuildings(){
   const p=params(); p.set('min_n',document.getElementById('b-minn').value);
+  const dep=document.getElementById('b-deposit').value; if(dep)p.set('deposit',dep);
   const r=await (await fetch('/api/buildings?'+p)).json();
   BLD=r.items; renderBuildings();
 }
@@ -397,18 +400,21 @@ function renderBuildings(){
     th.textContent=c.t+(c.k===bSort.col?(bSort.dir==='asc'?' ▲':' ▼'):'');
     th.onclick=()=>{if(bSort.col===c.k)bSort.dir=bSort.dir==='asc'?'desc':'asc';else{bSort.col=c.k;bSort.dir='desc';}renderBuildings();};
     h.appendChild(th);});
-  const isNum=k=>['n','occ_avg','occ_min','occ_max','week_avg'].includes(k);
+  const isNum=k=>['n','occ_avg','occ_min','occ_max','week_avg','net_avg','n_matched'].includes(k);
   const k=bSort.col;
   const rows=[...BLD].sort((a,b)=>{let av=a[k],bv=b[k];
-    if(isNum(k))return bSort.dir==='asc'?av-bv:bv-av;
+    if(isNum(k)){av=av==null?-Infinity:av;bv=bv==null?-Infinity:bv;return bSort.dir==='asc'?av-bv:bv-av;}
     return bSort.dir==='asc'?String(av).localeCompare(String(bv),'ko'):String(bv).localeCompare(String(av),'ko');});
   const b=document.getElementById('b-b');
-  if(!rows.length){b.innerHTML='<tr><td colspan="9" class="empty">매물수 조건을 만족하는 건물이 없습니다.</td></tr>';return;}
+  if(!rows.length){b.innerHTML='<tr><td colspan="11" class="empty">매물수 조건을 만족하는 건물이 없습니다.</td></tr>';return;}
   b.innerHTML=rows.map(r=>{
     const minc=r.occ_min>=60?'good':(r.occ_min<30?'bad':'mut');
+    const netc=r.net_avg==null?'mut':(r.net_avg>=0?'good':'bad');
+    const netv=r.net_avg==null?'<span class="mut">-</span>':`<span class="${netc}" style="font-weight:800">${r.net_avg}</span>`;
     return `<tr><td class="l" style="font-weight:700">${r.building}</td><td class="l">${r.dong}</td><td class="l">${r.btype}</td><td class="l">${r.station||'-'}</td>
       <td style="font-weight:800">${r.n}</td><td class="occ">${r.occ_avg}%</td>
-      <td class="${minc}" style="font-weight:800">${r.occ_min}%</td><td class="mut">${r.occ_max}%</td><td>${r.week_avg}</td></tr>`;
+      <td class="${minc}" style="font-weight:800">${r.occ_min}%</td><td class="mut">${r.occ_max}%</td><td>${r.week_avg}</td>
+      <td>${netv}</td><td class="mut">${r.n_matched||0}</td></tr>`;
   }).join('');
 }
 init();
