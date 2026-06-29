@@ -28,7 +28,7 @@ _PK = {
     'listings': 'articleNo',
     'naver_listings': 'article_no',
     'samsam_listings': 'room_id',
-    'users': 'id',
+    'members': 'id',
 }
 
 
@@ -180,11 +180,11 @@ def _seed_admin(conn):
     from werkzeug.security import generate_password_hash
     uname = os.environ.get('ADMIN_USERNAME', 'gunho')
     pw = os.environ.get('ADMIN_PASSWORD', 'rjsgh1004!')
-    row = conn.execute("SELECT id FROM users WHERE username=%s", (uname,)).fetchone()
+    row = conn.execute("SELECT id FROM members WHERE username=%s", (uname,)).fetchone()
     if row:
         return
     conn.execute(
-        "INSERT INTO users(username,email,password_hash,name,role,email_verified,created_at) "
+        "INSERT INTO members(username,email,password_hash,name,role,email_verified,created_at) "
         "VALUES(%s,%s,%s,%s,'admin',TRUE,%s)",
         (uname, None, generate_password_hash(pw), '관리자',
          __import__('datetime').datetime.now().isoformat(timespec='seconds')))
@@ -369,8 +369,9 @@ def init_db():
         PRIMARY KEY (snapshot_date, sido, sigungu, dong, building_type)
     )""")
     # 회원/로그인. 관리자는 username, 일반회원은 email로 로그인. 비번은 해시 저장.
+    # (이름이 Supabase 예약 auth.users 와 헷갈려 public.members 로 명명)
     conn.execute("""
-    CREATE TABLE IF NOT EXISTS users (
+    CREATE TABLE IF NOT EXISTS members (
         id              SERIAL PRIMARY KEY,
         username        TEXT UNIQUE,
         email           TEXT UNIQUE,
@@ -398,7 +399,7 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS ix_sl_building ON samsam_listings(building_name)",
         "CREATE INDEX IF NOT EXISTS ix_ss_date ON samsam_snapshots(snapshot_date)",
         "CREATE INDEX IF NOT EXISTS ix_ss_region ON samsam_snapshots(sido,sigungu,dong)",
-        "CREATE INDEX IF NOT EXISTS ix_users_email ON users(email)",
+        "CREATE INDEX IF NOT EXISTS ix_members_email ON members(email)",
     ]:
         conn.execute(idx)
     conn.commit()
