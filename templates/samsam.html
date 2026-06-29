@@ -199,7 +199,7 @@ let LISTITEMS=[], listSort={col:"vac",dir:"desc"}, listOname="";
 
 function v(id){return document.getElementById(id).value;}
 async function init(){
-  const f=await (await fetch('/api/facets')).json();
+  const f=await (await fetch('api/facets')).json();
   TREE=f.tree;
   const srcEl=document.getElementById('src');
   const isDb=f.source && f.source.startsWith('DB');
@@ -277,7 +277,7 @@ function renderTable(){
   });
 }
 async function analyze(){
-  const r=await (await fetch('/api/analyze?'+params())).json();
+  const r=await (await fetch('api/analyze?'+params())).json();
   const o=r.overall;
   document.getElementById('c-n').textContent=o.n.toLocaleString();
   document.getElementById('c-occ').innerHTML=(o.occ??'-')+'<small> %</small>';
@@ -294,7 +294,7 @@ async function loadList(option, keep){
   document.getElementById('t-have').classList.toggle('on',curMode==='have');
   renderTable();
   const p=params();p.set('option',option);p.set('mode',curMode);
-  const r=await (await fetch('/api/listings?'+p)).json();
+  const r=await (await fetch('api/listings?'+p)).json();
   listOname=r.optionName||option;
   LISTITEMS=r.items;
   listSort={col:"vac",dir:"desc"};   // 기본: 공실률 높은 순
@@ -358,7 +358,7 @@ async function loadTrend(){
   const p=new URLSearchParams();
   if(v('f-sido'))p.set('sido',v('f-sido'));
   if(v('f-sigungu'))p.set('sigungu',v('f-sigungu'));
-  TRD=await (await fetch('/api/trend?'+p)).json();
+  TRD=await (await fetch('api/trend?'+p)).json();
   renderTrend();
 }
 function renderTrend(){
@@ -399,7 +399,7 @@ async function loadBuildings(){
   const dep=document.getElementById('b-deposit').value; if(dep)p.set('deposit',dep);
   const fx=document.getElementById('b-fixed').value; if(fx)p.set('fixed',fx);
   const stn=document.getElementById('b-station').value.trim(); if(stn)p.set('station',stn);
-  const r=await (await fetch('/api/buildings?'+p)).json();
+  const r=await (await fetch('api/buildings?'+p)).json();
   BLD=r.items; renderBuildings();
 }
 function renderBuildings(){

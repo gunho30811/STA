@@ -151,7 +151,7 @@ function fmt(v){
 }
 
 async function init(){
-  const f = await (await fetch('/api/facets')).json();
+  const f = await (await fetch('api/facets')).json();
   const tb = document.getElementById('f-types');
   f.types.forEach(t=>{
     const b=document.createElement('button'); b.textContent=t.name; b.dataset.code=t.code;
@@ -161,7 +161,7 @@ async function init(){
   const ds=document.getElementById('f-dong');
   f.dongs.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;ds.appendChild(o);});
 
-  const s = await (await fetch('/api/stats')).json();
+  const s = await (await fetch('api/stats')).json();
   document.getElementById('c-total').textContent = s.total.toLocaleString();
   document.getElementById('c-dong').innerHTML = s.dong_count + '<small> 개동</small>';
   document.getElementById('c-rent').innerHTML = (s.rent_median??'-') + '<small> 만원</small>';
@@ -183,7 +183,7 @@ async function search(page){
   if(v('f-pmin'))p.set('pyeong_min',v('f-pmin'));
   if(v('f-pmax'))p.set('pyeong_max',v('f-pmax'));
   p.set('sort',v('f-sort'));p.set('page',page);p.set('size',24);
-  const r=await (await fetch('/api/listings?'+p)).json();
+  const r=await (await fetch('api/listings?'+p)).json();
   curItems=r.items;
   document.getElementById('r-count').textContent=r.total.toLocaleString();
   renderGrid(r.items);renderPager(r);

@@ -132,7 +132,7 @@ function n(x){return x==null?'-':x.toLocaleString();}
 function v(id){return document.getElementById(id).value.trim();}
 
 async function init(){
-  const f=await (await fetch('/api/facets')).json();
+  const f=await (await fetch('api/facets')).json();
   TREE=f.tree;
   const fill=(id,arr)=>{const s=document.getElementById(id);arr.forEach(x=>{const o=document.createElement('option');o.value=x;o.textContent=x;s.appendChild(o);});};
   fill('f-sido',f.sido); fill('f-btype',f.btype);
@@ -167,7 +167,7 @@ async function search(page){
   set('f-dongocc','dongocc_min');set('f-dep','dep_max');set('f-pmin','pyeong_min');set('f-pmax','pyeong_max');
   p.set('sort',curSort.col);p.set('dir',curSort.dir);p.set('page',page);p.set('size',40);
   renderThead();
-  const r=await (await fetch('/api/profit?'+p)).json();
+  const r=await (await fetch('api/profit?'+p)).json();
   const s=r.summary;
   document.getElementById('c-cnt').textContent=s.count.toLocaleString();
   document.getElementById('c-net').innerHTML=n(s.net_med)+'<small> 만원</small>';
@@ -253,7 +253,7 @@ async function tab(name){
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===name));
   document.getElementById('t-list').style.display=name==='list'?'':'none';
   document.getElementById('t-rank').style.display=name==='rank'?'':'none';
-  if(name==='rank'){ if(!RANK)RANK=await (await fetch('/api/rank')).json(); renderRank('dong','dh','db'); renderRank('station','sh','sb'); }
+  if(name==='rank'){ if(!RANK)RANK=await (await fetch('api/rank')).json(); renderRank('dong','dh','db'); renderRank('station','sh','sb'); }
 }
 function renderRank(which,hid,bid){
   const st=rankSort[which], rows=[...RANK[which]];
