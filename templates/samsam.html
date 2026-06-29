@@ -127,6 +127,7 @@
       <h2 class="sec">건물(오피스텔) 인기 순위 — 한 건물에 삼삼 여러 채가 <b>다 잘 나가면</b> 검증된 건물 🔥</h2>
       <p class="hint">
         <b>매물수</b>=그 건물의 삼삼 매물 수. <b>최저예약률</b>이 높으면 <b>전 호실이 다 잘 나간다</b>는 뜻(대박 후보). 위 필터(지역/유형/평수/주당) 적용됨.
+        <b>역 검색</b> <input id="b-station" placeholder="예: 강남역" style="width:100px" onkeydown="if(event.key==='Enter')loadBuildings()"> <button class="btn btn-go" style="padding:4px 10px;font-size:12px" onclick="loadBuildings()">검색</button> ·
         최소 매물수 <select id="b-minn" onchange="loadBuildings()"><option>2</option><option>1</option><option>3</option><option>5</option></select>채 이상 ·
         <b>보증금</b> <input type="number" id="b-deposit" value="1000" style="width:80px" onchange="loadBuildings()"> 만원 기준 <b>월순수익</b>(삼삼월수익−네이버월세@보증금−관리비) · 헤더 클릭 정렬.
       </p>
@@ -394,6 +395,7 @@ const BCOLS=[
 async function loadBuildings(){
   const p=params(); p.set('min_n',document.getElementById('b-minn').value);
   const dep=document.getElementById('b-deposit').value; if(dep)p.set('deposit',dep);
+  const stn=document.getElementById('b-station').value.trim(); if(stn)p.set('station',stn);
   const r=await (await fetch('/api/buildings?'+p)).json();
   BLD=r.items; renderBuildings();
 }
