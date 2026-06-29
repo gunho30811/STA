@@ -77,6 +77,7 @@ def _enrich(r):
     r["vac"] = 1 - r["occ"]                     # 공실률
     r["sam_week_man"] = round((r.get("rent_total_weekly") or 0) / 10000, 1)
     st = _parse_list(r.get("station_500m_names"))
+    r["stations"] = st
     r["station"] = st[0] if st else ""
     return r
 
@@ -333,6 +334,9 @@ def api_buildings():
     '검증된 대박 건물'. 매물수(n)·평균예약률·최저예약률(전 호실 다 잘 나가는지)·평균주당."""
     a = request.args
     rows = _filtered(a)
+    st = a.get("station", "").strip()
+    if st:   # 역 검색: 매물 500m 내 역명에 검색어 포함
+        rows = [r for r in rows if any(st in s for s in r.get("stations", []))]
     try:
         min_n = max(1, int(a.get("min_n", 2)))
     except ValueError:
