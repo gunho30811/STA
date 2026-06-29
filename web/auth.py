@@ -257,8 +257,44 @@ def verify():
     <form method=post><input type=hidden name=email value="{email}">
       <label>인증코드</label><input name=code inputmode=numeric autofocus>
       <button class=btn>인증하기</button>
+    </form>
+    <form method=post action="{url_for('auth.resend')}" style="margin-top:10px">
+      <input type=hidden name=email value="{email}">
+      <button class=btn style="background:#64748b">인증번호 다시 보내기</button>
     </form>"""
     return _render("이메일 인증", body)
+
+
+@bp.route("/resend", methods=["POST"])
+def resend():
+    email = (request.form.get("email") or "").strip().lower()
+    conn = db.connect()
+    r = conn.execute(
+        "SELECT id,email_verified,verify_expires FROM members WHERE email=%s", (email,)
+    ).fetchone()
+    if not r:
+        return redirect(url_for("auth.signup"))
+    if r["email_verified"]:
+        return redirect(url_for("auth.login"))
+    # 쿨다운: 직전 발송 후 60초 이내면 재발송 막음(verify_expires = 발송시각 + CODE_TTL_MIN 으로 역산)
+    if r["verify_expires"]:
+        try:
+            last_sent = dt.datetime.fromisoformat(r["verify_expires"]) - dt.timedelta(minutes=CODE_TTL_MIN)
+            wait = 60 - (_now() - last_sent).total_seconds()
+            if wait > 0:
+                body = (f'<h1>📧 이메일 인증</h1><p class="sub">{email}</p>'
+                        f'<div class="msg err">잠시 후 다시 시도해 주세요({int(wait)}초 뒤 재발송 가능).</div>'
+                        f'<div class=lnk><a href="{url_for("auth.verify", email=email)}">인증 화면으로</a></div>')
+                return _render("이메일 인증", body)
+        except (ValueError, TypeError):
+            pass
+    code = _gen_code()
+    exp = (_now() + dt.timedelta(minutes=CODE_TTL_MIN)).isoformat(timespec="seconds")
+    conn.execute("UPDATE members SET verify_code=%s, verify_expires=%s WHERE id=%s",
+                 (code, exp, r["id"]))
+    conn.commit()
+    shown = send_verify_email(email, code)
+    return redirect(url_for("auth.verify", email=email, dev=shown))
 
 
 @bp.route("/members")
