@@ -146,6 +146,7 @@
         매주 크롤 직후 <code>snapshot.py</code> 실행분이 쌓여요. <b>최신예약률</b>·<b>전주대비 Δ</b>(▲상승=수요↑, ▼하락) + 주차별 값.
         스냅샷이 1개뿐이면 현재값만 보이고, 2주차부터 변화가 나타나요. 위 시/도·시군구 필터 적용.
       </p>
+      <div style="margin:4px 0 10px">최소 매물수 <input type="number" id="tr-minn" value="5" style="width:70px;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px" onchange="renderTrend()">개 이상만 보기 <span class="mut" style="font-size:11.5px">(표본 적은 동네 노이즈 제외)</span></div>
       <div id="trend-empty" class="empty" style="display:none">아직 스냅샷이 없어요. 크롤 후 <code>python pipeline/samsam/snapshot.py</code> 실행하면 첫 데이터가 쌓여요.</div>
       <div class="scroll">
         <table>
@@ -370,10 +371,12 @@ function renderTrend(){
     h.appendChild(th);});
   const val=(x,k)=>k.startsWith('d:')?(x.series[k.slice(2)]??null):x[k];
   const k=trdSort.col, isNum=(k!=='dong'&&k!=='sigungu');
-  const rows=[...TRD.items].sort((a,b)=>{let av=val(a,k),bv=val(b,k);
+  const minN=parseInt((document.getElementById('tr-minn')||{}).value)||0;
+  const rows=TRD.items.filter(x=>(x.n||0)>=minN).sort((a,b)=>{let av=val(a,k),bv=val(b,k);
     if(isNum){av=av==null?-Infinity:av;bv=bv==null?-Infinity:bv;return trdSort.dir==='asc'?av-bv:bv-av;}
     return trdSort.dir==='asc'?String(av).localeCompare(String(bv),'ko'):String(bv).localeCompare(String(av),'ko');});
   const b=document.getElementById('tr-b');
+  if(!rows.length&&TRD.items.length){b.innerHTML='<tr><td colspan="20" class="empty">매물수 '+minN+'개 이상인 동이 없어요. 숫자를 낮춰보세요.</td></tr>';return;}
   b.innerHTML=rows.map(x=>{
     const dcell=x.delta==null?'<span class="mut">-</span>':(x.delta>0?`<span class="bad">▲${x.delta}</span>`:(x.delta<0?`<span style="color:#2563eb;font-weight:700">▼${Math.abs(x.delta)}</span>`:'0'));
     const dates=TRD.dates.map(d=>`<td class="mut">${x.series[d]??'-'}</td>`).join('');
