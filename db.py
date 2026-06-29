@@ -28,6 +28,7 @@ _PK = {
     'listings': 'articleNo',
     'naver_listings': 'article_no',
     'samsam_listings': 'room_id',
+    'users': 'id',
 }
 
 
@@ -172,6 +173,23 @@ class _Conn:
 
 def connect():
     return _Conn()
+
+
+def _seed_admin(conn):
+    """관리자 계정(gunho) 1회 시드. 환경변수 ADMIN_USERNAME/ADMIN_PASSWORD 로 덮어쓸 수 있음."""
+    from werkzeug.security import generate_password_hash
+    uname = os.environ.get('ADMIN_USERNAME', 'gunho')
+    pw = os.environ.get('ADMIN_PASSWORD', 'rjsgh1004!')
+    row = conn.execute("SELECT id FROM users WHERE username=%s", (uname,)).fetchone()
+    if row:
+        return
+    conn.execute(
+        "INSERT INTO users(username,email,password_hash,name,role,email_verified,created_at) "
+        "VALUES(%s,%s,%s,%s,'admin',TRUE,%s)",
+        (uname, None, generate_password_hash(pw), '관리자',
+         __import__('datetime').datetime.now().isoformat(timespec='seconds')))
+    conn.commit()
+    print(f"[db] 관리자 계정 시드: {uname}")
 
 
 def init_db():
@@ -350,6 +368,22 @@ def init_db():
         avg_week       REAL,
         PRIMARY KEY (snapshot_date, sido, sigungu, dong, building_type)
     )""")
+    # 회원/로그인. 관리자는 username, 일반회원은 email로 로그인. 비번은 해시 저장.
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id              SERIAL PRIMARY KEY,
+        username        TEXT UNIQUE,
+        email           TEXT UNIQUE,
+        password_hash   TEXT NOT NULL,
+        name            TEXT,
+        birthdate       TEXT,
+        role            TEXT DEFAULT 'member',
+        email_verified  BOOLEAN DEFAULT FALSE,
+        verify_code     TEXT,
+        verify_expires  TEXT,
+        created_at      TEXT
+    )""")
+    _seed_admin(conn)
     for idx in [
         "CREATE INDEX IF NOT EXISTS ix_l_region ON listings(sido,sigungu,dong)",
         "CREATE INDEX IF NOT EXISTS ix_l_deposit ON listings(deposit)",
@@ -364,6 +398,7 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS ix_sl_building ON samsam_listings(building_name)",
         "CREATE INDEX IF NOT EXISTS ix_ss_date ON samsam_snapshots(snapshot_date)",
         "CREATE INDEX IF NOT EXISTS ix_ss_region ON samsam_snapshots(sido,sigungu,dong)",
+        "CREATE INDEX IF NOT EXISTS ix_users_email ON users(email)",
     ]:
         conn.execute(idx)
     conn.commit()
