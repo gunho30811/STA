@@ -73,19 +73,6 @@ profit/api/profit 0.30s / samsam/api/facets 0.50s / samsam/api/buildings 0.97s(5
 - 후속 커밋: 원인 4 (`regions:["icn1"]`).
 - 적용 파일: `db.py`, `web/{gangnam,profit,samsam}_app.py`, `web/auth.py`, `vercel.json`.
 
-## 원인 4 후속: 무료 플랜은 함수 지역 변경 불가 → 삼삼도 파일 서빙으로 우회
-- `regions:["icn1"]` 적용해도 배포 후 여전히 `icn1::iad1`(함수 미국). **Hobby 플랜은 함수 지역 고정**
-  (대시보드 Functions 탭에서도 변경 불가). 즉 함수는 미국에 묶임.
-- 실측으로 느림의 정체 확인: **파일 기반 페이지는 빠르고(profit 0.26s, gangnam 0.46s) DB(서울) 쓰는
-  페이지만 느림**(samsam facets 0.5s, buildings 0.9s, trend 2.36s, login 1.8s). 미국 함수↔서울 DB 왕복 탓.
-- 해결: DB 이전/Pro 없이 — **삼삼도 profit/gangnam처럼 파일에서 읽게** 전환(미국 함수 안의 로컬 파일이라
-  태평양 왕복 0). `pipeline/samsam/export_jsonl.py`로 samsam_listings(11MB)·samsam_snapshots(506KB)를
-  `lab/`에 export(주간 크롤 후 재생성·커밋). `samsam_app`: EXPORT 파일 우선 로드(없으면 DB→샘플),
-  `api_trend`도 스냅샷 파일 우선.
-- 검증(로컬): samsam 출처=파일, buildings 0.9s→**0.06s**, trend 2.36s→**0.01s**.
-- DB-온-핫패스는 이제 auth(로그인/회원관리)만 남음(빈도 낮음). 데이터 갱신 워크플로: 크롤 → export_jsonl
-  → build_integrated → 커밋(자동 재배포).
-
 ## 남은 후속 과제
 - 강남 22MB jsonl은 콜드 인스턴스마다 1회 파싱 — DB 이전 또는 서버사이드 페이지네이션으로 개선 여지.
 - auth.py 나머지 라우트도 연결 명시 close 권장(autocommit으로 치명 누수는 차단됨).
