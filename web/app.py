@@ -8,6 +8,8 @@ from flask import Flask, jsonify, request, render_template
 import db
 
 app = Flask(__name__, template_folder=os.path.join(ROOT, "templates"))
+from auth import init_auth  # noqa: E402
+init_auth(app)
 
 
 @app.route("/")

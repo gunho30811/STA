@@ -21,6 +21,8 @@ from flask import Flask, jsonify, render_template, request
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "data")
 app = Flask(__name__, template_folder=os.path.join(ROOT, "templates"))
+from auth import init_auth  # noqa: E402
+init_auth(app)
 
 # CSV 원본 헤더 → 짧은 키 (실현/현실효율/CSV순수익은 안 씀 — 최대수익 기준으로 재계산)
 PROFIT_MAP = {

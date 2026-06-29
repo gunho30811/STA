@@ -17,6 +17,8 @@ DATA = os.path.join(ROOT, "lab", "naver_listings_gangnam.jsonl")
 M2_PER_PYEONG = 3.305785
 
 app = Flask(__name__, template_folder=os.path.join(ROOT, "templates"))
+from auth import init_auth  # noqa: E402
+init_auth(app)
 
 TYPE_NAMES = {
     "APT": "아파트", "OPST": "오피스텔", "VL": "빌라",

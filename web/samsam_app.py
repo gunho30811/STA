@@ -25,6 +25,8 @@ sys.path.insert(0, ROOT)
 SAMPLE = os.path.join(ROOT, "lab", "samsam_sample.jsonl")
 
 app = Flask(__name__, template_folder=os.path.join(ROOT, "templates"))
+from auth import init_auth  # noqa: E402
+init_auth(app)
 
 SAM_COLS = ("room_id", "url", "name", "building_type", "building_name",
             "sido", "sigungu", "dong", "area_pyeong", "rent_total_weekly",
