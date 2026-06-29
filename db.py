@@ -143,6 +143,11 @@ class _Conn:
             self._conn = _pg8000_connect(url)
         else:
             raise RuntimeError('Postgres 드라이버가 없습니다 (psycopg2 또는 pg8000 설치 필요).')
+        # autocommit: SELECT 후 "idle in transaction"으로 연결이 묶이는 것 방지(풀러 고갈 방지).
+        try:
+            self._conn.autocommit = True
+        except Exception:
+            pass
 
     def execute(self, sql, params=()):
         cur = self._conn.cursor()
@@ -192,8 +197,25 @@ def _seed_admin(conn):
     print(f"[db] 관리자 계정 시드: {uname}")
 
 
-def init_db():
+_INITED = False
+
+
+def init_db(force=False):
+    # 프로세스당 1회만 스키마 점검(서버리스 콜드스타트에서 앱마다 중복 실행 방지).
+    global _INITED
+    if _INITED and not force:
+        return
     conn = connect()
+    # 이미 스키마가 있으면 DDL(CREATE/ALTER/INDEX) 전체를 건너뛴다.
+    # — 콜드스타트마다 ALTER가 ACCESS EXCLUSIVE 락을 노려 다른 요청과 경합/hang 나는 것 방지.
+    if not force:
+        try:
+            if conn.execute("SELECT to_regclass('public.members')").fetchone()[0]:
+                _INITED = True
+                conn.close()
+                return
+        except Exception:
+            pass
     conn.execute("""
     CREATE TABLE IF NOT EXISTS regions (
         cortarNo   TEXT PRIMARY KEY,
@@ -407,6 +429,7 @@ def init_db():
         conn.execute(idx)
     conn.commit()
     conn.close()
+    _INITED = True
 
 
 if __name__ == "__main__":

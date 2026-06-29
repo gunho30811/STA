@@ -121,7 +121,16 @@ def load_listings():
     return rows, src
 
 
-LISTINGS, SOURCE = load_listings()
+_LC=None
+def _ensure():
+    global _LC
+    if _LC is None:
+        _LC=load_listings()
+    return _LC
+def L():
+    return _ensure()[0]
+def SRC():
+    return _ensure()[1]
 
 
 # ── 네이버 매칭 결과(net_profit_integrated.csv) → room_id별 수익 정보 ──
@@ -157,15 +166,19 @@ def _load_matches():
     return out
 
 
-MATCHES = _load_matches()
-print(f"[samsam_app] 네이버 매칭 {len(MATCHES)}건 로드", flush=True)
+_MC=None
+def M():
+    global _MC
+    if _MC is None:
+        _MC=_load_matches()
+    return _MC
 
 
 def calc_at_deposit(rid, dep, fixed=0.0):
     """보증금 dep(만원) 기준 분해값 dict 반환(매칭 없으면 None).
     월순수익 = 삼삼월수익(최대) − 네이버월세@dep − 관리비 − 고정비(통신비·청소비 등).
     네이버월세@dep = 환산월세 − dep×전환율/12 (보증금 정규화 역산)."""
-    m = MATCHES.get(rid)
+    m = M().get(rid)
     if not m or m.get("maxRev") is None or m.get("nEquiv") is None:
         return None
     rent = round(max(0.0, m["nEquiv"] - dep * CONV_PER_MONTH), 1)
@@ -181,7 +194,7 @@ def net_at_deposit(rid, dep, fixed=0.0):
 
 
 def _filtered(a):
-    rows = LISTINGS
+    rows = L()
     for key in ("sido", "sigungu", "dong", "building_type"):
         v = a.get(key)
         if v:
@@ -248,22 +261,22 @@ def index():
 
 @app.route("/api/facets")
 def api_facets():
-    sidos = sorted({r["sido"] for r in LISTINGS if r.get("sido")})
+    sidos = sorted({r["sido"] for r in L() if r.get("sido")})
     tree = {}
-    for r in LISTINGS:
+    for r in L():
         tree.setdefault(r.get("sido", ""), {}).setdefault(r.get("sigungu", ""), set()).add(r.get("dong", ""))
     tree = {s: {g: sorted(d) for g, d in gg.items()} for s, gg in tree.items()}
-    btypes = sorted({r["building_type"] for r in LISTINGS if r.get("building_type")})
-    opts = [{"code": c, "name": ko(c)} for c in sorted({o for r in LISTINGS for o in r["options"]})]
+    btypes = sorted({r["building_type"] for r in L() if r.get("building_type")})
+    opts = [{"code": c, "name": ko(c)} for c in sorted({o for r in L() for o in r["options"]})]
     return jsonify({"sido": sidos, "tree": tree, "building_type": btypes,
-                    "options": opts, "total": len(LISTINGS), "source": SOURCE,
+                    "options": opts, "total": len(L()), "source": SRC(),
                     "occ_window": _occ_window()})
 
 
 def _occ_window():
     """예약률 산정 구간 안내: 예약률 = 수집일 ~ +30일의 예약 비율."""
     import datetime as _dt
-    dates = sorted({(r.get("collected_at") or "")[:10] for r in LISTINGS if r.get("collected_at")})
+    dates = sorted({(r.get("collected_at") or "")[:10] for r in L() if r.get("collected_at")})
     if not dates:
         return "예약률 = 수집일 기준 향후 30일 (수집일 정보 없음)"
     lo, hi = dates[0], dates[-1]
@@ -446,7 +459,7 @@ if __name__ == "__main__":
         ip = socket.gethostbyname(socket.gethostname())
     except Exception:
         ip = "127.0.0.1"
-    print(f"출처: {SOURCE} / {len(LISTINGS)}건")
+    print(f"출처: {SRC()} / {len(L())}건")
     print("로컬:   http://127.0.0.1:5003")
     print(f"같은망: http://{ip}:5003")
     app.run(host="0.0.0.0", port=5003, debug=False)

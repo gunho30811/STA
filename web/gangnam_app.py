@@ -45,7 +45,12 @@ def _load():
     return rows
 
 
-LISTINGS = _load()
+_CACHE=None
+def L():
+    global _CACHE
+    if _CACHE is None:
+        _CACHE=_load()
+    return _CACHE
 
 
 @app.route("/")
@@ -55,17 +60,17 @@ def index():
 
 @app.route("/api/facets")
 def api_facets():
-    dongs = sorted({x.get("dong") for x in LISTINGS if x.get("dong")})
+    dongs = sorted({x.get("dong") for x in L() if x.get("dong")})
     types = [{"code": c, "name": TYPE_NAMES.get(c, c)}
              for c in ["APT", "OPST", "VL", "OR", "DDDGG", "SG"]
-             if any(x.get("building_type_code") == c for x in LISTINGS)]
-    return jsonify({"dongs": dongs, "types": types, "total": len(LISTINGS)})
+             if any(x.get("building_type_code") == c for x in L())]
+    return jsonify({"dongs": dongs, "types": types, "total": len(L())})
 
 
 @app.route("/api/stats")
 def api_stats():
     by_type, by_dong, rents = {}, {}, []
-    for x in LISTINGS:
+    for x in L():
         t = x.get("building_type_code")
         by_type[t] = by_type.get(t, 0) + 1
         d = x.get("dong")
@@ -76,7 +81,7 @@ def api_stats():
     rents.sort()
     med = rents[len(rents) // 2] if rents else None
     return jsonify({
-        "total": len(LISTINGS),
+        "total": len(L()),
         "dong_count": len(by_dong),
         "rent_median": med,
         "by_type": [{"code": k, "name": TYPE_NAMES.get(k, k), "count": v}
@@ -87,7 +92,7 @@ def api_stats():
 @app.route("/api/listings")
 def api_listings():
     a = request.args
-    items = LISTINGS
+    items = L()
 
     types = [t for t in a.get("types", "").split(",") if t]
     if types:
@@ -149,7 +154,7 @@ def _n(v):
 
 if __name__ == "__main__":
     import socket
-    print(f"강남 매물 {len(LISTINGS)}건 로드됨")
+    print(f"강남 매물 {len(L())}건 로드됨")
     try:
         ip = socket.gethostbyname(socket.gethostname())
     except Exception:

@@ -90,7 +90,12 @@ def _attach_area_occ(rows, field, out):
         r[out] = avg.get(r.get(field) or "")
 
 
-PROFIT = load_profit()
+_CACHE=None
+def P():
+    global _CACHE
+    if _CACHE is None:
+        _CACHE=load_profit()
+    return _CACHE
 
 
 @app.route("/")
@@ -101,20 +106,20 @@ def index():
 @app.route("/api/facets")
 def api_facets():
     def uniq(k):
-        return sorted({x.get(k) for x in PROFIT if x.get(k)})
+        return sorted({x.get(k) for x in P() if x.get(k)})
     tree = {}
-    for x in PROFIT:
+    for x in P():
         tree.setdefault(x.get("sido", ""), {}).setdefault(x.get("sigungu", ""), set()).add(x.get("dong", ""))
     tree = {s: {g: sorted(d) for g, d in gg.items()} for s, gg in tree.items()}
     return jsonify({
         "sido": uniq("sido"), "tree": tree, "sigungu": uniq("sigungu"),
         "btype": uniq("btype"), "rooms": ["원룸", "투룸", "쓰리룸+"],
-        "total": len(PROFIT),
+        "total": len(P()),
     })
 
 
 def _filter(a):
-    items = list(PROFIT)
+    items = list(P())
 
     def eq(key, field):
         v = a.get(key)
@@ -188,7 +193,7 @@ def api_rank():
     """동별·역별 순위 — 어디서 운영하는 게 제일 좋은지(평균 순수익/예약률/최대수익)."""
     def agg(field):
         by = {}
-        for x in PROFIT:
+        for x in P():
             k = x.get(field) or ""
             if not k:
                 continue
@@ -218,5 +223,5 @@ def _median(xs):
 
 
 if __name__ == "__main__":
-    print(f"수익성 매칭 {len(PROFIT)}건 로드 / http://127.0.0.1:5001")
+    print(f"수익성 매칭 {len(P())}건 로드 / http://127.0.0.1:5001")
     app.run(host="0.0.0.0", port=5001, debug=False)
