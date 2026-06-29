@@ -86,6 +86,20 @@ profit/api/profit 0.30s / samsam/api/facets 0.50s / samsam/api/buildings 0.97s(5
 - DB-온-핫패스는 이제 auth(로그인/회원관리)만 남음(빈도 낮음). 데이터 갱신 워크플로: 크롤 → export_jsonl
   → build_integrated → 커밋(자동 재배포).
 
+## 반전: 진짜 배포 실패 원인은 vercel.json (파일 크기 아님)
+- 증상: 성능 수정들이 배포돼도 사이트가 안 빨라짐. 알고 보니 **#55부터 모든 배포가 build failure**,
+  마지막 성공은 #54(c5a535d). 즉 lazy/autocommit/region/파일서빙 전부 **배포 자체가 안 됐고** 옛 #54가 떠있었음.
+- 원인: `vercel.json`의 `"functions":{maxDuration:60,memory:1024}`(#55) + `"regions":["icn1"]`(#56)이
+  **Hobby 플랜에서 빌드를 깨뜨림**(허용 안 되는 설정 → 무시가 아니라 실패). 파일 33MB는 무관했음.
+  → #57(파일서빙)을 용량 탓으로 오판해 되돌린 것도 잘못된 진단이었음.
+- 수정: `vercel.json`을 최소 설정(rewrites+installCommand)으로 복구(#59) → **배포 성공**.
+  그러자 그동안 막혔던 lazy/autocommit이 처음으로 실제 반영됨.
+- 그 위에 삼삼 파일서빙 재적용(#60, 되돌리기를 되돌림) → 배포 성공 + 삼삼 빨라짐.
+- 최종 배포본 실측(웜): 수익성 0.24s / 삼삼 facets 0.50s · trend 0.46s(이전 2.36s) · 건물 1.24s /
+  강남 1.0s / 랜딩 1.5s. 삼삼 첫 로딩 3.8s→0.3~0.5s.
+- 교훈: "배포했는데 안 바뀐다"면 **먼저 배포 state(success/failure)부터 확인**할 것. Hobby는
+  vercel.json의 functions/regions 같은 Pro 전용 키에 민감(빌드 실패).
+
 ## 남은 후속 과제
 - 강남 22MB jsonl은 콜드 인스턴스마다 1회 파싱 — DB 이전 또는 서버사이드 페이지네이션으로 개선 여지.
 - auth.py 나머지 라우트도 연결 명시 close 권장(autocommit으로 치명 누수는 차단됨).
