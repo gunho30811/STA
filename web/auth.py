@@ -101,10 +101,14 @@ def current_user():
     uid = session.get("uid")
     if not uid:
         return None
-    r = db.connect().execute(
-        "SELECT id,username,email,name,role,email_verified FROM members WHERE id=%s", (uid,)
-    ).fetchone()
-    return dict(r) if r else None
+    conn = db.connect()
+    try:
+        r = conn.execute(
+            "SELECT id,username,email,name,role,email_verified FROM members WHERE id=%s", (uid,)
+        ).fetchone()
+        return dict(r) if r else None
+    finally:
+        conn.close()
 
 
 # ── 공통 페이지 셸 ──────────────────────────────────────────────────────────────
