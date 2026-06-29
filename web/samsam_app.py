@@ -23,9 +23,6 @@ from flask import Flask, jsonify, render_template, request
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 SAMPLE = os.path.join(ROOT, "lab", "samsam_sample.jsonl")
-# 배포(미국 함수)에서 DB(서울) 왕복을 피하려고, export된 파일이 있으면 그걸 우선 읽는다.
-EXPORT = os.path.join(ROOT, "lab", "samsam_listings.jsonl")
-SNAP_EXPORT = os.path.join(ROOT, "lab", "samsam_snapshots.jsonl")
 
 app = Flask(__name__, template_folder=os.path.join(ROOT, "templates"))
 from auth import init_auth  # noqa: E402
@@ -113,26 +110,12 @@ def _load_sample():
     return rows
 
 
-def _load_jsonl(path):
-    rows = []
-    with open(path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                rows.append(json.loads(line))
-    return rows
-
-
 def load_listings():
-    # 1순위: export 파일(빠름, DB 왕복 없음) → 2순위: DB → 3순위: 합성 샘플
-    if os.path.exists(EXPORT):
-        rows, src = _load_jsonl(EXPORT), f"파일({os.path.basename(EXPORT)})"
-    else:
-        rows = _load_db()
-        src = "DB(samsam_listings)"
-        if not rows:
-            rows = _load_sample()
-            src = f"샘플({os.path.basename(SAMPLE)}, 합성 프리뷰)"
+    rows = _load_db()
+    src = "DB(samsam_listings)"
+    if not rows:   # DB 미연결(None) 또는 아직 비어있음(0건) → 합성 샘플 프리뷰
+        rows = _load_sample()
+        src = f"샘플({os.path.basename(SAMPLE)}, 합성 프리뷰 — 크롤 후 DB로 자동 전환)"
     rows = [_enrich(r) for r in rows]
     print(f"[samsam_app] {len(rows)}건 로드 — 출처: {src}", flush=True)
     return rows, src
@@ -433,28 +416,19 @@ def api_trend():
     """주간 스냅샷(samsam_snapshots)으로 지역(동)별 예약률 추이 + 전주대비 변화(Δ)."""
     a = request.args
     rows = []
-    sido_f, sigungu_f = a.get("sido"), a.get("sigungu")
     try:
-        if os.path.exists(SNAP_EXPORT):   # 파일 우선(DB 왕복 없음)
-            for r in _load_jsonl(SNAP_EXPORT):
-                if sido_f and r.get("sido") != sido_f:
-                    continue
-                if sigungu_f and r.get("sigungu") != sigungu_f:
-                    continue
-                rows.append(r)
-        else:
-            import db
-            conn = db.connect()
-            where, params = [], []
-            if sido_f:
-                where.append("sido=%s"); params.append(sido_f)
-            if sigungu_f:
-                where.append("sigungu=%s"); params.append(sigungu_f)
-            w = (" WHERE " + " AND ".join(where)) if where else ""
-            rows = [dict(r) for r in conn.execute(
-                "SELECT snapshot_date, sido, sigungu, dong, n, avg_occ_1m"
-                f" FROM samsam_snapshots{w}", params).fetchall()]
-            conn.close()
+        import db
+        conn = db.connect()
+        where, params = [], []
+        if a.get("sido"):
+            where.append("sido=%s"); params.append(a["sido"])
+        if a.get("sigungu"):
+            where.append("sigungu=%s"); params.append(a["sigungu"])
+        w = (" WHERE " + " AND ".join(where)) if where else ""
+        rows = [dict(r) for r in conn.execute(
+            "SELECT snapshot_date, sido, sigungu, dong, n, avg_occ_1m"
+            f" FROM samsam_snapshots{w}", params).fetchall()]
+        conn.close()
     except Exception as e:
         return jsonify({"dates": [], "items": [], "error": str(e)[:80]})
 
