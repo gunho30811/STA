@@ -2,10 +2,13 @@
 """
 삼삼엠투 전체 매물 크롤러 → Supabase samsam_listings 적재.
 
+신규 매물은 상세+예약스케줄을 모두 수집하고, 이미 적재된 기존 매물은 예약
+스케줄(booked_days_*/blocked_days_1m)만 다시 확인해 예약률을 최신화한다.
+
 사용법:
-  python pipeline/samsam/crawler.py              # 전체 수집 (이어받기)
-  python pipeline/samsam/crawler.py --limit 50   # N건만 (테스트)
-  python pipeline/samsam/crawler.py --redo       # 기존 수집분 재수집
+  python pipeline/samsam/crawler.py              # 신규 수집 + 기존 매물 예약률 갱신
+  python pipeline/samsam/crawler.py --limit 50   # 신규 N건만 (테스트)
+  python pipeline/samsam/crawler.py --redo       # 기존 수집분 전체 재수집(상세 포함)
 
 필요 환경변수 (.env):
   DATABASE_URL, SAMSAM_EMAIL, SAMSAM_PASSWORD
@@ -40,6 +43,7 @@ BTYPE_KO = {
 BATCH = 50
 REQ_SLEEP = 0.5
 BLOCK_WAIT = 120
+REFRESH_ROTATION_DAYS = 7  # 기존 매물 예약률 갱신을 요일별로 나눠 돈다 (매물당 대략 주 1회)
 
 TODAY = date.today()
 D30 = TODAY + timedelta(days=30)
@@ -101,6 +105,10 @@ def _parse_sigungu(jibun):
 
 
 # ── 스케줄 집계 ────────────────────────────────────────────────────────────────
+BOOKED_STATUSES = {'booking'}
+BLOCKED_STATUSES = {'disable', 'disabled', 'blocked'}
+
+
 def _count_status(schedules, from_d, to_d, statuses):
     cnt = 0
     for dt_str, st in (schedules or {}).items():
@@ -303,12 +311,10 @@ def map_row(rid, room, detail, schedules):
     sigungu = room.get('province') or _parse_sigungu(jibun_raw or road_raw)
     dong = room.get('town') or _parse_dong(jibun_raw or road_raw)
 
-    booked = {'booking'}
-    blocked = {'disable', 'disabled', 'blocked'}
-    bk1 = _count_status(schedules, TODAY, D30, booked)
-    bk2 = _count_status(schedules, TODAY, D60, booked)
-    bk3 = _count_status(schedules, TODAY, D90, booked)
-    bl1 = _count_status(schedules, TODAY, D30, blocked)
+    bk1 = _count_status(schedules, TODAY, D30, BOOKED_STATUSES)
+    bk2 = _count_status(schedules, TODAY, D60, BOOKED_STATUSES)
+    bk3 = _count_status(schedules, TODAY, D90, BOOKED_STATUSES)
+    bl1 = _count_status(schedules, TODAY, D30, BLOCKED_STATUSES)
 
     sub500 = sub1k = []
     if lat and lng:
@@ -379,6 +385,14 @@ def upsert_batch(conn, rows):
     conn.commit()
 
 
+def update_schedules_batch(conn, rows):
+    """기존 매물의 예약 스케줄만 갱신 (rows: [(bk1, bk2, bk3, bl1, collected_at, room_id), ...])."""
+    sql = ('UPDATE samsam_listings SET booked_days_1m=%s, booked_days_2m=%s, booked_days_3m=%s, '
+           'blocked_days_1m=%s, collected_at=%s WHERE room_id=%s')
+    conn.executemany(sql, rows)
+    conn.commit()
+
+
 # ── 메인 ───────────────────────────────────────────────────────────────────────
 def main():
     ap = argparse.ArgumentParser()
@@ -404,6 +418,11 @@ def main():
     rids = collect_rids(session)
     targets = [(rid, room) for rid, room in rids.items() if rid not in done]
 
+    # 예약률 갱신 대상(기존 매물)은 매물 수가 많아 하루에 전체를 못 돌므로 room_id 기반으로
+    # 요일별 7등분해 순환 갱신한다 (매물 1건당 대략 주 1회 갱신됨).
+    shard = TODAY.weekday()  # 0(월)~6(일)
+    refresh_targets = [rid for rid in rids if rid in done and rid % REFRESH_ROTATION_DAYS == shard]
+
     # 시군구 사전필터: 목록 API의 province/state/주소로 상세 호출 전에 거른다(상세 호출 절감).
     sigungu_filter = args.sigungu.strip()
     if sigungu_filter:
@@ -414,6 +433,7 @@ def main():
             return False
         before = len(targets)
         targets = [(rid, room) for rid, room in targets if _in_region(room)]
+        refresh_targets = [rid for rid in refresh_targets if _in_region(rids[rid])]
         log(f"시군구 필터 '{sigungu_filter}': {before} → {len(targets)}건")
     log(f"수집 대상: {len(targets)}건 (전체 {len(rids)}건)")
     if args.limit:
@@ -451,8 +471,39 @@ def main():
         upsert_batch(conn, batch)
         ok += len(batch)
 
+    # 기존 매물 예약률 갱신 — 상세는 그대로 두고 예약 스케줄만 다시 확인해
+    # booked_days_*/blocked_days_1m을 최신화한다 (오르내림 추적용).
+    log(f"기존 매물 예약률 갱신 대상(요일 로테이션 {shard + 1}/{REFRESH_ROTATION_DAYS}): {len(refresh_targets)}건")
+    upd_batch, refreshed = [], 0
+    for i, rid in enumerate(refresh_targets, 1):
+        if i % 50 == 0:
+            log(f"[예약률 갱신 {i}/{len(refresh_targets)}] {refreshed}건 갱신")
+
+        schedules = fetch_schedules(session, rid)
+        if not schedules:
+            continue
+        bk1 = _count_status(schedules, TODAY, D30, BOOKED_STATUSES)
+        bk2 = _count_status(schedules, TODAY, D60, BOOKED_STATUSES)
+        bk3 = _count_status(schedules, TODAY, D90, BOOKED_STATUSES)
+        bl1 = _count_status(schedules, TODAY, D30, BLOCKED_STATUSES)
+        upd_batch.append((bk1, bk2, bk3, bl1, datetime.now().isoformat(timespec='seconds'), rid))
+
+        if len(upd_batch) >= BATCH:
+            update_schedules_batch(conn, upd_batch)
+            refreshed += len(upd_batch)
+            upd_batch = []
+
+        if i % 150 == 0:
+            log("세션 갱신 중...")
+            cookies = _get_cookies(email, pw)
+            session = _make_session(cookies)
+
+    if upd_batch:
+        update_schedules_batch(conn, upd_batch)
+        refreshed += len(upd_batch)
+
     conn.close()
-    log(f"완료. 적재 {ok}건 / 실패 {fail}건")
+    log(f"완료. 신규 적재 {ok}건 / 실패 {fail}건, 예약률 갱신 {refreshed}건")
 
 
 if __name__ == '__main__':
