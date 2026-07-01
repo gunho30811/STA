@@ -56,6 +56,15 @@
   .lnk.n{background:#03c75a}.lnk.s{background:#ff5a5f}
   .rankwrap{display:flex;gap:12px;flex-wrap:wrap}
   .rankwrap .panel{flex:1;min-width:340px}
+  @media(max-width:720px){
+    header,.wrap{padding-left:14px;padding-right:14px}
+    .tabs{padding-left:14px;padding-right:14px}
+    .md{flex-direction:column;align-items:stretch}
+    .detail{width:100%;position:static;top:auto;max-height:none}
+    .listcol{max-height:none;width:100%}
+    .rankwrap .panel{min-width:0}
+    input,select{font-size:16px}   /* iOS 포커스 시 자동 확대 방지 */
+  }
 </style>
 </head>
 <body>
@@ -219,6 +228,9 @@ function showDetail(x){
       ${x.naverUrl?`<a class="lnk n" href="${x.naverUrl}" target="_blank">네이버</a>`:''}
       ${x.samUrl?`<a class="lnk s" href="${x.samUrl}" target="_blank">삼삼</a>`:''}
     </div>`;
+  // 모바일(상세가 목록 아래로 스택되는 폭)에선 클릭해도 상세가 화면 밖이라 반응 없어 보임 → 상세로 스크롤.
+  if(window.matchMedia('(max-width:720px)').matches)
+    d.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function renderPager(r){
   const pg=document.getElementById('pager');pg.innerHTML='';

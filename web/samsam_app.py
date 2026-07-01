@@ -22,6 +22,12 @@ from flask import Flask, jsonify, render_template, request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+
+# 윈도우 콘솔(cp949)에서 로그의 em-dash 등 유니코드가 못 찍혀 500 나는 것 방지(리눅스는 무영향).
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 SAMPLE = os.path.join(ROOT, "lab", "samsam_sample.jsonl")
 # 배포(미국 함수)에서 DB(서울) 왕복을 피하려고, export된 파일이 있으면 그걸 우선 읽는다.
 EXPORT = os.path.join(ROOT, "lab", "samsam_listings.jsonl")

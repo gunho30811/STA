@@ -44,6 +44,7 @@ box-shadow:0 10px 30px rgba(0,0,0,.25);transition:.15s}
 .card .ic{font-size:30px}.card h2{font-size:17px;margin:10px 0 4px;font-weight:800}
 .card p{font-size:12.5px;color:#64748b;margin:0;line-height:1.5}
 .admin{margin-top:22px}.admin a{color:#fca5a5;text-decoration:none;font-weight:700;font-size:13px}
+@media(max-width:640px){body{padding:24px 14px}h1{font-size:21px}.card{padding:18px}}
 </style></head><body><div class=wrap>
 <div class=top>
   <h1>🏠 부동산 단기임대 분석</h1>

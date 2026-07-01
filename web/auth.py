@@ -129,6 +129,9 @@ input{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;fo
 table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 10px;border-bottom:1px solid #eef0f2;text-align:left}
 th{background:#f9fafb}.danger{color:#dc2626;cursor:pointer;border:none;background:none;font-weight:700}
 .code{font-size:24px;font-weight:800;letter-spacing:4px;color:#2563eb;text-align:center;background:#eff6ff;padding:12px;border-radius:8px;margin:8px 0}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media(max-width:640px){body{padding:12px}.box{padding:22px 16px}
+table{font-size:12px}th,td{padding:7px 8px}input{font-size:16px}}
 </style></head><body><div class="box" style="{{boxstyle|default('')}}">{{body|safe}}</div></body></html>"""
 
 
@@ -334,8 +337,8 @@ def members():
     note = (f'<div class="msg info">승인 대기 {pending}명</div>' if pending else "")
     body = f"""<h1>👥 회원 관리</h1><p class="sub">관리자: {u['username'] or u['email']} ·
       <a href="/">홈</a> · <a href="{url_for('auth.logout')}">로그아웃</a></p>{note}
-    <table><thead><tr><th>ID</th><th>이메일</th><th>이름</th><th>생년월일</th>
-      <th>인증</th><th>승인</th><th>가입일</th><th>관리</th></tr></thead><tbody>{trs}</tbody></table>"""
+    <div class="tw"><table><thead><tr><th>ID</th><th>이메일</th><th>이름</th><th>생년월일</th>
+      <th>인증</th><th>승인</th><th>가입일</th><th>관리</th></tr></thead><tbody>{trs}</tbody></table></div>"""
     return _render("회원 관리", body, boxstyle="max-width:820px")
 
 
@@ -402,8 +405,8 @@ def crawl_status():
             f"<tr><td>{d}</td><td style='text-align:right'>{d_samsam.get(d,0):,}</td>"
             f"<td style='text-align:right'>{d_naver.get(d,0):,}</td></tr>" for d in dates)
         daily = (f'<h2 style="font-size:15px;margin:22px 0 6px">📈 일별 신규 매물 (최근 14일)</h2>'
-                 f'<table><thead><tr><th>날짜</th><th style="text-align:right">삼삼 신규</th>'
-                 f'<th style="text-align:right">네이버 상세 신규</th></tr></thead><tbody>{drows}</tbody></table>')
+                 f'<div class="tw"><table><thead><tr><th>날짜</th><th style="text-align:right">삼삼 신규</th>'
+                 f'<th style="text-align:right">네이버 상세 신규</th></tr></thead><tbody>{drows}</tbody></table></div>')
     else:
         daily = '<div class="msg info" style="margin-top:20px">아직 일별 수집 기록이 없습니다.</div>'
 
@@ -412,8 +415,8 @@ def crawl_status():
             f"<tr><td>{r[0]}</td><td style='text-align:right'>{r[1]:,}</td>"
             f"<td style='text-align:right'>{r[2]:,}</td></tr>" for r in snaps)
         snap_tbl = (f'<h2 style="font-size:15px;margin:22px 0 6px">🗓️ 삼삼 예약률 스냅샷 이력 (최근 14회)</h2>'
-                    f'<table><thead><tr><th>스냅샷 날짜</th><th style="text-align:right">지역×유형 수</th>'
-                    f'<th style="text-align:right">매물 합계</th></tr></thead><tbody>{srows}</tbody></table>')
+                    f'<div class="tw"><table><thead><tr><th>스냅샷 날짜</th><th style="text-align:right">지역×유형 수</th>'
+                    f'<th style="text-align:right">매물 합계</th></tr></thead><tbody>{srows}</tbody></table></div>')
     else:
         snap_tbl = ""
 
@@ -505,10 +508,13 @@ def _nav_html():
     admin = ('<a href="/auth/crawl">크롤현황</a><a href="/auth/members">회원관리</a>'
              if session.get("role") == "admin" else "")
     return f"""<div id=__nav style="position:sticky;top:0;z-index:9999;background:#0f172a;
-color:#e2e8f0;display:flex;gap:4px;align-items:center;padding:7px 14px;font-size:13px;
-font-family:'Pretendard','Malgun Gothic',sans-serif;box-shadow:0 1px 6px rgba(0,0,0,.2)">
-<a href="/" style="font-weight:800;color:#fff;text-decoration:none;margin-right:8px">🏠 홈</a>
+color:#e2e8f0;display:flex;flex-wrap:wrap;gap:4px 2px;align-items:center;
+padding:7px 12px;font-size:13px;font-family:'Pretendard','Malgun Gothic',sans-serif;
+box-shadow:0 1px 6px rgba(0,0,0,.2)">
+<a href="/" style="font-weight:800;color:#fff;text-decoration:none;margin-right:6px">🏠 홈</a>
 <a href="/profit/">💰 수익성</a><a href="/samsam/">🛋️ 삼삼분석</a><a href="/gangnam/">🏙️ 강남매물</a>
-<span style="flex:1"></span>{admin}<a href="/auth/logout">로그아웃</a>
-<style>#__nav a{{color:#cbd5e1;text-decoration:none;padding:5px 10px;border-radius:6px;font-weight:600}}
-#__nav a:hover{{background:#1e293b;color:#fff}}</style></div>"""
+{admin}<a href="/auth/logout" id=__logout>로그아웃</a>
+<style>#__nav a{{color:#cbd5e1;text-decoration:none;padding:5px 10px;border-radius:6px;font-weight:600;
+white-space:nowrap}}
+#__nav a:hover{{background:#1e293b;color:#fff}}
+@media(min-width:760px){{#__nav #__logout{{margin-left:auto}}}}</style></div>"""
