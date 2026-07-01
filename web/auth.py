@@ -131,7 +131,7 @@ th{background:#f9fafb}.danger{color:#dc2626;cursor:pointer;border:none;backgroun
 .code{font-size:24px;font-weight:800;letter-spacing:4px;color:#2563eb;text-align:center;background:#eff6ff;padding:12px;border-radius:8px;margin:8px 0}
 .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
 @media(max-width:640px){body{padding:12px}.box{padding:22px 16px}
-table{font-size:12px}th,td{padding:7px 8px}}
+table{font-size:12px}th,td{padding:7px 8px}input{font-size:16px}}
 </style></head><body><div class="box" style="{{boxstyle|default('')}}">{{body|safe}}</div></body></html>"""
 
 
