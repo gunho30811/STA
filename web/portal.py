@@ -59,7 +59,8 @@ box-shadow:0 10px 30px rgba(0,0,0,.25);transition:.15s}
   <a class=card href="/gangnam/"><div class=ic>🏙️</div><h2>네이버 강남 매물</h2>
     <p>강남구 네이버 매물 카드/상세 탐색</p></a>
 </div>
-{% if user.role == 'admin' %}<div class=admin><a href="/auth/members">👥 회원 관리 →</a></div>{% endif %}
+{% if user.role == 'admin' %}<div class=admin><a href="/auth/crawl">📊 크롤링 현황</a>
+  &nbsp;·&nbsp; <a href="/auth/members">👥 회원 관리 →</a></div>{% endif %}
 </div></body></html>"""
 
 

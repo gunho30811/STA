@@ -339,6 +339,93 @@ def members():
     return _render("회원 관리", body, boxstyle="max-width:820px")
 
 
+@bp.route("/crawl")
+def crawl_status():
+    """관리자 전용 크롤링 현황 대시보드.
+    네이버(목록·상세)/삼삼 테이블별 총 건수 + 마지막 크롤 시각 + 최근 일별 신규(증분) 추이.
+    크롤이 매일/매주 정상적으로 돌며 데이터가 쌓이는지 모니터링하는 용도."""
+    u = current_user()
+    if not u or u["role"] != "admin":
+        return redirect(url_for("auth.login", next=request.path))
+
+    conn = db.connect()
+
+    def scalar(sql):
+        try:
+            r = conn.execute(sql).fetchone()
+            return r[0] if r else None
+        except Exception:
+            return None
+
+    def rows(sql):
+        try:
+            return conn.execute(sql).fetchall()
+        except Exception:
+            return []
+
+    try:
+        n_list = scalar("SELECT COUNT(*) FROM listings") or 0
+        n_naver = scalar("SELECT COUNT(*) FROM naver_listings") or 0
+        n_samsam = scalar("SELECT COUNT(*) FROM samsam_listings") or 0
+        last_list = scalar("SELECT MAX(crawled_at) FROM listings")
+        last_naver = scalar("SELECT MAX(crawled_at) FROM naver_listings")
+        last_samsam = scalar("SELECT MAX(collected_at) FROM samsam_listings")
+        # collected_at/crawled_at 앞 10글자 = 날짜(YYYY-MM-DD). 신규 매물만 수집하므로 날짜별 건수 = 일별 증분.
+        d_samsam = {r[0]: r[1] for r in rows(
+            "SELECT substr(collected_at,1,10) d, COUNT(*) c FROM samsam_listings "
+            "WHERE collected_at IS NOT NULL GROUP BY substr(collected_at,1,10) "
+            "ORDER BY d DESC LIMIT 14")}
+        d_naver = {r[0]: r[1] for r in rows(
+            "SELECT substr(crawled_at,1,10) d, COUNT(*) c FROM naver_listings "
+            "WHERE crawled_at IS NOT NULL GROUP BY substr(crawled_at,1,10) "
+            "ORDER BY d DESC LIMIT 14")}
+        snaps = rows(
+            "SELECT snapshot_date d, COUNT(*) c, COALESCE(SUM(n),0) tot FROM samsam_snapshots "
+            "GROUP BY snapshot_date ORDER BY snapshot_date DESC LIMIT 14")
+    finally:
+        conn.close()
+
+    def card(title, n, last):
+        return (f'<div style="background:#f9fafb;border:1px solid #eef0f2;border-radius:10px;padding:14px">'
+                f'<div style="font-size:12px;color:#64748b">{title}</div>'
+                f'<div style="font-size:22px;font-weight:800;color:#111827">{n:,}</div>'
+                f'<div style="font-size:11px;color:#94a3b8;margin-top:2px">마지막: {last or "-"}</div></div>')
+
+    cards = (f'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:14px 0">'
+             f'{card("네이버 목록 (listings)", n_list, last_list)}'
+             f'{card("네이버 상세 (naver_listings)", n_naver, last_naver)}'
+             f'{card("삼삼 매물 (samsam_listings)", n_samsam, last_samsam)}</div>')
+
+    dates = sorted(set(d_samsam) | set(d_naver), reverse=True)[:14]
+    if dates:
+        drows = "".join(
+            f"<tr><td>{d}</td><td style='text-align:right'>{d_samsam.get(d,0):,}</td>"
+            f"<td style='text-align:right'>{d_naver.get(d,0):,}</td></tr>" for d in dates)
+        daily = (f'<h2 style="font-size:15px;margin:22px 0 6px">📈 일별 신규 매물 (최근 14일)</h2>'
+                 f'<table><thead><tr><th>날짜</th><th style="text-align:right">삼삼 신규</th>'
+                 f'<th style="text-align:right">네이버 상세 신규</th></tr></thead><tbody>{drows}</tbody></table>')
+    else:
+        daily = '<div class="msg info" style="margin-top:20px">아직 일별 수집 기록이 없습니다.</div>'
+
+    if snaps:
+        srows = "".join(
+            f"<tr><td>{r[0]}</td><td style='text-align:right'>{r[1]:,}</td>"
+            f"<td style='text-align:right'>{r[2]:,}</td></tr>" for r in snaps)
+        snap_tbl = (f'<h2 style="font-size:15px;margin:22px 0 6px">🗓️ 삼삼 예약률 스냅샷 이력 (최근 14회)</h2>'
+                    f'<table><thead><tr><th>스냅샷 날짜</th><th style="text-align:right">지역×유형 수</th>'
+                    f'<th style="text-align:right">매물 합계</th></tr></thead><tbody>{srows}</tbody></table>')
+    else:
+        snap_tbl = ""
+
+    body = (f'<h1>📊 크롤링 현황</h1>'
+            f'<p class="sub">관리자: {u["username"] or u["email"]} · '
+            f'<a href="/">홈</a> · <a href="{url_for("auth.members")}">회원 관리</a> · '
+            f'<a href="{url_for("auth.logout")}">로그아웃</a></p>'
+            f'<div class="msg info">네이버: 매주 월 10:00(KST) · 삼삼: 매일 00:00(KST) 자동 크롤</div>'
+            f'{cards}{daily}{snap_tbl}')
+    return _render("크롤링 현황", body, boxstyle="max-width:820px")
+
+
 def _form(endpoint, mid, label, extra_name=None, extra_val=None, color="#dc2626", confirm=False):
     extra = f'<input type=hidden name={extra_name} value="{extra_val}">' if extra_name else ""
     onclick = ' onclick="return confirm(\'삭제?\')"' if confirm else ""
@@ -415,7 +502,8 @@ def init_auth(app):
 
 
 def _nav_html():
-    admin = ('<a href="/auth/members">회원관리</a>' if session.get("role") == "admin" else "")
+    admin = ('<a href="/auth/crawl">크롤현황</a><a href="/auth/members">회원관리</a>'
+             if session.get("role") == "admin" else "")
     return f"""<div id=__nav style="position:sticky;top:0;z-index:9999;background:#0f172a;
 color:#e2e8f0;display:flex;gap:4px;align-items:center;padding:7px 14px;font-size:13px;
 font-family:'Pretendard','Malgun Gothic',sans-serif;box-shadow:0 1px 6px rgba(0,0,0,.2)">

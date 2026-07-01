@@ -1,0 +1,65 @@
+name: 삼삼엠투 크롤링 자동화 (매일)
+
+on:
+  schedule:
+    # 매일 15:00 UTC (한국시간 00:00, 자정). 네이버 주간 크롤(월 01:00 UTC)과 겹치지
+    # 않게 시각을 벌려 둘이 같은 파일(net_profit_integrated.csv)을 커밋할 때 push 충돌을 피한다.
+    - cron: '0 15 * * *'
+  workflow_dispatch:        # 수동 실행 가능
+
+permissions:
+  contents: write   # jsonl·csv 커밋·푸시용
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SAMSAM_EMAIL: ${{ secrets.SAMSAM_EMAIL }}
+      SAMSAM_PASSWORD: ${{ secrets.SAMSAM_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python 설치
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 의존성 설치
+        run: pip install flask psycopg2-binary python-dotenv playwright requests
+
+      - name: Playwright Chromium 설치
+        run: python -m playwright install chromium --with-deps
+
+      - name: 삼삼 전국 크롤 (신규 매물만, 이어받기)
+        run: python pipeline/samsam/crawler.py
+
+      - name: 예약률 스냅샷 (samsam_snapshots 적재)
+        run: python pipeline/samsam/snapshot.py
+        continue-on-error: true
+
+      - name: 삼삼 JSONL export (파일 서빙용 lab/*.jsonl 갱신)
+        run: python pipeline/samsam/export_jsonl.py
+        continue-on-error: true
+
+      - name: 수익성 CSV 재생성 (삼삼 × 네이버 통합)
+        run: python pipeline/integrate/build_integrated.py
+        continue-on-error: true   # 네이버 데이터 없으면 스킵
+
+      - name: 변경분 커밋
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add lab/samsam_listings.jsonl lab/samsam_snapshots.jsonl data/net_profit_integrated.csv
+          if git diff --cached --quiet; then
+            echo "변경분 없음 — 커밋 스킵"
+          else
+            git commit -m "chore: 삼삼 매물 자동 갱신 $(date +'%Y-%m-%d')"
+            git pull --rebase --autostash origin main
+            git push
+          fi
