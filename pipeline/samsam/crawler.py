@@ -49,7 +49,7 @@ BATCH = 50
 REQ_SLEEP = 0.5
 BLOCK_WAIT = 120
 METRO_SIDO = {'서울특별시', '경기도', '인천광역시'}  # 수도권만 수집·갱신 (그 외 지역은 DB에 남아있어도 갱신 안 함)
-REFRESH_WORKERS = 4       # 기존 매물 예약률 갱신 동시 요청 수
+REFRESH_WORKERS = 2       # 기존 매물 예약률 갱신 동시 요청 수 (4개일 때 서버가 조용히 거부, 갱신 0건 발생 확인)
 REFRESH_CHUNK = 2000      # 이 건수마다 세션(로그인)을 새로 고침
 
 TODAY = date.today()
@@ -206,23 +206,39 @@ def _make_session(cookies):
 
 
 # ── API 호출 ───────────────────────────────────────────────────────────────────
+_seen_fail_reasons = set()
+
+
+def _log_fail_once(reason):
+    """실패 사유별로 최초 1회만 로그 (동시 요청 시 동일 사유 수천 건 도배 방지)."""
+    if reason not in _seen_fail_reasons:
+        _seen_fail_reasons.add(reason)
+        log(f"요청 실패 사유(최초 1회 로그): {reason}")
+
+
 def _get(session, url, params=None):
     """GET 요청 — 403이면 BLOCK_WAIT 후 1회 재시도, 실패 시 None 반환."""
     try:
         r = session.get(url, params=params, timeout=15)
-    except Exception:
+    except Exception as e:
+        _log_fail_once(f"exception {repr(e)[:60]}")
         return None
     if r.status_code == 403:
         log(f"403 차단, {BLOCK_WAIT}s 대기")
         time.sleep(BLOCK_WAIT)
         try:
             r = session.get(url, params=params, timeout=15)
-        except Exception:
+        except Exception as e:
+            _log_fail_once(f"exception(재시도) {repr(e)[:60]}")
             return None
     if r.status_code != 200:
+        _log_fail_once(f"status {r.status_code}")
         return None
     d = r.json()
-    return d if d.get('code') == 'SCSS_001' else None
+    if d.get('code') != 'SCSS_001':
+        _log_fail_once(f"code {d.get('code')}")
+        return None
+    return d
 
 
 def collect_rids(session):
