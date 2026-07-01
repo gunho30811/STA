@@ -6,6 +6,9 @@
 스케줄(booked_days_*/blocked_days_1m)만 매일 전부 다시 확인해 예약률을 최신화한다.
 매물 수가 많아 예약률 갱신은 동시 요청(REFRESH_WORKERS)으로 처리한다.
 
+신규 매물은 상세+예약스케줄을 모두 수집하고, 이미 적재된 기존 매물은 예약
+스케줄(booked_days_*/blocked_days_1m)만 다시 확인해 예약률을 최신화한다.
+
 사용법:
   python pipeline/samsam/crawler.py              # 신규 수집 + 기존 매물 예약률 갱신
   python pipeline/samsam/crawler.py --limit 50   # 신규 N건만 (테스트)
