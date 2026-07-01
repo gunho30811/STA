@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>삼삼엠투 통합 채팅</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Pretendard","Malgun Gothic","맑은 고딕",sans-serif;background:#f3f5f7;color:#1f2937}
+  header{background:linear-gradient(120deg,#0f172a,#1e293b);color:#fff;padding:16px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+  header h1{margin:0;font-size:19px;font-weight:800}
+  header p{margin:5px 0 0;font-size:12.5px;color:#94a3b8}
+  .btn{cursor:pointer;border:none;border-radius:7px;padding:9px 16px;font-size:13px;font-weight:700}
+  .btn-go{background:#2563eb;color:#fff}
+  .btn-ghost{background:#fff;color:#2563eb;border:1px solid #2563eb}
+  .btn-danger{background:#fee2e2;color:#b91c1c}
+  .wrap{padding:16px 24px;max-width:1280px;margin:0 auto}
+  .panel{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:15px;margin-bottom:16px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+  h2.sec{font-size:14px;margin:0 0 10px;font-weight:800}
+  .accounts{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+  .acct{border:1px solid #e5e7eb;border-radius:10px;padding:10px 14px;min-width:180px;font-size:12.5px;position:relative}
+  .acct .label{font-weight:800;font-size:13.5px}
+  .acct .email{color:#6b7280;font-size:11.5px}
+  .acct .status{display:inline-block;margin-top:4px;font-size:11px;padding:2px 8px;border-radius:999px;font-weight:700}
+  .status.ok{background:#064e3b;color:#6ee7b7}
+  .status.reauth_needed{background:#7c2d12;color:#fed7aa}
+  .status.error{background:#7c2d12;color:#fed7aa}
+  .acct .del{position:absolute;top:8px;right:8px;background:none;border:none;color:#9ca3af;cursor:pointer;font-size:12px}
+  .addform{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;border-top:1px dashed #e5e7eb;padding-top:12px}
+  .fg{display:flex;flex-direction:column;gap:4px}
+  .fg label{font-size:11px;font-weight:700;color:#4b5563}
+  .fg input{padding:7px 9px;border:1px solid #d1d5db;border-radius:7px;font-size:13px;min-width:160px}
+  .msg{font-size:12px;color:#dc2626;margin-top:8px}
+  .msg.ok{color:#059669}
+  .md{display:flex;gap:14px;align-items:flex-start}
+  .roomlist{width:320px;flex:none;border:1px solid #e5e7eb;border-radius:10px;max-height:70vh;overflow:auto}
+  .room{padding:10px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer}
+  .room:hover{background:#f8fafc}
+  .room.on{background:#eff6ff}
+  .room .rn{font-weight:800;font-size:13px;display:flex;justify-content:space-between;gap:6px}
+  .room .rn .lbl{font-size:10.5px;font-weight:700;color:#fff;background:#64748b;padding:1px 6px;border-radius:6px;white-space:nowrap}
+  .room .last{color:#6b7280;font-size:11.5px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .room .time{color:#9ca3af;font-size:10.5px;margin-top:2px}
+  .thread{flex:1;min-width:0;border:1px solid #e5e7eb;border-radius:10px;padding:14px;max-height:70vh;overflow:auto;display:flex;flex-direction:column;gap:8px}
+  .bubble{max-width:70%;padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.5;white-space:pre-wrap}
+  .bubble.me{align-self:flex-end;background:#2563eb;color:#fff;border-bottom-right-radius:3px}
+  .bubble.other{align-self:flex-start;background:#f1f5f9;color:#1f2937;border-bottom-left-radius:3px}
+  .bubble.system{align-self:center;background:#fef9c3;color:#854d0e;font-size:11.5px;max-width:85%}
+  .bubble .t{display:block;font-size:10px;opacity:.7;margin-top:3px}
+  .empty{text-align:center;color:#9ca3af;padding:40px 0;font-size:13px}
+  @media(max-width:720px){
+    .md{flex-direction:column}
+    .roomlist{width:100%;max-height:240px}
+    .thread{width:100%}
+    header{padding:14px 14px}
+    .wrap{padding:14px 14px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>💬 삼삼엠투 통합 채팅</h1>
+    <p>연결한 여러 삼삼 계정의 채팅을 한 곳에서 확인</p>
+  </div>
+  <button class="btn btn-ghost" id="refreshBtn">지금 새로고침</button>
+</header>
+<div class="wrap">
+
+  <div class="panel">
+    <h2 class="sec">연결된 삼삼 계정</h2>
+    <div class="accounts" id="accounts"></div>
+    <div class="addform">
+      <div class="fg"><label>삼삼 이메일</label><input id="fEmail" type="email" placeholder="you@example.com"></div>
+      <div class="fg"><label>비밀번호</label><input id="fPw" type="password" placeholder="비밀번호"></div>
+      <div class="fg"><label>별칭(선택)</label><input id="fLabel" type="text" placeholder="예: 강남계정"></div>
+      <button class="btn btn-go" id="addBtn">계정 연결</button>
+    </div>
+    <div class="msg" id="addMsg"></div>
+  </div>
+
+  <div class="panel">
+    <h2 class="sec">통합 채팅함</h2>
+    <div class="md">
+      <div class="roomlist" id="roomlist"></div>
+      <div class="thread" id="thread"><div class="empty">왼쪽에서 채팅방을 선택하세요</div></div>
+    </div>
+  </div>
+
+</div>
+<script>
+const $=s=>document.querySelector(s);
+let curRoom=null;
+
+function fmtTime(ms){
+  if(!ms) return '';
+  const d=new Date(Number(ms));
+  return d.toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+
+async function loadAccounts(){
+  const rows=await (await fetch('api/accounts')).json();
+  const box=$('#accounts');
+  box.innerHTML = rows.length ? '' : '<span style="color:#9ca3af;font-size:12.5px">연결된 계정이 없습니다. 아래에서 추가해주세요.</span>';
+  for(const a of rows){
+    const el=document.createElement('div');
+    el.className='acct';
+    el.innerHTML = `
+      <button class="del" data-id="${a.id}" title="연결 해제">✕</button>
+      <div class="label">${a.label||a.samsam_email}</div>
+      <div class="email">${a.samsam_email}</div>
+      <span class="status ${a.status}">${a.status==='ok'?'정상':a.status==='reauth_needed'?'재연결 필요':'오류'}</span>
+    `;
+    box.appendChild(el);
+  }
+  box.querySelectorAll('.del').forEach(btn=>{
+    btn.onclick=async()=>{
+      if(!confirm('이 계정 연결을 해제할까요?')) return;
+      await fetch(`api/accounts/${btn.dataset.id}`, {method:'DELETE'});
+      loadAccounts(); loadRooms();
+    };
+  });
+}
+
+async function loadRooms(){
+  const rows=await (await fetch('api/rooms')).json();
+  const box=$('#roomlist');
+  box.innerHTML = rows.length ? '' : '<div class="empty">아직 채팅방이 없습니다</div>';
+  for(const r of rows){
+    const el=document.createElement('div');
+    el.className='room'+(curRoom===r.id?' on':'');
+    el.innerHTML = `
+      <div class="rn"><span>${r.room_name||'(이름없음)'}</span><span class="lbl">${r.label||r.samsam_email}</span></div>
+      <div class="last">${(r.last_message||'').replace(/\\n/g,' ')}</div>
+      <div class="time">${fmtTime(r.last_message_time)}</div>
+    `;
+    el.onclick=()=>openRoom(r.id);
+    box.appendChild(el);
+  }
+}
+
+async function openRoom(id){
+  curRoom=id;
+  document.querySelectorAll('.room').forEach((el,i)=>el.classList.remove('on'));
+  loadRooms();
+  const res=await (await fetch(`api/rooms/${id}/messages`)).json();
+  const box=$('#thread');
+  if(res.error){ box.innerHTML='<div class="empty">불러오기 실패</div>'; return; }
+  box.innerHTML='';
+  for(const m of res.messages){
+    const el=document.createElement('div');
+    const mine = String(m.sender)===String(res.owner_id);
+    el.className = 'bubble ' + (m.message_type==='system' ? 'system' : (mine?'me':'other'));
+    el.innerHTML = `${(m.message||'').replace(/</g,'&lt;')}<span class="t">${fmtTime(m.message_time)}</span>`;
+    box.appendChild(el);
+  }
+  box.scrollTop = box.scrollHeight;
+}
+
+$('#addBtn').onclick=async()=>{
+  const email=$('#fEmail').value.trim(), password=$('#fPw').value, label=$('#fLabel').value.trim();
+  const msgEl=$('#addMsg');
+  if(!email||!password){ msgEl.textContent='이메일/비밀번호를 입력해주세요.'; msgEl.className='msg'; return; }
+  msgEl.textContent='로그인 확인 중... (최대 20초)'; msgEl.className='msg';
+  $('#addBtn').disabled=true;
+  try{
+    const r=await fetch('api/accounts', {method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email,password,label})});
+    const d=await r.json();
+    if(!r.ok){ msgEl.textContent=d.error||'연결 실패'; msgEl.className='msg'; }
+    else{
+      msgEl.textContent='연결되었습니다. 새로고침 버튼으로 채팅을 불러오세요.'; msgEl.className='msg ok';
+      $('#fEmail').value=''; $('#fPw').value=''; $('#fLabel').value='';
+      loadAccounts();
+    }
+  } finally { $('#addBtn').disabled=false; }
+};
+
+$('#refreshBtn').onclick=async()=>{
+  $('#refreshBtn').disabled=true; $('#refreshBtn').textContent='새로고침 중...';
+  try{
+    await fetch('api/poll', {method:'POST'});
+    await loadRooms();
+  } finally {
+    $('#refreshBtn').disabled=false; $('#refreshBtn').textContent='지금 새로고침';
+  }
+};
+
+loadAccounts();
+loadRooms();
+</script>
+</body>
+</html>

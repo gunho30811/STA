@@ -17,6 +17,7 @@ import json
 import os
 import statistics
 import sys
+from datetime import datetime
 
 from flask import Flask, jsonify, render_template, request
 
@@ -34,8 +35,15 @@ EXPORT = os.path.join(ROOT, "lab", "samsam_listings.jsonl")
 SNAP_EXPORT = os.path.join(ROOT, "lab", "samsam_snapshots.jsonl")
 
 app = Flask(__name__, template_folder=os.path.join(ROOT, "templates"))
-from auth import init_auth  # noqa: E402
+from auth import current_user, init_auth  # noqa: E402
 init_auth(app)
+
+# 삼삼 통합 채팅: 계정 연결(Playwright 1회 로그인) + 폴링 결과 조회.
+sys.path.insert(0, os.path.join(ROOT, "pipeline", "samsam"))
+import chat_auth  # noqa: E402
+import chat_poll  # noqa: E402
+import crypto_util  # noqa: E402
+import db  # noqa: E402
 
 SAM_COLS = ("room_id", "url", "name", "building_type", "building_name",
             "sido", "sigungu", "dong", "area_pyeong", "rent_total_weekly",
@@ -483,6 +491,108 @@ def api_trend():
                     "latest": latest, "delta": delta, "n": n_latest})
     out.sort(key=lambda r: (r["latest"] is None, -(r["latest"] or 0)))
     return jsonify({"dates": dates, "items": out})
+
+
+@app.route("/chat/")
+def chat_page():
+    return render_template("samsam_chat.html")
+
+
+@app.route("/chat/api/accounts")
+def chat_api_accounts():
+    u = current_user()
+    conn = db.connect()
+    rows = conn.execute(
+        "SELECT id, samsam_email, label, status, last_error, last_polled_at "
+        "FROM samsam_accounts WHERE member_id=%s ORDER BY id", (u["id"],)).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route("/chat/api/accounts", methods=["POST"])
+def chat_api_add_account():
+    u = current_user()
+    data = request.get_json(force=True) or {}
+    email = (data.get("email") or "").strip()
+    password = data.get("password") or ""
+    label = (data.get("label") or "").strip()
+    if not email or not password:
+        return jsonify({"error": "이메일/비밀번호를 입력해주세요."}), 400
+    try:
+        res = chat_auth.login_and_get_refresh_token(email, password)
+    except chat_auth.LoginError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": f"로그인 중 오류: {repr(e)[:120]}"}), 500
+
+    conn = db.connect()
+    conn.execute(
+        "INSERT INTO samsam_accounts (member_id, samsam_email, label, password_enc, "
+        "refresh_token_enc, samsam_member_id, status, created_at) "
+        "VALUES (%s,%s,%s,%s,%s,%s,'ok',%s)",
+        (u["id"], email, label or email, crypto_util.encrypt(password),
+         crypto_util.encrypt(res["refresh_token"]), res["samsam_member_id"],
+         datetime.now().isoformat(timespec="seconds")))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/chat/api/accounts/<int:acct_id>", methods=["DELETE"])
+def chat_api_delete_account(acct_id):
+    u = current_user()
+    conn = db.connect()
+    conn.execute("DELETE FROM samsam_accounts WHERE id=%s AND member_id=%s", (acct_id, u["id"]))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/chat/api/poll", methods=["POST"])
+def chat_api_poll():
+    """이 회원이 연결한 계정만 지금 즉시 폴링(로컬 테스트/수동 새로고침용)."""
+    u = current_user()
+    conn = db.connect()
+    accounts = conn.execute(
+        "SELECT id, member_id, samsam_email, label, password_enc, refresh_token_enc, "
+        "samsam_member_id FROM samsam_accounts WHERE member_id=%s AND status != 'disabled'",
+        (u["id"],)).fetchall()
+    for acct in accounts:
+        chat_poll.poll_account(conn, dict(acct))
+    conn.close()
+    return jsonify({"ok": True, "polled": len(accounts)})
+
+
+@app.route("/chat/api/rooms")
+def chat_api_rooms():
+    u = current_user()
+    conn = db.connect()
+    rows = conn.execute(
+        "SELECT r.id, r.room_name, r.last_message, r.last_message_time, r.chat_room_status, "
+        "r.contract_status, a.label, a.samsam_email "
+        "FROM samsam_chat_rooms r JOIN samsam_accounts a ON a.id = r.account_id "
+        "WHERE a.member_id=%s AND r.host_or_guest='host' "
+        "ORDER BY r.last_message_time DESC NULLS LAST", (u["id"],)).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route("/chat/api/rooms/<int:room_id>/messages")
+def chat_api_messages(room_id):
+    u = current_user()
+    conn = db.connect()
+    owner = conn.execute(
+        "SELECT a.samsam_member_id AS owner_id "
+        "FROM samsam_chat_rooms r JOIN samsam_accounts a ON a.id = r.account_id "
+        "WHERE r.id=%s AND a.member_id=%s", (room_id, u["id"])).fetchone()
+    if not owner:
+        conn.close()
+        return jsonify({"error": "not found"}), 404
+    rows = conn.execute(
+        "SELECT msg_key, sender, receiver, message, message_type, message_time, title "
+        "FROM samsam_chat_messages WHERE room_id=%s ORDER BY message_time ASC", (room_id,)).fetchall()
+    conn.close()
+    return jsonify({"owner_id": owner["owner_id"], "messages": [dict(r) for r in rows]})
 
 
 if __name__ == "__main__":

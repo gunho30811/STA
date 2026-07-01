@@ -410,6 +410,56 @@ def init_db(force=False):
     # 기존 테이블에 승인 컬럼 보강(이미 있으면 무시)
     conn.execute("ALTER TABLE members ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT FALSE")
     _seed_admin(conn)
+
+    # 삼삼엠투 통합 채팅: 회원이 연결한 삼삼 계정(비번·refreshToken은 암호화해 저장).
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS samsam_accounts (
+        id                 SERIAL PRIMARY KEY,
+        member_id          INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+        samsam_email       TEXT NOT NULL,
+        label              TEXT,
+        password_enc       TEXT,
+        refresh_token_enc  TEXT,
+        samsam_member_id   TEXT,
+        status             TEXT DEFAULT 'ok',
+        last_error         TEXT,
+        last_polled_at     TEXT,
+        created_at         TEXT
+    )""")
+    # 계정별 채팅방(삼삼 RTDB live/chatlist/{member_id} 의 방 하나에 대응).
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS samsam_chat_rooms (
+        id                  SERIAL PRIMARY KEY,
+        account_id          INTEGER NOT NULL REFERENCES samsam_accounts(id) ON DELETE CASCADE,
+        samsam_room_key     TEXT NOT NULL,
+        room_name           TEXT,
+        host_or_guest       TEXT,
+        counterpart_member  TEXT,
+        contract_status     TEXT,
+        chat_room_status    TEXT,
+        start_date          TEXT,
+        end_date            TEXT,
+        last_message        TEXT,
+        last_message_time   BIGINT,
+        updated_at          TEXT,
+        UNIQUE (account_id, samsam_room_key)
+    )""")
+    conn.execute("ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS host_or_guest TEXT")
+    # 채팅방별 메시지(RTDB live/messagelist/{room_key}).
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS samsam_chat_messages (
+        id            SERIAL PRIMARY KEY,
+        room_id       INTEGER NOT NULL REFERENCES samsam_chat_rooms(id) ON DELETE CASCADE,
+        msg_key       TEXT NOT NULL,
+        sender        TEXT,
+        receiver      TEXT,
+        message       TEXT,
+        message_type  TEXT,
+        message_time  BIGINT,
+        image         TEXT,
+        title         TEXT,
+        UNIQUE (room_id, msg_key)
+    )""")
     for idx in [
         "CREATE INDEX IF NOT EXISTS ix_l_region ON listings(sido,sigungu,dong)",
         "CREATE INDEX IF NOT EXISTS ix_l_deposit ON listings(deposit)",
@@ -425,6 +475,11 @@ def init_db(force=False):
         "CREATE INDEX IF NOT EXISTS ix_ss_date ON samsam_snapshots(snapshot_date)",
         "CREATE INDEX IF NOT EXISTS ix_ss_region ON samsam_snapshots(sido,sigungu,dong)",
         "CREATE INDEX IF NOT EXISTS ix_members_email ON members(email)",
+        "CREATE INDEX IF NOT EXISTS ix_sa_member ON samsam_accounts(member_id)",
+        "CREATE INDEX IF NOT EXISTS ix_scr_account ON samsam_chat_rooms(account_id)",
+        "CREATE INDEX IF NOT EXISTS ix_scr_last_msg ON samsam_chat_rooms(last_message_time)",
+        "CREATE INDEX IF NOT EXISTS ix_scm_room ON samsam_chat_messages(room_id)",
+        "CREATE INDEX IF NOT EXISTS ix_scm_time ON samsam_chat_messages(message_time)",
     ]:
         conn.execute(idx)
     conn.commit()

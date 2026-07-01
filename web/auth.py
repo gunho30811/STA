@@ -512,7 +512,7 @@ color:#e2e8f0;display:flex;flex-wrap:wrap;gap:4px 2px;align-items:center;
 padding:7px 12px;font-size:13px;font-family:'Pretendard','Malgun Gothic',sans-serif;
 box-shadow:0 1px 6px rgba(0,0,0,.2)">
 <a href="/" style="font-weight:800;color:#fff;text-decoration:none;margin-right:6px">🏠 홈</a>
-<a href="/profit/">💰 수익성</a><a href="/samsam/">🛋️ 삼삼분석</a><a href="/gangnam/">🏙️ 강남매물</a>
+<a href="/profit/">💰 수익성</a><a href="/samsam/">🛋️ 삼삼분석</a><a href="/gangnam/">🏙️ 강남매물</a><a href="/samsam/chat/">💬 통합채팅</a>
 {admin}<a href="/auth/logout" id=__logout>로그아웃</a>
 <style>#__nav a{{color:#cbd5e1;text-decoration:none;padding:5px 10px;border-radius:6px;font-weight:600;
 white-space:nowrap}}
