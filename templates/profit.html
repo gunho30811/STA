@@ -56,6 +56,14 @@
   .lnk.n{background:#03c75a}.lnk.s{background:#ff5a5f}
   .rankwrap{display:flex;gap:12px;flex-wrap:wrap}
   .rankwrap .panel{flex:1;min-width:340px}
+  @media(max-width:720px){
+    header,.wrap{padding-left:14px;padding-right:14px}
+    .tabs{padding-left:14px;padding-right:14px}
+    .md{flex-direction:column;align-items:stretch}
+    .detail{width:100%;position:static;top:auto;max-height:none}
+    .listcol{max-height:none;width:100%}
+    .rankwrap .panel{min-width:0}
+  }
 </style>
 </head>
 <body>
