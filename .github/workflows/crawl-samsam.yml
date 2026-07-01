@@ -2,9 +2,9 @@ name: 삼삼엠투 크롤링 자동화 (매일)
 
 on:
   schedule:
-    # 매일 15:00 UTC (한국시간 00:00, 자정). 네이버 주간 크롤(월 01:00 UTC)과 겹치지
-    # 않게 시각을 벌려 둘이 같은 파일(net_profit_integrated.csv)을 커밋할 때 push 충돌을 피한다.
-    - cron: '0 15 * * *'
+    # 매일 21:00 UTC (한국시간 06:00, 아침). 네이버 주간 크롤(월 01:00 UTC=10:00 KST)과
+    # 몇 시간 떨어져 있어 같은 파일(net_profit_integrated.csv)을 커밋할 때 겹칠 일이 없다.
+    - cron: '0 21 * * *'
   workflow_dispatch:        # 수동 실행 가능
 
 permissions:
@@ -37,7 +37,7 @@ jobs:
       - name: Playwright Chromium 설치
         run: python -m playwright install chromium --with-deps
 
-      - name: 삼삼 전국 크롤 (신규 매물만, 이어받기)
+      - name: 삼삼 전국 크롤 (신규 매물 수집 + 기존 매물 예약률 갱신)
         run: python pipeline/samsam/crawler.py
 
       - name: 예약률 스냅샷 (samsam_snapshots 적재)
