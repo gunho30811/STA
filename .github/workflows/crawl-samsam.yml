@@ -37,7 +37,7 @@ jobs:
       - name: Playwright Chromium 설치
         run: python -m playwright install chromium --with-deps
 
-      - name: 삼삼 전국 크롤 (신규 매물 수집 + 기존 매물 예약률 갱신)
+      - name: 삼삼 수도권 크롤 (신규 매물 수집 + 기존 매물 예약률 매일 갱신)
         run: python pipeline/samsam/crawler.py
 
       - name: 예약률 스냅샷 (samsam_snapshots 적재)
