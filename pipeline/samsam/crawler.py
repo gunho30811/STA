@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-삼삼엠투 전체 매물 크롤러 → Supabase samsam_listings 적재.
+삼삼엠투 수도권(서울·경기·인천) 매물 크롤러 → Supabase samsam_listings 적재.
+
+신규 매물은 상세+예약스케줄을 모두 수집하고, 이미 적재된 기존 매물은 예약
+스케줄(booked_days_*/blocked_days_1m)만 매일 전부 다시 확인해 예약률을 최신화한다.
+매물 수가 많아 예약률 갱신은 동시 요청(REFRESH_WORKERS)으로 처리한다.
 
 신규 매물은 상세+예약스케줄을 모두 수집하고, 이미 적재된 기존 매물은 예약
 스케줄(booked_days_*/blocked_days_1m)만 다시 확인해 예약률을 최신화한다.
@@ -15,6 +19,7 @@
 """
 import argparse, getpass, json, os, re, sys, time
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta
 
 import requests
@@ -43,7 +48,9 @@ BTYPE_KO = {
 BATCH = 50
 REQ_SLEEP = 0.5
 BLOCK_WAIT = 120
-REFRESH_ROTATION_DAYS = 7  # 기존 매물 예약률 갱신을 요일별로 나눠 돈다 (매물당 대략 주 1회)
+METRO_SIDO = {'서울특별시', '경기도', '인천광역시'}  # 수도권만 수집·갱신 (그 외 지역은 DB에 남아있어도 갱신 안 함)
+REFRESH_WORKERS = 4       # 기존 매물 예약률 갱신 동시 요청 수
+REFRESH_CHUNK = 2000      # 이 건수마다 세션(로그인)을 새로 고침
 
 TODAY = date.today()
 D30 = TODAY + timedelta(days=30)
@@ -87,6 +94,11 @@ def _parse_dong(jibun):
 def _parse_sido(addr):
     parts = _strip_floor(addr).split()
     return parts[0] if parts else ''
+
+
+def _room_sido(room):
+    """목록(room) 객체에서 시도 판정 — state 필드 우선, 없으면 주소 파싱."""
+    return room.get('state') or _parse_sido(room.get('addrLot') or room.get('addrStreet') or '')
 
 
 def _parse_sigungu(jibun):
@@ -416,12 +428,12 @@ def main():
 
     log("매물 목록 수집 중...")
     rids = collect_rids(session)
-    targets = [(rid, room) for rid, room in rids.items() if rid not in done]
+    before_metro = len(rids)
+    rids = {rid: room for rid, room in rids.items() if _room_sido(room) in METRO_SIDO}
+    log(f"수도권(서울/경기/인천) 필터: {before_metro} → {len(rids)}건 (그 외 지역은 갱신 대상에서 제외)")
 
-    # 예약률 갱신 대상(기존 매물)은 매물 수가 많아 하루에 전체를 못 돌므로 room_id 기반으로
-    # 요일별 7등분해 순환 갱신한다 (매물 1건당 대략 주 1회 갱신됨).
-    shard = TODAY.weekday()  # 0(월)~6(일)
-    refresh_targets = [rid for rid in rids if rid in done and rid % REFRESH_ROTATION_DAYS == shard]
+    targets = [(rid, room) for rid, room in rids.items() if rid not in done]
+    refresh_targets = [rid for rid in rids if rid in done]
 
     # 시군구 사전필터: 목록 API의 province/state/주소로 상세 호출 전에 거른다(상세 호출 절감).
     sigungu_filter = args.sigungu.strip()
@@ -471,29 +483,34 @@ def main():
         upsert_batch(conn, batch)
         ok += len(batch)
 
-    # 기존 매물 예약률 갱신 — 상세는 그대로 두고 예약 스케줄만 다시 확인해
-    # booked_days_*/blocked_days_1m을 최신화한다 (오르내림 추적용).
-    log(f"기존 매물 예약률 갱신 대상(요일 로테이션 {shard + 1}/{REFRESH_ROTATION_DAYS}): {len(refresh_targets)}건")
-    upd_batch, refreshed = [], 0
-    for i, rid in enumerate(refresh_targets, 1):
-        if i % 50 == 0:
-            log(f"[예약률 갱신 {i}/{len(refresh_targets)}] {refreshed}건 갱신")
+    # 기존 매물(수도권) 예약률 갱신 — 상세는 그대로 두고 예약 스케줄만 다시 확인해
+    # booked_days_*/blocked_days_1m을 최신화한다 (오르내림 추적용). 매물 수가 많아
+    # 동시 요청(REFRESH_WORKERS)으로 처리하고, REFRESH_CHUNK건마다 세션을 새로 고친다.
+    log(f"기존 매물(수도권) 예약률 갱신 대상: {len(refresh_targets)}건, 동시 요청 {REFRESH_WORKERS}개")
+    upd_batch, refreshed, processed = [], 0, 0
+    for start in range(0, len(refresh_targets), REFRESH_CHUNK):
+        chunk = refresh_targets[start:start + REFRESH_CHUNK]
+        with ThreadPoolExecutor(max_workers=REFRESH_WORKERS) as pool:
+            futs = {pool.submit(fetch_schedules, session, rid): rid for rid in chunk}
+            for fut in as_completed(futs):
+                rid = futs[fut]
+                processed += 1
+                schedules = fut.result()
+                if schedules:
+                    bk1 = _count_status(schedules, TODAY, D30, BOOKED_STATUSES)
+                    bk2 = _count_status(schedules, TODAY, D60, BOOKED_STATUSES)
+                    bk3 = _count_status(schedules, TODAY, D90, BOOKED_STATUSES)
+                    bl1 = _count_status(schedules, TODAY, D30, BLOCKED_STATUSES)
+                    upd_batch.append(
+                        (bk1, bk2, bk3, bl1, datetime.now().isoformat(timespec='seconds'), rid))
+                    if len(upd_batch) >= BATCH:
+                        update_schedules_batch(conn, upd_batch)
+                        refreshed += len(upd_batch)
+                        upd_batch = []
+                if processed % 500 == 0:
+                    log(f"[예약률 갱신 {processed}/{len(refresh_targets)}] {refreshed}건 갱신")
 
-        schedules = fetch_schedules(session, rid)
-        if not schedules:
-            continue
-        bk1 = _count_status(schedules, TODAY, D30, BOOKED_STATUSES)
-        bk2 = _count_status(schedules, TODAY, D60, BOOKED_STATUSES)
-        bk3 = _count_status(schedules, TODAY, D90, BOOKED_STATUSES)
-        bl1 = _count_status(schedules, TODAY, D30, BLOCKED_STATUSES)
-        upd_batch.append((bk1, bk2, bk3, bl1, datetime.now().isoformat(timespec='seconds'), rid))
-
-        if len(upd_batch) >= BATCH:
-            update_schedules_batch(conn, upd_batch)
-            refreshed += len(upd_batch)
-            upd_batch = []
-
-        if i % 150 == 0:
+        if start + REFRESH_CHUNK < len(refresh_targets):
             log("세션 갱신 중...")
             cookies = _get_cookies(email, pw)
             session = _make_session(cookies)
