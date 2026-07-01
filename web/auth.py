@@ -508,13 +508,13 @@ def _nav_html():
     admin = ('<a href="/auth/crawl">크롤현황</a><a href="/auth/members">회원관리</a>'
              if session.get("role") == "admin" else "")
     return f"""<div id=__nav style="position:sticky;top:0;z-index:9999;background:#0f172a;
-color:#e2e8f0;display:flex;flex-wrap:nowrap;overflow-x:auto;gap:4px;align-items:center;
+color:#e2e8f0;display:flex;flex-wrap:wrap;gap:4px 2px;align-items:center;
 padding:7px 12px;font-size:13px;font-family:'Pretendard','Malgun Gothic',sans-serif;
 box-shadow:0 1px 6px rgba(0,0,0,.2)">
 <a href="/" style="font-weight:800;color:#fff;text-decoration:none;margin-right:6px">🏠 홈</a>
 <a href="/profit/">💰 수익성</a><a href="/samsam/">🛋️ 삼삼분석</a><a href="/gangnam/">🏙️ 강남매물</a>
-<span style="flex:1;min-width:8px"></span>{admin}<a href="/auth/logout">로그아웃</a>
-<style>#__nav{{-ms-overflow-style:none;scrollbar-width:none}}#__nav::-webkit-scrollbar{{display:none}}
-#__nav a{{color:#cbd5e1;text-decoration:none;padding:5px 10px;border-radius:6px;font-weight:600;
-white-space:nowrap;flex-shrink:0}}
-#__nav a:hover{{background:#1e293b;color:#fff}}</style></div>"""
+{admin}<a href="/auth/logout" id=__logout>로그아웃</a>
+<style>#__nav a{{color:#cbd5e1;text-decoration:none;padding:5px 10px;border-radius:6px;font-weight:600;
+white-space:nowrap}}
+#__nav a:hover{{background:#1e293b;color:#fff}}
+@media(min-width:760px){{#__nav #__logout{{margin-left:auto}}}}</style></div>"""
