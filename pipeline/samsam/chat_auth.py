@@ -11,7 +11,6 @@ import base64
 import json
 
 import requests
-from playwright.sync_api import sync_playwright
 
 BASE = 'https://web.33m2.co.kr'
 UA = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
@@ -38,6 +37,10 @@ def login_and_get_refresh_token(email, password):
     반환: {'refresh_token', 'id_token', 'samsam_member_id'}
     실패 시 LoginError.
     """
+    # 지연 import: Vercel 등 서버리스 환경엔 브라우저 자동화가 없어 모듈 최상단에서
+    # import하면 이 함수를 안 써도(REST 폴링만 해도) 앱 전체가 기동 실패한다.
+    from playwright.sync_api import sync_playwright
+
     captured = {}
 
     def on_response(resp):
