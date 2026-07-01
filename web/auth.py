@@ -11,11 +11,12 @@ localhost 쿠키는 포트를 구분하지 않으므로 같은 SECRET_KEY를 쓰
 import datetime as dt
 import os
 import re
+import secrets
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from flask import (Blueprint, redirect, render_template_string, request,
+from flask import (Blueprint, jsonify, redirect, render_template_string, request,
                    session, url_for)
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -26,6 +27,7 @@ PW_RE = re.compile(f"[{re.escape(SPECIAL)}]")
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 CODE_TTL_MIN = 10
 DAILY_SIGNUP_LIMIT = int(os.environ.get("DAILY_SIGNUP_LIMIT", 10))  # 하루 가입 한도(스팸 방지)
+ONLINE_WINDOW_MIN = 5   # 이 시간 안에 핑이 온 세션만 "접속중"으로 집계
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -464,6 +466,37 @@ def member_delete():
     return redirect(url_for("auth.members"))
 
 
+def _ping_visitor():
+    """현재 접속자수 집계용 핑. 로그인 여부와 무관하게 세션마다 최근 활동시각 기록.
+    부가 기능이라 실패해도 요청 자체를 막지 않는다."""
+    try:
+        vid = session.get("vid")
+        if not vid:
+            vid = secrets.token_hex(8)
+            session["vid"] = vid
+        conn = db.connect()
+        conn.execute(
+            "INSERT INTO visitor_pings(session_id,last_seen) VALUES(%s,%s) "
+            "ON CONFLICT (session_id) DO UPDATE SET last_seen=EXCLUDED.last_seen",
+            (vid, _now().isoformat(timespec="seconds")))
+        if secrets.randbelow(50) == 0:   # 가끔 오래된 핑 정리(별도 크론 없이 테이블 크기 관리)
+            cutoff = (_now() - dt.timedelta(days=1)).isoformat(timespec="seconds")
+            conn.execute("DELETE FROM visitor_pings WHERE last_seen < %s", (cutoff,))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+@bp.route("/api/online")
+def api_online():
+    conn = db.connect()
+    cutoff = (_now() - dt.timedelta(minutes=ONLINE_WINDOW_MIN)).isoformat(timespec="seconds")
+    n = conn.execute("SELECT COUNT(*) FROM visitor_pings WHERE last_seen >= %s", (cutoff,)).fetchone()[0]
+    conn.close()
+    return jsonify({"online": n})
+
+
 def init_auth(app):
     """앱에 로그인 게이트 적용. 모든 라우트를 보호하고 /auth/* 와 정적파일만 허용."""
     app.secret_key = os.environ.get("SECRET_KEY", "dev-insecure-change-me")
@@ -477,6 +510,8 @@ def init_auth(app):
     @app.before_request
     def _guard():
         ep = request.endpoint or ""
+        if ep != "static":
+            _ping_visitor()
         if ep.startswith("auth.") or ep == "static":
             return None
         if not session.get("uid"):
@@ -513,8 +548,18 @@ padding:7px 12px;font-size:13px;font-family:'Pretendard','Malgun Gothic',sans-se
 box-shadow:0 1px 6px rgba(0,0,0,.2)">
 <a href="/" style="font-weight:800;color:#fff;text-decoration:none;margin-right:6px">🏠 홈</a>
 <a href="/profit/">💰 수익성</a><a href="/samsam/">🛋️ 삼삼분석</a><a href="/gangnam/">🏙️ 강남매물</a>
-{admin}<a href="/auth/logout" id=__logout>로그아웃</a>
+{admin}
+<span id=__online title="최근 {ONLINE_WINDOW_MIN}분 내 접속" style="color:#94a3b8;
+font-size:12px;padding:5px 10px;white-space:nowrap">🟢 접속자 <b id=__online_n>-</b>명</span>
+<a href="/auth/logout" id=__logout>로그아웃</a>
 <style>#__nav a{{color:#cbd5e1;text-decoration:none;padding:5px 10px;border-radius:6px;font-weight:600;
 white-space:nowrap}}
 #__nav a:hover{{background:#1e293b;color:#fff}}
-@media(min-width:760px){{#__nav #__logout{{margin-left:auto}}}}</style></div>"""
+@media(min-width:760px){{#__nav #__logout{{margin-left:auto}}}}</style>
+<script>(function(){{
+  function tick(){{fetch('/auth/api/online').then(r=>r.json()).then(d=>{{
+    var el=document.getElementById('__online_n'); if(el) el.textContent=d.online;
+  }}).catch(function(){{}});}}
+  tick(); setInterval(tick, 20000);
+}})();</script>
+</div>"""

@@ -410,6 +410,13 @@ def init_db(force=False):
     # 기존 테이블에 승인 컬럼 보강(이미 있으면 무시)
     conn.execute("ALTER TABLE members ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT FALSE")
     _seed_admin(conn)
+
+    # 현재 접속자수: 로그인 여부와 무관하게 최근 활동한 세션을 핑으로 기록(auth.py before_request).
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS visitor_pings (
+        session_id  TEXT PRIMARY KEY,
+        last_seen   TEXT NOT NULL
+    )""")
     for idx in [
         "CREATE INDEX IF NOT EXISTS ix_l_region ON listings(sido,sigungu,dong)",
         "CREATE INDEX IF NOT EXISTS ix_l_deposit ON listings(deposit)",
@@ -425,6 +432,7 @@ def init_db(force=False):
         "CREATE INDEX IF NOT EXISTS ix_ss_date ON samsam_snapshots(snapshot_date)",
         "CREATE INDEX IF NOT EXISTS ix_ss_region ON samsam_snapshots(sido,sigungu,dong)",
         "CREATE INDEX IF NOT EXISTS ix_members_email ON members(email)",
+        "CREATE INDEX IF NOT EXISTS ix_vp_last_seen ON visitor_pings(last_seen)",
     ]:
         conn.execute(idx)
     conn.commit()
