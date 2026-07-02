@@ -8,8 +8,7 @@ on:
   workflow_dispatch:        # 수동 실행 가능
 
 permissions:
-  contents: write      # jsonl·csv 커밋·푸시용
-  pull-requests: write # 자동 PR 생성·머지용 (main은 보호 브랜치라 직접 push 불가)
+  contents: write      # jsonl·csv 를 main에 직접 커밋·push (main은 실제로 미보호 → PR 불필요)
 
 jobs:
   crawl:
@@ -26,10 +25,18 @@ jobs:
       SAMSAM_REFRESH_WORKERS: '2'
       SAMSAM_REFRESH_DAILY_LIMIT: '5000'
       SAMSAM_RL_COOLDOWN: '20'
+      # 리프레시 도중 1,000건마다 lab/*.jsonl 을 main에 직접 커밋·push → 배포(Vercel) 점진 갱신.
+      SAMSAM_DEPLOY_PUSH: '1'
+      SAMSAM_DEPLOY_CHUNK: '1000'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: git 설정 (봇 커밋 주체)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Python 설치
         uses: actions/setup-python@v5
@@ -58,22 +65,15 @@ jobs:
         run: python pipeline/integrate/build_integrated.py
         continue-on-error: true   # 네이버 데이터 없으면 스킵
 
-      - name: 변경분 커밋 (PR 생성 및 자동 머지)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: 최종 변경분 커밋 (main 직접 push)
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # 크롤 스텝이 리프레시 도중 lab/samsam_listings.jsonl 은 이미 점진 커밋했고,
+          # 여기선 스냅샷·CSV까지 포함한 최종 상태를 한 번 더 main에 직접 push한다(PR 없음).
           git add lab/samsam_listings.jsonl lab/samsam_snapshots.jsonl data/net_profit_integrated.csv
           if git diff --cached --quiet; then
             echo "변경분 없음 — 커밋 스킵"
           else
-            branch="chore/samsam-auto-${{ github.run_id }}"
-            git checkout -b "$branch"
             git commit -m "chore: 삼삼 매물 자동 갱신 $(date +'%Y-%m-%d')"
-            git push origin "$branch"
-            gh pr create --base main --head "$branch" \
-              --title "chore: 삼삼 매물 자동 갱신 $(date +'%Y-%m-%d')" \
-              --body "자동 크롤링 결과 반영 (workflow run ${{ github.run_id }})"
-            gh pr merge "$branch" --squash --delete-branch
+            git pull --rebase origin main
+            git push origin HEAD:main
           fi

@@ -17,7 +17,7 @@
 필요 환경변수 (.env):
   DATABASE_URL, SAMSAM_EMAIL, SAMSAM_PASSWORD
 """
-import argparse, getpass, json, os, re, sys, threading, time
+import argparse, getpass, json, os, re, subprocess, sys, threading, time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta
@@ -29,6 +29,7 @@ from playwright.sync_api import sync_playwright
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, BASE_DIR)
 sys.path.insert(0, os.path.join(BASE_DIR, 'pipeline', 'naver'))
+sys.path.insert(0, os.path.join(BASE_DIR, 'pipeline', 'samsam'))   # deploy_lab의 export_jsonl import용
 
 import db
 from subway import stations_within
@@ -65,6 +66,14 @@ REFRESH_DAILY_LIMIT = int(os.environ.get('SAMSAM_REFRESH_DAILY_LIMIT', '0'))
 RL_COOLDOWN = int(os.environ.get('SAMSAM_RL_COOLDOWN', '20'))    # 429 시 전 워커 공통 대기(초)
 RL_RETRY = int(os.environ.get('SAMSAM_RL_RETRY', '6'))           # 429 요청당 재시도 횟수
 EARLY_CHECK = 200         # 예약률 갱신 초반 이 건수까지 데이터 0이면 차단으로 보고 조기 중단
+
+# ── 점진 배포 ───────────────────────────────────────────────────────────────────
+# 리프레시 도중 이 건수만큼 DB에 반영될 때마다 lab/*.jsonl을 재생성해 main에 직접 커밋·push한다.
+# → 실행이 끝나길 기다리지 않고 배포(Vercel)가 점진적으로 갱신되고, 도중 크래시에도 진행분이 배포됨.
+# export가 ORDER BY로 정렬돼 있어 커밋 사이 diff가 작아 repo가 거의 안 큰다. PR 없이 직접 커밋.
+# CI(SAMSAM_DEPLOY_PUSH=1)에서만 git push하고, 로컬 실행은 건너뛴다.
+DEPLOY_CHUNK = int(os.environ.get('SAMSAM_DEPLOY_CHUNK', '1000'))
+DEPLOY_PUSH = os.environ.get('SAMSAM_DEPLOY_PUSH') == '1'
 
 
 def _parse_shard():
@@ -495,6 +504,38 @@ def update_schedules_batch(conn, rows):
     conn.commit()
 
 
+# ── 점진 배포 ───────────────────────────────────────────────────────────────────
+def _git(*args):
+    """BASE_DIR에서 git 명령 실행 → CompletedProcess."""
+    return subprocess.run(['git', *args], cwd=BASE_DIR,
+                          capture_output=True, text=True, encoding='utf-8', errors='replace')
+
+
+def deploy_lab(reason):
+    """현재 DB를 lab/*.jsonl로 export하고 main에 직접 커밋·push한다(PR 없음).
+
+    CI(SAMSAM_DEPLOY_PUSH=1)에서만 push한다. 로컬 실행에선 파일만 갱신하지 않고 통째로 스킵.
+    main이 그새 움직였을 수 있으니 커밋 후 rebase pull → push. 실패해도 크롤은 계속(다음 청크에서 재시도).
+    """
+    if not DEPLOY_PUSH:
+        return
+    try:
+        import export_jsonl
+        export_jsonl.main()   # DB → lab/*.jsonl 재생성(ORDER BY 정렬)
+        _git('add', 'lab/samsam_listings.jsonl', 'lab/samsam_snapshots.jsonl')
+        if _git('diff', '--cached', '--quiet').returncode == 0:
+            return   # 변경 없음(커밋할 것 없음)
+        _git('commit', '-m', f'chore(samsam): 예약률 갱신 배포 — {reason}')
+        _git('pull', '--rebase', 'origin', 'main')   # 그새 올라온 커밋 반영
+        p = _git('push', 'origin', 'HEAD:main')
+        if p.returncode == 0:
+            log(f"배포 커밋·push 완료 — {reason}")
+        else:
+            log(f"배포 push 실패({reason}) rc={p.returncode}: {(p.stderr or '')[:150]}")
+    except Exception as e:
+        log(f"배포 예외({reason}): {repr(e)[:150]}")
+
+
 # ── 메인 ───────────────────────────────────────────────────────────────────────
 def main():
     ap = argparse.ArgumentParser()
@@ -603,6 +644,7 @@ def main():
     log(f"기존 매물(수도권) 예약률 갱신 대상: {len(refresh_targets)}건, 동시 요청 {REFRESH_WORKERS}개")
     stats = {}
     buf, failed, with_data, processed, refreshed = [], 0, 0, 0, 0
+    last_deploy = 0   # 마지막으로 배포(lab 커밋)한 시점의 refreshed 값
     checkpoint_passed = False
     rate_limited = False
 
@@ -657,6 +699,11 @@ def main():
                     log(f"[예약률 갱신 {processed}/{len(refresh_targets)}] "
                         f"DB반영 {refreshed}+버퍼 {len(buf)}(데이터有 {with_data}) 실패 {failed} | HTTP {stats}")
 
+                # 점진 배포: DEPLOY_CHUNK건 DB 반영될 때마다 lab 재생성·커밋·push (CI에서만).
+                if DEPLOY_PUSH and refreshed - last_deploy >= DEPLOY_CHUNK:
+                    deploy_lab(f"{refreshed}건 갱신")
+                    last_deploy = refreshed
+
         if not rate_limited and start + REFRESH_CHUNK < len(refresh_targets):
             _flush()   # 세션 재로그인 전에 버퍼 비움(진행 보존)
             log("세션 갱신 중...")
@@ -681,6 +728,8 @@ def main():
     log(f"예약률 갱신 집계: DB반영 {refreshed}건(데이터有 {with_data}, 공실 {refreshed - with_data}) "
         f"/ 실패 {failed}건 / 대상 {len(refresh_targets)}건")
     log(f"  HTTP 응답 분포: {stats}")
+    if refreshed - last_deploy > 0:
+        deploy_lab(f"최종 {refreshed}건")   # 남은 갱신분 배포
     log(f"완료. 신규 적재 {ok}건 / 실패 {fail}건, 예약률 갱신(DB반영) {refreshed}건 / 실패 {failed}건")
 
 
