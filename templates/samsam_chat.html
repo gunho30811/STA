@@ -42,13 +42,20 @@
   .room .rn .lbl{font-size:10.5px;font-weight:700;color:#fff;background:#64748b;padding:1px 6px;border-radius:6px;white-space:nowrap}
   .room .last{color:#6b7280;font-size:11.5px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .room .time{color:#9ca3af;font-size:10.5px;margin-top:2px}
-  .thread{flex:1;min-width:0;border:1px solid #e5e7eb;border-radius:10px;padding:14px;max-height:70vh;overflow:auto;display:flex;flex-direction:column;gap:8px}
+  .room .dot{display:inline-block;width:7px;height:7px;border-radius:999px;background:#ef4444;margin-right:5px}
+  .roomgrp{padding:8px 12px 4px;font-size:11px;font-weight:800;color:#6b7280;background:#f8fafc;border-bottom:1px solid #f1f5f9}
+  .thread{flex:1;min-width:0;border:1px solid #e5e7eb;border-radius:10px;padding:14px;max-height:60vh;overflow:auto;display:flex;flex-direction:column;gap:8px}
   .bubble{max-width:70%;padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.5;white-space:pre-wrap}
   .bubble.me{align-self:flex-end;background:#2563eb;color:#fff;border-bottom-right-radius:3px}
   .bubble.other{align-self:flex-start;background:#f1f5f9;color:#1f2937;border-bottom-left-radius:3px}
   .bubble.system{align-self:center;background:#fef9c3;color:#854d0e;font-size:11.5px;max-width:85%}
+  .bubble.pending{opacity:.6}
   .bubble .t{display:block;font-size:10px;opacity:.7;margin-top:3px}
   .empty{text-align:center;color:#9ca3af;padding:40px 0;font-size:13px}
+  .sendbar{display:none;gap:8px;margin-top:10px}
+  .sendbar.on{display:flex}
+  .sendbar textarea{flex:1;resize:none;border:1px solid #d1d5db;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;height:38px}
+  .threadwrap{display:flex;flex-direction:column;flex:1;min-width:0}
   @media(max-width:720px){
     .md{flex-direction:column}
     .roomlist{width:100%;max-height:240px}
@@ -84,7 +91,13 @@
     <h2 class="sec">통합 채팅함</h2>
     <div class="md">
       <div class="roomlist" id="roomlist"></div>
-      <div class="thread" id="thread"><div class="empty">왼쪽에서 채팅방을 선택하세요</div></div>
+      <div class="threadwrap">
+        <div class="thread" id="thread"><div class="empty">왼쪽에서 채팅방을 선택하세요</div></div>
+        <div class="sendbar" id="sendbar">
+          <textarea id="sendInput" placeholder="답장을 입력해 주세요"></textarea>
+          <button class="btn btn-go" id="sendBtn">전송</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -123,26 +136,39 @@ async function loadAccounts(){
   });
 }
 
+function roomRow(r){
+  const el=document.createElement('div');
+  el.className='room'+(curRoom===r.id?' on':'');
+  el.innerHTML = `
+    <div class="rn"><span>${r.unread?'<span class="dot"></span>':''}${r.room_name||'(이름없음)'}</span><span class="lbl">${r.label||r.samsam_email}</span></div>
+    <div class="last">${(r.last_message||'').replace(/\\n/g,' ')}</div>
+    <div class="time">${fmtTime(r.last_message_time)}</div>
+  `;
+  el.onclick=()=>openRoom(r.id);
+  return el;
+}
+
 async function loadRooms(){
   const rows=await (await fetch('api/rooms')).json();
   const box=$('#roomlist');
-  box.innerHTML = rows.length ? '' : '<div class="empty">아직 채팅방이 없습니다</div>';
-  for(const r of rows){
-    const el=document.createElement('div');
-    el.className='room'+(curRoom===r.id?' on':'');
-    el.innerHTML = `
-      <div class="rn"><span>${r.room_name||'(이름없음)'}</span><span class="lbl">${r.label||r.samsam_email}</span></div>
-      <div class="last">${(r.last_message||'').replace(/\\n/g,' ')}</div>
-      <div class="time">${fmtTime(r.last_message_time)}</div>
-    `;
-    el.onclick=()=>openRoom(r.id);
-    box.appendChild(el);
+  if(!rows.length){ box.innerHTML='<div class="empty">아직 채팅방이 없습니다</div>'; return; }
+  const unread = rows.filter(r=>r.unread), rest = rows.filter(r=>!r.unread);
+  box.innerHTML='';
+  if(unread.length){
+    const h=document.createElement('div'); h.className='roomgrp'; h.textContent=`미확인 (${unread.length})`;
+    box.appendChild(h);
+    unread.forEach(r=>box.appendChild(roomRow(r)));
+  }
+  if(rest.length){
+    const h=document.createElement('div'); h.className='roomgrp'; h.textContent='전체';
+    box.appendChild(h);
+    rest.forEach(r=>box.appendChild(roomRow(r)));
   }
 }
 
 async function openRoom(id){
   curRoom=id;
-  document.querySelectorAll('.room').forEach((el,i)=>el.classList.remove('on'));
+  document.querySelectorAll('.room').forEach(el=>el.classList.remove('on'));
   loadRooms();
   const res=await (await fetch(`api/rooms/${id}/messages`)).json();
   const box=$('#thread');
@@ -155,8 +181,39 @@ async function openRoom(id){
     el.innerHTML = `${(m.message||'').replace(/</g,'&lt;')}<span class="t">${fmtTime(m.message_time)}</span>`;
     box.appendChild(el);
   }
+  for(const p of (res.pending||[])){
+    const el=document.createElement('div');
+    el.className='bubble me pending';
+    el.innerHTML = `${(p.message||'').replace(/</g,'&lt;')}<span class="t">전송 대기 중...</span>`;
+    box.appendChild(el);
+  }
   box.scrollTop = box.scrollHeight;
+  $('#sendbar').classList.add('on');
 }
+
+$('#sendBtn').onclick=async()=>{
+  if(!curRoom) return;
+  const ta=$('#sendInput');
+  const message=ta.value.trim();
+  if(!message) return;
+  $('#sendBtn').disabled=true;
+  try{
+    const r=await fetch(`api/rooms/${curRoom}/send`, {method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({message})});
+    const d=await r.json();
+    if(r.ok){ ta.value=''; openRoom(curRoom); }
+    else alert(d.error||'전송 실패');
+  } finally { $('#sendBtn').disabled=false; }
+};
+$('#sendInput').addEventListener('keydown', e=>{
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); $('#sendBtn').click(); }
+});
+
+// 새로고침 버튼 없이도 새 메시지를 보게: DB에 이미 반영된 걸 가볍게 주기적으로 다시 불러온다
+// (실제 삼삼 크롤/폴링은 서버쪽 1분 cron이 처리 — 여긴 그 결과를 화면에 반영만 함).
+setInterval(()=>{
+  if(curRoom) openRoom(curRoom); else loadRooms();
+}, 20000);
 
 $('#addBtn').onclick=async()=>{
   const email=$('#fEmail').value.trim(), password=$('#fPw').value, label=$('#fLabel').value.trim();

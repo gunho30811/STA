@@ -626,13 +626,19 @@ def chat_api_rooms():
     u = current_user()
     conn = db.connect()
     rows = conn.execute(
-        "SELECT r.id, r.room_name, r.last_message, r.last_message_time, r.chat_room_status, "
-        "r.contract_status, a.label, a.samsam_email "
+        "SELECT r.id, r.room_name, r.last_message, r.last_message_time, r.last_read_at, "
+        "r.chat_room_status, r.contract_status, a.label, a.samsam_email "
         "FROM samsam_chat_rooms r JOIN samsam_accounts a ON a.id = r.account_id "
         "WHERE a.member_id=%s AND r.host_or_guest='host' "
         "ORDER BY r.last_message_time DESC NULLS LAST", (u["id"],)).fetchall()
     conn.close()
-    return jsonify([dict(r) for r in rows])
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["unread"] = bool(d["last_message_time"]
+                            and (not d["last_read_at"] or d["last_message_time"] > d["last_read_at"]))
+        out.append(d)
+    return jsonify(out)
 
 
 @app.route("/chat/api/rooms/<int:room_id>/messages")
@@ -640,7 +646,7 @@ def chat_api_messages(room_id):
     u = current_user()
     conn = db.connect()
     owner = conn.execute(
-        "SELECT a.samsam_member_id AS owner_id "
+        "SELECT a.samsam_member_id AS owner_id, r.last_message_time "
         "FROM samsam_chat_rooms r JOIN samsam_accounts a ON a.id = r.account_id "
         "WHERE r.id=%s AND a.member_id=%s", (room_id, u["id"])).fetchone()
     if not owner:
@@ -649,8 +655,42 @@ def chat_api_messages(room_id):
     rows = conn.execute(
         "SELECT msg_key, sender, receiver, message, message_type, message_time, title "
         "FROM samsam_chat_messages WHERE room_id=%s ORDER BY message_time ASC", (room_id,)).fetchall()
+    pending = conn.execute(
+        "SELECT id, message, status, created_at FROM samsam_chat_outbox "
+        "WHERE room_id=%s AND status='pending' ORDER BY id ASC", (room_id,)).fetchall()
+    # 방을 열람했으니 지금까지의 메시지는 읽음 처리(미확인 배지 해제).
+    conn.execute("UPDATE samsam_chat_rooms SET last_read_at=%s WHERE id=%s",
+                 (owner["last_message_time"], room_id))
+    conn.commit()
     conn.close()
-    return jsonify({"owner_id": owner["owner_id"], "messages": [dict(r) for r in rows]})
+    return jsonify({"owner_id": owner["owner_id"], "messages": [dict(r) for r in rows],
+                    "pending": [dict(r) for r in pending]})
+
+
+@app.route("/chat/api/rooms/<int:room_id>/send", methods=["POST"])
+def chat_api_send_message(room_id):
+    """답장 큐잉 — 삼삼 쓰기는 브라우저 UI 조작(Playwright)으로만 가능해 여기선 큐잉만 하고,
+    GH Actions(samsam-chat-poll.yml)가 실제 발송을 처리한다(연결 계정 즉시 로그인과 동일 구조)."""
+    u = current_user()
+    data = request.get_json(force=True) or {}
+    message = (data.get("message") or "").strip()
+    if not message:
+        return jsonify({"error": "메시지를 입력해주세요."}), 400
+    conn = db.connect()
+    owner = conn.execute(
+        "SELECT r.id FROM samsam_chat_rooms r JOIN samsam_accounts a ON a.id = r.account_id "
+        "WHERE r.id=%s AND a.member_id=%s", (room_id, u["id"])).fetchone()
+    if not owner:
+        conn.close()
+        return jsonify({"error": "not found"}), 404
+    conn.execute(
+        "INSERT INTO samsam_chat_outbox (room_id, message, status, created_at) "
+        "VALUES (%s,%s,'pending',%s)",
+        (room_id, message, datetime.now().isoformat(timespec="seconds")))
+    conn.commit()
+    conn.close()
+    _trigger_chat_poll_workflow()
+    return jsonify({"ok": True})
 
 
 if __name__ == "__main__":
