@@ -17,7 +17,7 @@
 필요 환경변수 (.env):
   DATABASE_URL, SAMSAM_EMAIL, SAMSAM_PASSWORD
 """
-import argparse, getpass, json, os, re, sys, time
+import argparse, getpass, json, os, re, sys, threading, time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta
@@ -52,7 +52,33 @@ METRO_SIDO = {'서울특별시', '경기도', '인천광역시'}  # 수도권만
 # 기존 매물 예약률 갱신 동시 요청 수. 서버 차단이 의심되면 env(SAMSAM_REFRESH_WORKERS)로 낮춰 재실험.
 REFRESH_WORKERS = int(os.environ.get('SAMSAM_REFRESH_WORKERS', '2'))
 REFRESH_CHUNK = 2000      # 이 건수마다 세션(로그인)을 새로 고침
+
+# ── 레이트리밋 대응 ─────────────────────────────────────────────────────────────
+# 33m2 스케줄 API는 IP당 짧은 창에서 ~100요청을 넘기면 429로 막고 한동안 안 풀린다.
+# 그래서 (1) 하루에 stalest N건만 갱신하는 '로테이션', (2) 429 시 대기·재시도 '백오프',
+# (3) 여러 러너 IP로 '샤딩'해 수평 분할한다.
+#   - SAMSAM_REFRESH_DAILY_LIMIT: 이번 실행에서 갱신할 최대 매물 수(가장 오래된 것부터). 0=제한없음.
+#   - SAMSAM_SHARD='i/N': room_id % N == i 인 매물만 담당(러너별로 다른 IP). 미설정=전체.
+#   - SAMSAM_RL_COOLDOWN: 429가 연속으로 누적될 때 쉬는 시간(초). 회복시간에 맞춰 조정.
+REFRESH_DAILY_LIMIT = int(os.environ.get('SAMSAM_REFRESH_DAILY_LIMIT', '0'))
+# 실측: ~100요청 소진 시 429, 때리기 멈추면 ~15초 내 회복. 안전하게 20초 쿨다운.
+RL_COOLDOWN = int(os.environ.get('SAMSAM_RL_COOLDOWN', '20'))    # 429 시 전 워커 공통 대기(초)
+RL_RETRY = int(os.environ.get('SAMSAM_RL_RETRY', '6'))           # 429 요청당 재시도 횟수
 EARLY_CHECK = 200         # 예약률 갱신 초반 이 건수까지 데이터 0이면 차단으로 보고 조기 중단
+
+
+def _parse_shard():
+    """SAMSAM_SHARD='i/N' → (i, N). 미설정/형식오류면 (0, 1)=전체."""
+    raw = os.environ.get('SAMSAM_SHARD', '').strip()
+    if '/' in raw:
+        try:
+            i, n = raw.split('/', 1)
+            i, n = int(i), int(n)
+            if n >= 1 and 0 <= i < n:
+                return i, n
+        except ValueError:
+            pass
+    return 0, 1
 
 TODAY = date.today()
 D30 = TODAY + timedelta(days=30)
@@ -207,44 +233,76 @@ def _make_session(cookies):
     return s
 
 
+# ── 레이트리밋 게이트 ────────────────────────────────────────────────────────────
+# 429는 IP 전역(rolling window)이라 워커마다 따로 재시도하면 계속 때려서 회복이 안 된다.
+# 그래서 공유 '재개 시각(resume_at)'을 둬, 한 워커가 429를 만나면 모든 워커가 그 시각까지
+# 함께 멈췄다가(때리기 중단→창 회복) 재개한다.
+_rl_lock = threading.Lock()
+_rl_resume_at = 0.0
+
+
+def _rl_wait():
+    """재개 시각까지 대기(전 워커 공통). 쿨다운 중이면 그만큼 잔다."""
+    while True:
+        with _rl_lock:
+            wait = _rl_resume_at - time.time()
+        if wait <= 0:
+            return
+        time.sleep(min(wait, 3))
+
+
+def _rl_trip(cooldown):
+    """429를 만난 워커가 호출 — 모든 워커의 재개 시각을 now+cooldown 이후로 민다."""
+    global _rl_resume_at
+    with _rl_lock:
+        _rl_resume_at = max(_rl_resume_at, time.time() + cooldown)
+
+
 # ── API 호출 ───────────────────────────────────────────────────────────────────
 def _get(session, url, params=None, stats=None):
-    """GET 요청 — 403이면 BLOCK_WAIT 후 1회 재시도, 실패 시 None 반환.
+    """GET 요청 — 403은 BLOCK_WAIT, 429는 공유 쿨다운 후 재시도. 최종 실패 시 None.
 
     stats(dict)를 주면 응답 결과를 분류해 카운트한다(진단용):
-      'ok'(200+SCSS_001) / 'http_<code>' / 'code_<code>' / 'nojson' / 'exc'.
+      'ok'(200+SCSS_001) / 'http_<code>' / 'code_<code>' / 'nojson' / 'exc' / '429_retry'.
     이렇게 남겨야 "성공했지만 예약 0"과 "차단/에러로 빈값"을 사후에 구분할 수 있다.
     """
     def _rec(k):
         if stats is not None:
-            stats[k] = stats.get(k, 0) + 1
+            with _rl_lock:
+                stats[k] = stats.get(k, 0) + 1
 
-    try:
-        r = session.get(url, params=params, timeout=15)
-    except Exception:
-        _rec('exc')
-        return None
-    if r.status_code == 403:
-        log(f"403 차단, {BLOCK_WAIT}s 대기")
-        _rec('403_retry')
-        time.sleep(BLOCK_WAIT)
+    for attempt in range(RL_RETRY + 1):
+        _rl_wait()   # 쿨다운 중이면 대기 후 요청
         try:
             r = session.get(url, params=params, timeout=15)
         except Exception:
             _rec('exc')
             return None
-    if r.status_code != 200:
-        _rec(f'http_{r.status_code}')
+        if r.status_code == 403:
+            _rec('403_retry')
+            time.sleep(BLOCK_WAIT)
+            continue
+        if r.status_code == 429:
+            # 레이트리밋: 전 워커 공통 쿨다운 후 재시도(마지막 시도면 포기).
+            _rec('http_429')
+            if attempt < RL_RETRY:
+                _rl_trip(RL_COOLDOWN)
+                _rl_wait()
+                continue
+            return None
+        if r.status_code != 200:
+            _rec(f'http_{r.status_code}')
+            return None
+        try:
+            d = r.json()
+        except Exception:
+            _rec('nojson')
+            return None
+        if d.get('code') == 'SCSS_001':
+            _rec('ok')
+            return d
+        _rec(f'code_{d.get("code")}')
         return None
-    try:
-        d = r.json()
-    except Exception:
-        _rec('nojson')
-        return None
-    if d.get('code') == 'SCSS_001':
-        _rec('ok')
-        return d
-    _rec(f'code_{d.get("code")}')
     return None
 
 
@@ -451,11 +509,13 @@ def main():
 
     conn = db.connect()
 
-    # 이미 적재된 room_id
+    # 이미 적재된 room_id + 마지막 갱신 시각(로테이션에 사용)
     done = set()
+    coll = {}   # room_id → collected_at (오래된 것부터 갱신하기 위한 정렬 키)
     if not args.redo:
-        rows = conn.execute('SELECT room_id FROM samsam_listings').fetchall()
-        done = {r[0] for r in rows}
+        rows = conn.execute('SELECT room_id, collected_at FROM samsam_listings').fetchall()
+        for r in rows:
+            done.add(r[0]); coll[r[0]] = r[1] or ''
         log(f"기존 적재: {len(done)}건 skip")
 
     log("매물 목록 수집 중...")
@@ -482,6 +542,18 @@ def main():
     log(f"수집 대상: {len(targets)}건 (전체 {len(rids)}건)")
     if args.limit:
         log(f"--limit {args.limit} (적재 목표 건수)")
+
+    # ── 샤딩 + 로테이션: 러너 IP별로 나누고, 가장 오래된 것부터 하루치만 갱신 ──────────
+    shard_i, shard_n = _parse_shard()
+    if shard_n > 1:
+        before = len(refresh_targets)
+        refresh_targets = [rid for rid in refresh_targets if rid % shard_n == shard_i]
+        log(f"샤드 {shard_i}/{shard_n}: 예약률 갱신 대상 {before} → {len(refresh_targets)}건")
+    # 오래된(stale) 순으로 정렬 → 매일 실행하면 자연스럽게 전체를 로테이션.
+    refresh_targets.sort(key=lambda rid: coll.get(rid, ''))
+    if REFRESH_DAILY_LIMIT and len(refresh_targets) > REFRESH_DAILY_LIMIT:
+        log(f"로테이션: 오래된 순 {REFRESH_DAILY_LIMIT}건만 갱신(전체 {len(refresh_targets)}건, 나머지는 다음 실행)")
+        refresh_targets = refresh_targets[:REFRESH_DAILY_LIMIT]
 
     batch, ok, fail = [], 0, 0
     for i, (rid, room) in enumerate(targets, 1):
@@ -566,19 +638,22 @@ def main():
                     if checkpoint_passed and len(buf) >= BATCH:
                         _flush()   # 체크포인트 통과 후: 실시간 증분 커밋
 
-                # 체크포인트 판정: 초반 EARLY_CHECK건에서 데이터가 하나도 없으면 차단으로 보고 중단.
-                # (실 API는 ~80%가 데이터를 주므로 0은 곧 차단.) 통과하면 버퍼를 즉시 커밋.
-                if not checkpoint_passed and processed >= EARLY_CHECK:
-                    if with_data == 0:
+                # 체크포인트 판정:
+                #   - 데이터가 조금이라도 확인되면(차단 아님) 바로 통과 → 실시간 증분 커밋 시작.
+                #     (로테이션으로 배치가 작을 때도 실시간 반영되게 하려고 EARLY_CHECK를 안 기다림.)
+                #   - 초반 EARLY_CHECK건까지 데이터 0이면 차단으로 보고 중단(0 오염 방지).
+                if not checkpoint_passed:
+                    if with_data >= 5:
+                        checkpoint_passed = True
+                        _flush()
+                        log(f"체크포인트 통과({processed}건, 데이터有 {with_data}) — 실시간 증분 커밋 시작.")
+                    elif processed >= EARLY_CHECK and with_data == 0:
                         log(f"★ 조기 중단: 처음 {processed}건 중 데이터 수신 0건 "
                             f"(성공 {len(buf)} 실패 {failed}) | HTTP {stats} — 차단 판단, DB 미반영 종료.")
                         rate_limited = True
                         break
-                    checkpoint_passed = True
-                    _flush()
-                    log(f"체크포인트 통과({processed}건, 데이터有 {with_data}) — 이후 실시간 증분 커밋 시작.")
 
-                if processed % 500 == 0:
+                if processed % 50 == 0:
                     log(f"[예약률 갱신 {processed}/{len(refresh_targets)}] "
                         f"DB반영 {refreshed}+버퍼 {len(buf)}(데이터有 {with_data}) 실패 {failed} | HTTP {stats}")
 
