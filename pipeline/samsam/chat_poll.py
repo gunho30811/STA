@@ -112,6 +112,11 @@ def poll_account(conn, acct):
         if not acct['password_enc']:
             _mark_status(conn, acct_id, 'reauth_needed', '저장된 비밀번호 없음 — 재연결 필요')
             return
+        if not chat_auth.playwright_available():
+            # Vercel(1분 cron)처럼 브라우저 자동화가 없는 환경 — 여기서 시도하면 항상 실패해
+            # 상태를 잘못 덮어쓴다. 그냥 스킵하고 GH Actions(Playwright 설치됨, 10분 주기)에 맡긴다.
+            log(f"  계정#{acct_id} 로그인 필요하지만 이 환경엔 Playwright 없음 — 스킵")
+            return
         try:
             password = crypto_util.decrypt(acct['password_enc'])
             tok = chat_auth.login_and_get_refresh_token(acct['samsam_email'], password)

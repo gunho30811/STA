@@ -23,6 +23,16 @@ class LoginError(Exception):
     pass
 
 
+def playwright_available():
+    """로그인(브라우저 자동화)이 가능한 환경인지. Vercel 등 서버리스엔 Playwright가 없음 —
+    폴러가 로그인을 시도해서 상태를 잘못된 'reauth_needed'로 덮어쓰지 않도록 사전 체크용."""
+    try:
+        import playwright  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
 def _member_id_from_id_token(id_token):
     """idToken(JWT) payload에서 user_id(=삼삼 member_id) 추출. 서명 검증 없음(신뢰 응답 파싱용)."""
     payload_b64 = id_token.split('.')[1]
