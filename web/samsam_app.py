@@ -195,6 +195,7 @@ def _load_matches():
                 "nMgmt": num(r.get("네이버관리비_만원")),
                 "nDep": num(r.get("네이버보증금_만원")),
                 "nEquiv": num(r.get("네이버환산월세_만원")),
+                "nUrl": (r.get("네이버링크") or "").strip(),
             }
     return out
 
@@ -226,12 +227,22 @@ def net_at_deposit(rid, dep, fixed=0.0):
     return c["net"] if c else None
 
 
+def _city(sigungu):
+    """시군구 표기를 시 단위로 정규화 — 수집 소스에 따라 같은 도시가 '부천시'(구 없이)와
+    '부천시 원미구'(구 포함) 두 가지 문자열로 갈라져 필터에 중복으로 뜨는 문제를 막는다.
+    '강남구'처럼 애초에 한 토큰인 서울/인천 구는 그대로 유지된다."""
+    return (sigungu or "").split(" ")[0]
+
+
 def _filtered(a):
     rows = L()
-    for key in ("sido", "sigungu", "dong", "building_type"):
+    for key in ("sido", "dong", "building_type"):
         v = a.get(key)
         if v:
             rows = [r for r in rows if r.get(key) == v]
+    sigungu = a.get("sigungu")
+    if sigungu:
+        rows = [r for r in rows if _city(r.get("sigungu")) == sigungu]
 
     def rng(field, lo, hi, scale=1.0):
         nonlocal rows
@@ -297,7 +308,7 @@ def api_facets():
     sidos = sorted({r["sido"] for r in L() if r.get("sido")})
     tree = {}
     for r in L():
-        tree.setdefault(r.get("sido", ""), {}).setdefault(r.get("sigungu", ""), set()).add(r.get("dong", ""))
+        tree.setdefault(r.get("sido", ""), {}).setdefault(_city(r.get("sigungu")), set()).add(r.get("dong", ""))
     tree = {s: {g: sorted(d) for g, d in gg.items()} for s, gg in tree.items()}
     btypes = sorted({r["building_type"] for r in L() if r.get("building_type")})
     opts = [{"code": c, "name": ko(c)} for c in sorted({o for r in L() for o in r["options"]})]
@@ -406,6 +417,14 @@ def api_buildings():
         fixed = float(a.get("fixed", 0) or 0)          # 고정비(통신비·청소비 등, 만원/월)
     except ValueError:
         fixed = 0.0
+    try:
+        occ_min_filter = float(a["occ_min_filter"]) if a.get("occ_min_filter") else None
+    except ValueError:
+        occ_min_filter = None
+    try:
+        net_min_filter = float(a["net_min_filter"]) if a.get("net_min_filter") else None
+    except ValueError:
+        net_min_filter = None
     by = {}
     for r in rows:
         bn = (r.get("building_name") or "").strip()
@@ -422,6 +441,8 @@ def api_buildings():
         calcs = [calc_at_deposit(x["room_id"], dep, fixed) for x in xs]
         calcs = [c for c in calcs if c is not None]
         avg = (lambda key: round(statistics.mean(c[key] for c in calcs), 1)) if calcs else (lambda key: None)
+        # 링크용 대표 매물: 네이버 매칭이 있는 방을 우선(부동산링크까지 같이 나오게), 없으면 그냥 첫 방.
+        sample = next((x for x in xs if M().get(x["room_id"], {}).get("nUrl")), xs[0])
         out.append({
             "building": bn, "sigungu": sg, "dong": dong,
             "btype": xs[0].get("building_type", ""),
@@ -438,7 +459,13 @@ def api_buildings():
                    "dep": dep, "fixed": fixed} if calcs else None,
             "station": next((x["station"] for x in xs if x.get("station")), ""),
             "room_ids": [x["room_id"] for x in xs],
+            "sam_url": sample.get("url", "") or "",
+            "naver_url": M().get(sample["room_id"], {}).get("nUrl", "") or "",
         })
+    if occ_min_filter is not None:
+        out = [r for r in out if r["occ_min"] >= occ_min_filter]
+    if net_min_filter is not None:
+        out = [r for r in out if r["net_avg"] is not None and r["net_avg"] >= net_min_filter]
     # 평균예약률 높고 매물 많은 순. (최저예약률도 높으면 전 호실 검증된 건물)
     out.sort(key=lambda r: (-r["occ_avg"], -r["n"]))
     return jsonify({"total": len(out), "items": out})
