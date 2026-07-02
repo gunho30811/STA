@@ -44,28 +44,44 @@ def _mark_status(conn, acct_id, status, error):
     conn.commit()
 
 
-def _upsert_room(conn, acct_id, room_key, room):
+def _upsert_room(conn, acct_id, room_key, room, nickname):
     row = conn.execute(
         """INSERT INTO samsam_chat_rooms
            (account_id, samsam_room_key, room_name, host_or_guest, counterpart_member,
-            contract_status, chat_room_status, start_date, end_date, last_message,
-            last_message_time, updated_at)
-           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            counterpart_nickname, contract_status, chat_room_status, start_date, end_date,
+            last_message, last_message_time, updated_at)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
            ON CONFLICT (account_id, samsam_room_key) DO UPDATE SET
              room_name=EXCLUDED.room_name, host_or_guest=EXCLUDED.host_or_guest,
              counterpart_member=EXCLUDED.counterpart_member,
+             counterpart_nickname=EXCLUDED.counterpart_nickname,
              contract_status=EXCLUDED.contract_status, chat_room_status=EXCLUDED.chat_room_status,
              start_date=EXCLUDED.start_date, end_date=EXCLUDED.end_date,
              last_message=EXCLUDED.last_message, last_message_time=EXCLUDED.last_message_time,
              updated_at=EXCLUDED.updated_at
            RETURNING id""",
         (acct_id, str(room_key), room.get('room_name'), room.get('host_or_guest'),
-         str(room.get('member') or ''), room.get('contract_status'), room.get('chat_room_status'),
-         room.get('start_date'), room.get('end_date'), room.get('last_message'),
-         room.get('last_message_time'), _now()),
+         str(room.get('member') or ''), nickname, room.get('contract_status'),
+         room.get('chat_room_status'), room.get('start_date'), room.get('end_date'),
+         room.get('last_message'), room.get('last_message_time'), _now()),
     ).fetchone()
     conn.commit()
     return row[0]
+
+
+def _get_nickname(id_token, member_id, cache):
+    """RTDB live/users/{id}에서 닉네임 조회. 순수 HTTP라 Vercel 1분 cron에서도 바로 동작.
+    같은 계정 폴링 1회 안에서 상대가 겹칠 수 있어 cache로 중복 조회 방지."""
+    if member_id in cache:
+        return cache[member_id]
+    nickname = None
+    try:
+        user = chat_auth.rtdb_get(f'live/users/{member_id}', id_token) or {}
+        nickname = user.get('nickname')
+    except Exception as e:
+        log(f"    상대(member {member_id}) 닉네임 조회 실패: {repr(e)[:80]}")
+    cache[member_id] = nickname
+    return nickname
 
 
 def _poll_messages(conn, room_id, room_key, id_token):
@@ -137,8 +153,13 @@ def poll_account(conn, acct):
 
     # 임대인(host) 모드 채팅만 저장 — 이 계정이 게스트로 예약한 방(임차인 채팅)은 제외.
     host_rooms = {k: r for k, r in chatlist.items() if r.get('host_or_guest') == 'host'}
+    nickname_cache = {}
     for room_key, room in host_rooms.items():
-        room_id = _upsert_room(conn, acct_id, room_key, room)
+        nickname = None
+        counterpart = room.get('member')
+        if counterpart:
+            nickname = _get_nickname(id_token, counterpart, nickname_cache)
+        room_id = _upsert_room(conn, acct_id, room_key, room, nickname)
         _poll_messages(conn, room_id, room_key, id_token)
 
     conn.execute(

@@ -447,6 +447,8 @@ def init_db(force=False):
     conn.execute("ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS host_or_guest TEXT")
     # 마지막으로 이 방을 읽은 시점(last_message_time과 같은 epoch ms) — 미확인 방 표시용.
     conn.execute("ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS last_read_at BIGINT")
+    # 상대방(counterpart_member) 닉네임 — RTDB live/users/{id}에서 조회해 채팅 목록에 표시.
+    conn.execute("ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS counterpart_nickname TEXT")
     # 채팅방별 메시지(RTDB live/messagelist/{room_key}).
     conn.execute("""
     CREATE TABLE IF NOT EXISTS samsam_chat_messages (

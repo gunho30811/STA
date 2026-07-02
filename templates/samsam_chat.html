@@ -56,6 +56,8 @@
   .sendbar.on{display:flex}
   .sendbar textarea{flex:1;resize:none;border:1px solid #d1d5db;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;height:38px}
   .threadwrap{display:flex;flex-direction:column;flex:1;min-width:0}
+  .threadhdr{padding:8px 12px;border:1px solid #e5e7eb;border-bottom:none;border-radius:10px 10px 0 0;background:#f8fafc;font-weight:800;font-size:13.5px}
+  .threadhdr .sub{font-weight:400;color:#6b7280;font-size:11.5px;margin-left:6px}
   @media(max-width:720px){
     .md{flex-direction:column}
     .roomlist{width:100%;max-height:240px}
@@ -92,6 +94,7 @@
     <div class="md">
       <div class="roomlist" id="roomlist"></div>
       <div class="threadwrap">
+        <div class="threadhdr" id="threadhdr" style="display:none"></div>
         <div class="thread" id="thread"><div class="empty">왼쪽에서 채팅방을 선택하세요</div></div>
         <div class="sendbar" id="sendbar">
           <textarea id="sendInput" placeholder="답장을 입력해 주세요"></textarea>
@@ -105,6 +108,7 @@
 <script>
 const $=s=>document.querySelector(s);
 let curRoom=null;
+let roomsById={};
 
 function fmtTime(ms){
   if(!ms) return '';
@@ -139,8 +143,9 @@ async function loadAccounts(){
 function roomRow(r){
   const el=document.createElement('div');
   el.className='room'+(curRoom===r.id?' on':'');
+  const name = r.counterpart_nickname || r.room_name || '(이름없음)';
   el.innerHTML = `
-    <div class="rn"><span>${r.unread?'<span class="dot"></span>':''}${r.room_name||'(이름없음)'}</span><span class="lbl">${r.label||r.samsam_email}</span></div>
+    <div class="rn"><span>${r.unread?'<span class="dot"></span>':''}${name}</span><span class="lbl">${r.label||r.samsam_email}</span></div>
     <div class="last">${(r.last_message||'').replace(/\\n/g,' ')}</div>
     <div class="time">${fmtTime(r.last_message_time)}</div>
   `;
@@ -150,6 +155,7 @@ function roomRow(r){
 
 async function loadRooms(){
   const rows=await (await fetch('api/rooms')).json();
+  roomsById = Object.fromEntries(rows.map(r=>[r.id, r]));
   const box=$('#roomlist');
   if(!rows.length){ box.innerHTML='<div class="empty">아직 채팅방이 없습니다</div>'; return; }
   const unread = rows.filter(r=>r.unread), rest = rows.filter(r=>!r.unread);
@@ -169,7 +175,14 @@ async function loadRooms(){
 async function openRoom(id){
   curRoom=id;
   document.querySelectorAll('.room').forEach(el=>el.classList.remove('on'));
-  loadRooms();
+  await loadRooms();
+  const info = roomsById[id];
+  const hdr=$('#threadhdr');
+  if(info){
+    const name = info.counterpart_nickname || info.room_name || '(이름없음)';
+    hdr.innerHTML = `${name}${info.room_name && info.counterpart_nickname ? `<span class="sub">${info.room_name}</span>` : ''}`;
+    hdr.style.display='';
+  }
   const res=await (await fetch(`api/rooms/${id}/messages`)).json();
   const box=$('#thread');
   if(res.error){ box.innerHTML='<div class="empty">불러오기 실패</div>'; return; }
