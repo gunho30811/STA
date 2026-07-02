@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<title>네이버 오피스텔 월세 검색 (서울·경기·인천)</title>
+<title>부동산 오피스텔 월세 검색 (서울·경기·인천)</title>
 <style>
   * { box-sizing: border-box; }
   body { margin:0; font-family:"Malgun Gothic","맑은 고딕",sans-serif; background:#f4f6f8; color:#222; }
@@ -54,7 +54,7 @@
 </head>
 <body>
 <header>
-  <h1>🏢 네이버 오피스텔 월세 검색</h1>
+  <h1>🏢 부동산 오피스텔 월세 검색</h1>
   <span class="sub">서울 · 경기 · 인천 / <span id="stat"></span></span>
 </header>
 
@@ -184,7 +184,7 @@ function render(r){
         <div class="meta">${fmtArea(x.area_real_m2)} · ${x.floorinfo||'-'}층 · ${x.direction||'-'}</div>
         <div class="ft">${x.featuredesc||x.tags||''}</div>
         <div class="meta" style="color:#999">확인 ${x.confirmymd||'-'} · ${x.realtorname||x.cpname||''}</div>
-        <a class="link" href="${x.articleurl}" target="_blank">네이버에서 보기 →</a>
+        <a class="link" href="${x.articleurl}" target="_blank">부동산에서 보기 →</a>
       </div>`;
     g.appendChild(card);
   });

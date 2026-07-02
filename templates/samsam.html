@@ -145,8 +145,8 @@
         <b>최저예약률</b> <input type="number" id="b-occmin" placeholder="예: 50" style="width:60px" onchange="loadBuildings()"> % 이상 ·
         <b>월순수익</b> <input type="number" id="b-netmin" placeholder="예: 0" style="width:60px" onchange="loadBuildings()"> 만원 이상 ·
         <b>손익분기점</b> <input type="number" id="b-bemax" placeholder="예: 3" style="width:55px" onchange="loadBuildings()"> 주 이하 ·<br>
-        월순수익=삼삼월매출−네이버월세@보증금−관리비−고정비 (셀에 마우스 올리면 분해) ·
-        <b>손익분기점(주)</b>=(네이버월세@보증금+관리비)÷삼삼주당 → <b>작을수록 회수 빠름(좋음)</b> · 헤더 클릭 정렬.
+        월순수익=삼삼월매출−부동산월세@보증금−관리비−고정비 (셀에 마우스 올리면 분해) ·
+        <b>손익분기점(주)</b>=(부동산월세@보증금+관리비)÷삼삼주당 → <b>작을수록 회수 빠름(좋음)</b> · 헤더 클릭 정렬.
       </p>
       <div class="flex">
         <span class="mut" id="b-count" style="font-size:12px"></span>
@@ -470,7 +470,7 @@ function renderBuildings(){
     if(r.net_avg!=null){
       let tip='';
       if(r.bd){const b=r.bd;
-        tip=`삼삼 월매출 ${b.maxRev}\n− 네이버월세(보증금 ${b.dep}만 기준) ${b.rent}\n− 관리비 ${b.mgmt}`
+        tip=`삼삼 월매출 ${b.maxRev}\n− 부동산월세(보증금 ${b.dep}만 기준) ${b.rent}\n− 관리비 ${b.mgmt}`
           +(b.fixed?`\n− 고정비 ${b.fixed}`:'')+`\n= 월순수익 ${r.net_avg} 만원`;}
       netv=`<span class="${netc}" style="font-weight:800;cursor:help;border-bottom:1px dotted #94a3b8" title="${tip}">${r.net_avg}</span>`;
     }
@@ -480,7 +480,7 @@ function renderBuildings(){
       const bc=r.breakeven<=3?'good':(r.breakeven>6?'bad':'');
       let btip='';
       if(r.bd){const b=r.bd;
-        btip=`(네이버월세 ${b.rent} + 관리비 ${b.mgmt}) ÷ 주당 ${r.week_avg}\n= ${r.breakeven}주면 월 고정비용 회수`;}
+        btip=`(부동산월세 ${b.rent} + 관리비 ${b.mgmt}) ÷ 주당 ${r.week_avg}\n= ${r.breakeven}주면 월 고정비용 회수`;}
       bev=`<span class="${bc}" style="font-weight:800;cursor:help;border-bottom:1px dotted #94a3b8" title="${btip}">${r.breakeven}주</span>`;
     }
     const links=(r.sam_url?`<a class="lnk" href="${r.sam_url}" target="_blank">삼삼 예시</a>`:'')
