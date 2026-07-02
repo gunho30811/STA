@@ -477,7 +477,8 @@ def init_auth(app):
     @app.before_request
     def _guard():
         ep = request.endpoint or ""
-        if ep.startswith("auth.") or ep == "static":
+        # chat_api_cron_poll: 외부 크론 서비스가 세션 없이 호출 — 자체 CRON_SECRET 검증으로 대체 보호.
+        if ep.startswith("auth.") or ep == "static" or ep == "chat_api_cron_poll":
             return None
         if not session.get("uid"):
             return redirect(url_for("auth.login", next=request.path))

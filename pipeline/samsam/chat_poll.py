@@ -145,17 +145,22 @@ def poll_account(conn, acct):
         f"임대인 채팅방 {len(host_rooms)}개 갱신(전체 {len(chatlist)}개 중 게스트모드 제외)")
 
 
-def main():
-    db.init_db()
-    conn = db.connect()
+def poll_all(conn):
+    """연결된(비활성 아닌) 전체 계정을 폴링. GH Actions(main)와 Vercel cron 엔드포인트가 공용으로 씀."""
     accounts = conn.execute(
         "SELECT id, member_id, samsam_email, label, password_enc, refresh_token_enc, "
         "samsam_member_id FROM samsam_accounts WHERE status != 'disabled'").fetchall()
-    log(f"연결된 삼삼 계정 {len(accounts)}개 폴링 시작")
     for acct in accounts:
         poll_account(conn, dict(acct))
+    return len(accounts)
+
+
+def main():
+    db.init_db()
+    conn = db.connect()
+    n = poll_all(conn)
     conn.close()
-    log("완료")
+    log(f"완료 — 연결된 삼삼 계정 {n}개 폴링")
 
 
 if __name__ == '__main__':

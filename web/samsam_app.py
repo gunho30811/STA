@@ -13,6 +13,7 @@
   가용일 = 30 − 막힘일(blocked_days_1m)
   예약률 = booked_days_1m / 가용일,  공실률 = 1 − 예약률
 """
+import hmac
 import json
 import os
 import statistics
@@ -575,6 +576,24 @@ def chat_api_poll():
         chat_poll.poll_account(conn, dict(acct))
     conn.close()
     return jsonify({"ok": True, "polled": len(accounts)})
+
+
+@app.route("/chat/api/cron-poll", methods=["GET", "POST"])
+def chat_api_cron_poll():
+    """외부 무료 크론 서비스(예: cron-job.org)가 1분마다 호출 — 전체 계정 폴링.
+
+    순수 HTTP(토큰 갱신 + RTDB 조회)라 Vercel에서도 바로 돌아간다. 로그인/재로그인은
+    Playwright가 필요해 여기선 항상 실패(reauth_needed로 표시)하고, 그건 GH Actions
+    쪽 10분 스케줄(samsam-chat-poll.yml)이 대신 처리한다.
+    """
+    secret = os.environ.get("CRON_SECRET")
+    key = request.args.get("key", "")
+    if not secret or not hmac.compare_digest(key, secret):
+        return jsonify({"error": "unauthorized"}), 403
+    conn = db.connect()
+    n = chat_poll.poll_all(conn)
+    conn.close()
+    return jsonify({"ok": True, "polled": n})
 
 
 @app.route("/chat/api/rooms")
