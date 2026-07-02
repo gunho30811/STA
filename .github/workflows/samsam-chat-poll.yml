@@ -1,0 +1,39 @@
+name: 삼삼엠투 통합채팅 폴링 (10분마다)
+
+on:
+  schedule:
+    # 매 10분. 채팅 인박스 신규 메시지 반영 지연을 짧게 유지.
+    - cron: '*/10 * * * *'
+  workflow_dispatch:        # 수동 실행 가능
+
+permissions:
+  contents: read       # DB에만 쓰고 이 저장소에 커밋할 파일 없음
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CHAT_ENC_KEY: ${{ secrets.CHAT_ENC_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python 설치
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 의존성 설치
+        run: pip install flask psycopg2-binary python-dotenv playwright requests cryptography
+
+      - name: Playwright Chromium 설치
+        # refreshToken 만료로 재로그인이 필요한 계정이 있을 때만 실제로 쓰임(chat_auth.py는 지연 import).
+        run: python -m playwright install chromium --with-deps
+
+      - name: 연결된 계정 채팅 폴링
+        run: python pipeline/samsam/chat_poll.py

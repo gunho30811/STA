@@ -25,6 +25,7 @@
   .status.ok{background:#064e3b;color:#6ee7b7}
   .status.reauth_needed{background:#7c2d12;color:#fed7aa}
   .status.error{background:#7c2d12;color:#fed7aa}
+  .status.pending_login{background:#1e3a5f;color:#93c5fd}
   .acct .del{position:absolute;top:8px;right:8px;background:none;border:none;color:#9ca3af;cursor:pointer;font-size:12px}
   .addform{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;border-top:1px dashed #e5e7eb;padding-top:12px}
   .fg{display:flex;flex-direction:column;gap:4px}
@@ -109,7 +110,7 @@ async function loadAccounts(){
       <button class="del" data-id="${a.id}" title="연결 해제">✕</button>
       <div class="label">${a.label||a.samsam_email}</div>
       <div class="email">${a.samsam_email}</div>
-      <span class="status ${a.status}">${a.status==='ok'?'정상':a.status==='reauth_needed'?'재연결 필요':'오류'}</span>
+      <span class="status ${a.status}">${a.status==='ok'?'정상':a.status==='pending_login'?'연결 처리 중':a.status==='reauth_needed'?'재연결 필요':'오류'}</span>
     `;
     box.appendChild(el);
   }
@@ -169,7 +170,8 @@ $('#addBtn').onclick=async()=>{
     const d=await r.json();
     if(!r.ok){ msgEl.textContent=d.error||'연결 실패'; msgEl.className='msg'; }
     else{
-      msgEl.textContent='연결되었습니다. 새로고침 버튼으로 채팅을 불러오세요.'; msgEl.className='msg ok';
+      msgEl.textContent = d.pending ? d.message : '연결되었습니다. 새로고침 버튼으로 채팅을 불러오세요.';
+      msgEl.className='msg ok';
       $('#fEmail').value=''; $('#fPw').value=''; $('#fLabel').value='';
       loadAccounts();
     }
