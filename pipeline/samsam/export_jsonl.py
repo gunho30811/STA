@@ -21,11 +21,15 @@ def dump(rows, path):
     print(f"  {len(rows)}건 → {path}")
 
 def main():
+    # ORDER BY로 줄 순서를 고정한다. 정렬이 없으면 export마다 행 순서가 뒤섞여 10MB 파일 전체가
+    # "바뀐 것"이 되어 git 히스토리가 통째로 불어난다. 순서를 고정하면 커밋 사이엔 바뀐 예약률
+    # 몇 줄만 diff → git 델타 압축으로 커밋당 증가분이 KB 수준 → 자주 커밋해도 repo가 거의 안 큰다.
     c = db.connect()
-    dump(c.execute(f"SELECT {COLS} FROM samsam_listings").fetchall(),
+    dump(c.execute(f"SELECT {COLS} FROM samsam_listings ORDER BY room_id").fetchall(),
          os.path.join(LAB, "samsam_listings.jsonl"))
     dump(c.execute("SELECT snapshot_date,sido,sigungu,dong,building_type,n,avg_occ_1m,avg_occ_3m,avg_week "
-                   "FROM samsam_snapshots").fetchall(),
+                   "FROM samsam_snapshots "
+                   "ORDER BY snapshot_date,sido,sigungu,dong,building_type").fetchall(),
          os.path.join(LAB, "samsam_snapshots.jsonl"))
     c.close()
 
