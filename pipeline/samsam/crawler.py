@@ -523,10 +523,24 @@ def main():
     # 이렇게 해야 "성공했지만 예약 0인 공실"은 0으로 기록하되, "차단/에러로 못 받은 건"은
     # 건너뛰어 기존 값을 덮어쓰지 않는다. 또 전면 실패(응답은 오는데 데이터가 전무 = 소프트차단)
     # 시엔 0으로 도배해 DB를 오염시키지 않도록 커밋 자체를 막고 실패로 끝낸다.
+    # 커밋 전략: 초반 EARLY_CHECK건까지는 버퍼에만 모아 두고 "차단 여부"를 먼저 판정한다.
+    #   - 데이터 수신 0 → 레이트리밋/차단으로 보고 버퍼를 버린 뒤 즉시 실패 종료(0 오염 방지).
+    #   - 데이터 확인됨 → 체크포인트 통과. 버퍼를 커밋하고, 이후로는 BATCH마다 증분 커밋한다.
+    # 증분 커밋 덕에 실행 중에도 DB가 실시간으로 채워져(SELECT로 진행 관찰 가능) 크래시에도 안전하다.
+    # 체크포인트 통과 후 도중에 차단이 나도, 실패건(ok=False)은 커밋에서 빠지므로 기존 값이 보존된다.
     log(f"기존 매물(수도권) 예약률 갱신 대상: {len(refresh_targets)}건, 동시 요청 {REFRESH_WORKERS}개")
     stats = {}
-    pending, failed, with_data, processed = [], 0, 0, 0
+    buf, failed, with_data, processed, refreshed = [], 0, 0, 0, 0
+    checkpoint_passed = False
     rate_limited = False
+
+    def _flush():
+        nonlocal buf, refreshed
+        if buf:
+            update_schedules_batch(conn, buf)
+            refreshed += len(buf)
+            buf = []
+
     for start in range(0, len(refresh_targets), REFRESH_CHUNK):
         if rate_limited:
             break
@@ -545,55 +559,54 @@ def main():
                     bk2 = _count_status(schedules, TODAY, D60, BOOKED_STATUSES)
                     bk3 = _count_status(schedules, TODAY, D90, BOOKED_STATUSES)
                     bl1 = _count_status(schedules, TODAY, D30, BLOCKED_STATUSES)
-                    pending.append(
+                    buf.append(
                         (bk1, bk2, bk3, bl1, datetime.now().isoformat(timespec='seconds'), rid))
                     if schedules:
                         with_data += 1
+                    if checkpoint_passed and len(buf) >= BATCH:
+                        _flush()   # 체크포인트 통과 후: 실시간 증분 커밋
+
+                # 체크포인트 판정: 초반 EARLY_CHECK건에서 데이터가 하나도 없으면 차단으로 보고 중단.
+                # (실 API는 ~80%가 데이터를 주므로 0은 곧 차단.) 통과하면 버퍼를 즉시 커밋.
+                if not checkpoint_passed and processed >= EARLY_CHECK:
+                    if with_data == 0:
+                        log(f"★ 조기 중단: 처음 {processed}건 중 데이터 수신 0건 "
+                            f"(성공 {len(buf)} 실패 {failed}) | HTTP {stats} — 차단 판단, DB 미반영 종료.")
+                        rate_limited = True
+                        break
+                    checkpoint_passed = True
+                    _flush()
+                    log(f"체크포인트 통과({processed}건, 데이터有 {with_data}) — 이후 실시간 증분 커밋 시작.")
+
                 if processed % 500 == 0:
                     log(f"[예약률 갱신 {processed}/{len(refresh_targets)}] "
-                        f"성공 {len(pending)}(데이터有 {with_data}) 실패 {failed} | HTTP {stats}")
-                # 조기 중단: 초반 EARLY_CHECK건에서 데이터 수신이 0이면(레이트리밋·차단)
-                # 3시간 헛돌지 않고 즉시 종료. 실 API는 ~80%가 데이터를 주므로 0은 곧 차단이다.
-                if processed >= EARLY_CHECK and with_data == 0:
-                    log(f"★ 조기 중단: 처음 {processed}건 중 데이터 수신 0건 "
-                        f"(성공 {len(pending)} 실패 {failed}) | HTTP {stats} — 차단 판단, 즉시 종료.")
-                    rate_limited = True
-                    break
+                        f"DB반영 {refreshed}+버퍼 {len(buf)}(데이터有 {with_data}) 실패 {failed} | HTTP {stats}")
 
         if not rate_limited and start + REFRESH_CHUNK < len(refresh_targets):
+            _flush()   # 세션 재로그인 전에 버퍼 비움(진행 보존)
             log("세션 갱신 중...")
             cookies = _get_cookies(email, pw)
             session = _make_session(cookies)
 
-    ok_cnt = len(pending)
-    log(f"예약률 갱신 집계: 성공 {ok_cnt}건(데이터有 {with_data}, 공실 {ok_cnt - with_data}) "
+    # ── 종료 처리 ────────────────────────────────────────────────────
+    if rate_limited:
+        conn.close()
+        log(f"완료(실패). 신규 적재 {ok}건, 예약률 갱신 중단 — DB반영 {refreshed}건 / 실패 {failed}건")
+        sys.exit(1)
+
+    # 체크포인트를 못 넘겼는데(대상이 EARLY_CHECK보다 적음) 데이터가 전무하면 오염 방지로 미반영.
+    if not checkpoint_passed and with_data == 0 and refresh_targets:
+        conn.close()
+        log(f"★ 예약데이터 수신 0건(대상 {len(refresh_targets)}건) — 차단 의심, DB 미반영 종료.")
+        log(f"  HTTP 응답 분포: {stats}")
+        sys.exit(1)
+
+    _flush()   # 남은 버퍼 커밋
+    conn.close()
+    log(f"예약률 갱신 집계: DB반영 {refreshed}건(데이터有 {with_data}, 공실 {refreshed - with_data}) "
         f"/ 실패 {failed}건 / 대상 {len(refresh_targets)}건")
     log(f"  HTTP 응답 분포: {stats}")
-
-    # ── 오염 방지 가드 ────────────────────────────────────────────────
-    # 응답은 왔는데(성공 다수) 데이터가 하나도 없으면 소프트차단(빈배열 위장)일 가능성이 크다.
-    # 이때 0으로 커밋하면 실제 예약/차단을 전부 0으로 밀어버리므로 커밋을 막고 실패로 끝낸다.
-    abort = False
-    if rate_limited:
-        log("★ 레이트리밋/차단으로 조기 중단됨 — DB 미반영, 실패 종료.")
-        abort = True
-    elif refresh_targets and ok_cnt == 0:
-        log("★ 전면 실패: 성공 응답 0건 — IP 차단/엔드포인트 이상 의심. DB 미반영, 실패 종료.")
-        abort = True
-    elif with_data == 0:
-        log("★ 소프트차단 의심: 예약데이터 수신 0건 — DB 오염 방지 위해 미반영, 실패 종료.")
-        abort = True
-
-    refreshed = 0
-    if not abort:
-        for s in range(0, len(pending), BATCH):
-            update_schedules_batch(conn, pending[s:s + BATCH])
-            refreshed += len(pending[s:s + BATCH])
-
-    conn.close()
     log(f"완료. 신규 적재 {ok}건 / 실패 {fail}건, 예약률 갱신(DB반영) {refreshed}건 / 실패 {failed}건")
-    if abort:
-        sys.exit(1)
 
 
 if __name__ == '__main__':
