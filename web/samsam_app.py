@@ -20,6 +20,7 @@ import statistics
 import sys
 from datetime import datetime
 
+import requests
 from flask import Flask, jsonify, render_template, request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -494,6 +495,29 @@ def api_trend():
     return jsonify({"dates": dates, "items": out})
 
 
+GH_REPO = "gunho30811/STA"
+GH_CHAT_POLL_WORKFLOW = "samsam-chat-poll.yml"
+
+
+def _trigger_chat_poll_workflow():
+    """계정 연결 직후 GH Actions 폴링 workflow(Playwright 있는 환경)를 즉시 트리거해
+    10분 스케줄을 기다리지 않고 곧바로 로그인을 처리하게 한다. 실패해도 조용히 무시 —
+    GH_DISPATCH_TOKEN 미설정이거나 API 호출이 실패해도 기존 10분 스케줄이 안전망으로 남는다."""
+    token = os.environ.get("GH_DISPATCH_TOKEN")
+    if not token:
+        return
+    try:
+        requests.post(
+            f"https://api.github.com/repos/{GH_REPO}/actions/workflows/"
+            f"{GH_CHAT_POLL_WORKFLOW}/dispatches",
+            json={"ref": "main"},
+            headers={"Authorization": f"Bearer {token}",
+                     "Accept": "application/vnd.github+json"},
+            timeout=8)
+    except Exception:
+        pass
+
+
 @app.route("/chat/")
 def chat_page():
     return render_template("samsam_chat.html")
@@ -535,8 +559,9 @@ def chat_api_add_account():
              datetime.now().isoformat(timespec="seconds")))
         conn.commit()
         conn.close()
+        _trigger_chat_poll_workflow()
         return jsonify({"ok": True, "pending": True,
-                         "message": "로그인 처리가 큐잉되었습니다. 10분 이내 자동 연결되니 잠시 후 새로고침해주세요."})
+                         "message": "로그인 처리 중입니다. 잠시 후(보통 1분 이내) 새로고침해주세요."})
     except Exception as e:
         return jsonify({"error": f"로그인 중 오류: {repr(e)[:120]}"}), 500
 
