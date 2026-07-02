@@ -20,6 +20,9 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       SAMSAM_EMAIL: ${{ secrets.SAMSAM_EMAIL }}
       SAMSAM_PASSWORD: ${{ secrets.SAMSAM_PASSWORD }}
+      # 예약률 갱신 동시 요청 수. 4병렬은 서버가 스케줄 API를 소프트차단(200+빈배열)하는 정황이라
+      # 2로 낮춤. 2병렬로도 막히면 1로 내리고 crawler.py의 REQ_SLEEP을 함께 조정한다.
+      SAMSAM_REFRESH_WORKERS: '2'
 
     steps:
       - name: Checkout

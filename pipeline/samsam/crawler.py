@@ -49,8 +49,10 @@ BATCH = 50
 REQ_SLEEP = 0.5
 BLOCK_WAIT = 120
 METRO_SIDO = {'서울특별시', '경기도', '인천광역시'}  # 수도권만 수집·갱신 (그 외 지역은 DB에 남아있어도 갱신 안 함)
-REFRESH_WORKERS = 4       # 기존 매물 예약률 갱신 동시 요청 수
+# 기존 매물 예약률 갱신 동시 요청 수. 서버 차단이 의심되면 env(SAMSAM_REFRESH_WORKERS)로 낮춰 재실험.
+REFRESH_WORKERS = int(os.environ.get('SAMSAM_REFRESH_WORKERS', '2'))
 REFRESH_CHUNK = 2000      # 이 건수마다 세션(로그인)을 새로 고침
+EARLY_CHECK = 200         # 예약률 갱신 초반 이 건수까지 데이터 0이면 차단으로 보고 조기 중단
 
 TODAY = date.today()
 D30 = TODAY + timedelta(days=30)
@@ -206,23 +208,44 @@ def _make_session(cookies):
 
 
 # ── API 호출 ───────────────────────────────────────────────────────────────────
-def _get(session, url, params=None):
-    """GET 요청 — 403이면 BLOCK_WAIT 후 1회 재시도, 실패 시 None 반환."""
+def _get(session, url, params=None, stats=None):
+    """GET 요청 — 403이면 BLOCK_WAIT 후 1회 재시도, 실패 시 None 반환.
+
+    stats(dict)를 주면 응답 결과를 분류해 카운트한다(진단용):
+      'ok'(200+SCSS_001) / 'http_<code>' / 'code_<code>' / 'nojson' / 'exc'.
+    이렇게 남겨야 "성공했지만 예약 0"과 "차단/에러로 빈값"을 사후에 구분할 수 있다.
+    """
+    def _rec(k):
+        if stats is not None:
+            stats[k] = stats.get(k, 0) + 1
+
     try:
         r = session.get(url, params=params, timeout=15)
     except Exception:
+        _rec('exc')
         return None
     if r.status_code == 403:
         log(f"403 차단, {BLOCK_WAIT}s 대기")
+        _rec('403_retry')
         time.sleep(BLOCK_WAIT)
         try:
             r = session.get(url, params=params, timeout=15)
         except Exception:
+            _rec('exc')
             return None
     if r.status_code != 200:
+        _rec(f'http_{r.status_code}')
         return None
-    d = r.json()
-    return d if d.get('code') == 'SCSS_001' else None
+    try:
+        d = r.json()
+    except Exception:
+        _rec('nojson')
+        return None
+    if d.get('code') == 'SCSS_001':
+        _rec('ok')
+        return d
+    _rec(f'code_{d.get("code")}')
+    return None
 
 
 def collect_rids(session):
@@ -265,27 +288,36 @@ def fetch_detail(session, rid):
     return d.get('data') if d else None
 
 
-def fetch_schedules(session, rid):
-    """예약 스케줄 → {날짜:상태} dict. 상태: 'booking'(예약)/'disable'(막힘).
+def fetch_schedules(session, rid, stats=None):
+    """예약 스케줄 → (스케줄 dict, ok). 상태: 'booking'(예약)/'disable'(막힘).
 
     엔드포인트는 year+month(정수) 필수, 응답은 data.schedules = [{date,status}, ...].
     오늘~+90일을 덮는 월(보통 3~4개)을 각각 호출해 병합.
+
+    ok=True  : 조회한 모든 월이 정상 응답(빈 dict여도 '예약 0'이 확정된 값 → 공실).
+    ok=False : 하나라도 요청 실패(차단/에러) → 값 신뢰 불가, DB 갱신에서 제외해야 함.
+
+    스케줄 API는 상태(예약/차단)가 있는 날짜만 돌려주므로, 완전 공실 매물은
+    정상적으로 빈 배열을 반환한다. 이 정상 빈값을 실패와 뭉뚱그리면 공실의 예약률(0%)을
+    영영 기록하지 못하므로 ok 플래그로 반드시 구분한다.
     """
     out = {}
     months = {(TODAY.year, TODAY.month)}
     for off in (30, 60, 90):
         dd = TODAY + timedelta(days=off)
         months.add((dd.year, dd.month))
+    ok = True
     for (y, m) in sorted(months):
         d = _get(session, f'{BASE}/v1/use-auth/rooms/{rid}/schedules',
-                 params={'year': y, 'month': m})
+                 params={'year': y, 'month': m}, stats=stats)
         time.sleep(REQ_SLEEP)
-        if not d:
+        if d is None:
+            ok = False   # 한 달이라도 실패하면 예약수 undercount 위험 → 전체를 신뢰 불가로.
             continue
         for e in (d.get('data', {}).get('schedules') or []):
             if e.get('date'):
                 out[e['date']] = e.get('status')
-    return out
+    return out, ok
 
 
 # ── 행 매핑 ────────────────────────────────────────────────────────────────────
@@ -464,7 +496,7 @@ def main():
             fail += 1
             continue
 
-        schedules = fetch_schedules(session, rid)
+        schedules, _ok = fetch_schedules(session, rid)
         row = map_row(rid, room, detail, schedules)
         batch.append(row)
 
@@ -486,41 +518,82 @@ def main():
     # 기존 매물(수도권) 예약률 갱신 — 상세는 그대로 두고 예약 스케줄만 다시 확인해
     # booked_days_*/blocked_days_1m을 최신화한다 (오르내림 추적용). 매물 수가 많아
     # 동시 요청(REFRESH_WORKERS)으로 처리하고, REFRESH_CHUNK건마다 세션을 새로 고친다.
+    #
+    # 결과를 메모리에 모아 두고(성공/실패/공실 구분), 전체 통과 후 한 번에 커밋한다.
+    # 이렇게 해야 "성공했지만 예약 0인 공실"은 0으로 기록하되, "차단/에러로 못 받은 건"은
+    # 건너뛰어 기존 값을 덮어쓰지 않는다. 또 전면 실패(응답은 오는데 데이터가 전무 = 소프트차단)
+    # 시엔 0으로 도배해 DB를 오염시키지 않도록 커밋 자체를 막고 실패로 끝낸다.
     log(f"기존 매물(수도권) 예약률 갱신 대상: {len(refresh_targets)}건, 동시 요청 {REFRESH_WORKERS}개")
-    upd_batch, refreshed, processed = [], 0, 0
+    stats = {}
+    pending, failed, with_data, processed = [], 0, 0, 0
+    rate_limited = False
     for start in range(0, len(refresh_targets), REFRESH_CHUNK):
+        if rate_limited:
+            break
         chunk = refresh_targets[start:start + REFRESH_CHUNK]
         with ThreadPoolExecutor(max_workers=REFRESH_WORKERS) as pool:
-            futs = {pool.submit(fetch_schedules, session, rid): rid for rid in chunk}
+            futs = {pool.submit(fetch_schedules, session, rid, stats): rid for rid in chunk}
             for fut in as_completed(futs):
                 rid = futs[fut]
                 processed += 1
-                schedules = fut.result()
-                if schedules:
+                schedules, sched_ok = fut.result()
+                if not sched_ok:
+                    failed += 1        # 차단/에러 → 신뢰 불가, 갱신 제외(기존 값 보존)
+                else:
+                    # 성공: 빈 dict여도 '예약 0'이 확정된 공실이므로 반드시 기록
                     bk1 = _count_status(schedules, TODAY, D30, BOOKED_STATUSES)
                     bk2 = _count_status(schedules, TODAY, D60, BOOKED_STATUSES)
                     bk3 = _count_status(schedules, TODAY, D90, BOOKED_STATUSES)
                     bl1 = _count_status(schedules, TODAY, D30, BLOCKED_STATUSES)
-                    upd_batch.append(
+                    pending.append(
                         (bk1, bk2, bk3, bl1, datetime.now().isoformat(timespec='seconds'), rid))
-                    if len(upd_batch) >= BATCH:
-                        update_schedules_batch(conn, upd_batch)
-                        refreshed += len(upd_batch)
-                        upd_batch = []
+                    if schedules:
+                        with_data += 1
                 if processed % 500 == 0:
-                    log(f"[예약률 갱신 {processed}/{len(refresh_targets)}] {refreshed}건 갱신")
+                    log(f"[예약률 갱신 {processed}/{len(refresh_targets)}] "
+                        f"성공 {len(pending)}(데이터有 {with_data}) 실패 {failed} | HTTP {stats}")
+                # 조기 중단: 초반 EARLY_CHECK건에서 데이터 수신이 0이면(레이트리밋·차단)
+                # 3시간 헛돌지 않고 즉시 종료. 실 API는 ~80%가 데이터를 주므로 0은 곧 차단이다.
+                if processed >= EARLY_CHECK and with_data == 0:
+                    log(f"★ 조기 중단: 처음 {processed}건 중 데이터 수신 0건 "
+                        f"(성공 {len(pending)} 실패 {failed}) | HTTP {stats} — 차단 판단, 즉시 종료.")
+                    rate_limited = True
+                    break
 
-        if start + REFRESH_CHUNK < len(refresh_targets):
+        if not rate_limited and start + REFRESH_CHUNK < len(refresh_targets):
             log("세션 갱신 중...")
             cookies = _get_cookies(email, pw)
             session = _make_session(cookies)
 
-    if upd_batch:
-        update_schedules_batch(conn, upd_batch)
-        refreshed += len(upd_batch)
+    ok_cnt = len(pending)
+    log(f"예약률 갱신 집계: 성공 {ok_cnt}건(데이터有 {with_data}, 공실 {ok_cnt - with_data}) "
+        f"/ 실패 {failed}건 / 대상 {len(refresh_targets)}건")
+    log(f"  HTTP 응답 분포: {stats}")
+
+    # ── 오염 방지 가드 ────────────────────────────────────────────────
+    # 응답은 왔는데(성공 다수) 데이터가 하나도 없으면 소프트차단(빈배열 위장)일 가능성이 크다.
+    # 이때 0으로 커밋하면 실제 예약/차단을 전부 0으로 밀어버리므로 커밋을 막고 실패로 끝낸다.
+    abort = False
+    if rate_limited:
+        log("★ 레이트리밋/차단으로 조기 중단됨 — DB 미반영, 실패 종료.")
+        abort = True
+    elif refresh_targets and ok_cnt == 0:
+        log("★ 전면 실패: 성공 응답 0건 — IP 차단/엔드포인트 이상 의심. DB 미반영, 실패 종료.")
+        abort = True
+    elif with_data == 0:
+        log("★ 소프트차단 의심: 예약데이터 수신 0건 — DB 오염 방지 위해 미반영, 실패 종료.")
+        abort = True
+
+    refreshed = 0
+    if not abort:
+        for s in range(0, len(pending), BATCH):
+            update_schedules_batch(conn, pending[s:s + BATCH])
+            refreshed += len(pending[s:s + BATCH])
 
     conn.close()
-    log(f"완료. 신규 적재 {ok}건 / 실패 {fail}건, 예약률 갱신 {refreshed}건")
+    log(f"완료. 신규 적재 {ok}건 / 실패 {fail}건, 예약률 갱신(DB반영) {refreshed}건 / 실패 {failed}건")
+    if abort:
+        sys.exit(1)
 
 
 if __name__ == '__main__':
