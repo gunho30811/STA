@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>삼삼 × 네이버 단기임대 수익성</title>
+<title>삼삼 × 부동산 단기임대 수익성</title>
 <style>
   *{box-sizing:border-box}
   body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;background:#f3f5f7;color:#1f2937}
@@ -69,8 +69,8 @@
 </head>
 <body>
 <header>
-  <h1>🏠 삼삼 × 네이버 단기임대 수익성</h1>
-  <p>삼삼 단기임대 풀가동 시 네이버 장기월세 대비 최대수익·순수익 + 동/역 수요(예약률) · 단위 만원 · 행 클릭 시 오른쪽 상세</p>
+  <h1>🏠 삼삼 × 부동산 단기임대 수익성</h1>
+  <p>삼삼 단기임대 풀가동 시 부동산 장기월세 대비 최대수익·순수익 + 동/역 수요(예약률) · 단위 만원 · 행 클릭 시 오른쪽 상세</p>
 </header>
 <div class="tabs">
   <button class="on" data-tab="list" onclick="tab('list')">매물 수익성</button>
@@ -96,7 +96,7 @@
         <div class="fg"><label>키워드</label><input id="f-kw" placeholder="매물/건물"></div>
         <div class="fg"><label>순수익 ≥</label><input type="number" id="f-net" placeholder="만원"></div>
         <div class="fg"><label>최대수익 ≥</label><input type="number" id="f-maxrev" placeholder="만원"></div>
-        <div class="fg"><label>예약률 ≥</label><input type="number" id="f-occ" placeholder="%"></div>
+        <div class="fg"><label>예약률 ≥ <span style="color:#2563eb">(기본 20%)</span></label><input type="number" id="f-occ" placeholder="%" value="20"></div>
         <div class="fg"><label>동예약률 ≥</label><input type="number" id="f-dongocc" placeholder="%"></div>
         <div class="fg"><label>보증금 ≤</label><input type="number" id="f-dep" placeholder="만원"></div>
         <div class="fg"><label>평수</label><div style="display:flex;gap:4px"><input type="number" id="f-pmin" placeholder="최소" style="width:60px"><input type="number" id="f-pmax" placeholder="최대" style="width:60px"></div></div>
@@ -104,8 +104,13 @@
         <div class="fg"><label>&nbsp;</label><button class="btn btn-reset" onclick="resetF()">초기화</button></div>
       </div>
       <div class="legend">
-        <b>최대수익</b>=삼삼 풀가동 월매출(주당×4.345) · <b>순수익</b>=최대수익−네이버월총(환산월세+관리비) ·
-        <b>예약률</b>=1달 예약일/(30−막힘일), 높을수록 수요↑ · <b>동예약률</b>=같은 동 평균 예약률 · <b>환산월세</b>=네이버월세+보증금×6%/12
+        <b>최대수익</b>=삼삼 풀가동 월매출(주당×4.345) · <b>순수익</b>=최대수익−부동산월총(환산월세+관리비) ·
+        <b>예약률</b>=1달 예약일/(30−막힘일), 높을수록 수요↑ · <b>동예약률</b>=같은 동 평균 예약률 · <b>환산월세</b>=부동산월세+보증금×6%/12
+      </div>
+      <div class="legend" style="margin-top:6px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:7px;padding:8px 10px">
+        ⚠️ <b>순수익·최대수익은 "풀가동(100% 예약) 가정" 이론값</b>이에요. 그래서 <b>실제 예약률이 0%인(=아무도 안 나가는)</b>
+        매물도 순수익이 커 보여 상단에 뜰 수 있어요 — 실제 수요가 없으면 그 수익은 못 냅니다.
+        그래서 기본값으로 <b>예약률 20% 이상</b>만 보여줍니다. 0% 포함 전체를 보려면 위 <b>예약률 ≥</b> 칸을 비우고 검색하세요.
       </div>
     </div>
     <div class="md">
@@ -203,13 +208,13 @@ function showDetail(x){
   d.innerHTML=`
     <div class="d-title">${x.name||''}</div>
     <div class="d-sub">${x.btype||''} · ${x.rooms||''} · ${x.sigungu||''} ${x.dong||''} · ${x.pyeong||'-'}평</div>
-    <div class="d-net">순수익 <b>${n(x.net)}</b> 만원 <span style="font-size:11px">(최대수익−네이버월총)</span></div>
+    <div class="d-net">순수익 <b>${n(x.net)}</b> 만원 <span style="font-size:11px">(최대수익−부동산월총)</span></div>
     <div class="d-sec"><h4>삼삼 단기임대</h4>
       ${kv('주당 임대료',n(x.wk)+' 만원')}
       ${kv('최대수익(월환산)',n(x.maxRev)+' 만원')}
       ${kv('1달 예약일 / 막힘',n(x.bk)+' / '+n(x.bl)+' 일')}
       ${kv('예약률',n(x.occ)+' %')}</div>
-    <div class="d-sec"><h4>네이버 장기월세 (매칭 기준)</h4>
+    <div class="d-sec"><h4>부동산 장기월세 (매칭 기준)</h4>
       ${kv('보증금',n(x.nDep)+' 만원')}
       ${kv('월세',n(x.nRent)+' 만원')}
       ${kv('환산월세',n(x.nEquiv)+' 만원')}
@@ -222,10 +227,10 @@ function showDetail(x){
       ${kv('동 경쟁(삼삼)',n(x.dongCnt))}
       ${kv('동 예약률',n(x.dongOcc)+' %')}
       ${kv('인근역',(x.station||'-')+' (역예약률 '+n(x.stOcc)+'%)')}
-      ${kv('건물 네이버 매물수',n(x.bldgCnt))}
+      ${kv('건물 부동산 매물수',n(x.bldgCnt))}
       ${kv('건물 월세(최저/중간/최고)',n(x.bldgRentMin)+'/'+n(x.bldgRentMed)+'/'+n(x.bldgRentMax))}</div>
     <div>
-      ${x.naverUrl?`<a class="lnk n" href="${x.naverUrl}" target="_blank">네이버</a>`:''}
+      ${x.naverUrl?`<a class="lnk n" href="${x.naverUrl}" target="_blank">부동산</a>`:''}
       ${x.samUrl?`<a class="lnk s" href="${x.samUrl}" target="_blank">삼삼</a>`:''}
     </div>`;
   // 모바일(상세가 목록 아래로 스택되는 폭)에선 클릭해도 상세가 화면 밖이라 반응 없어 보임 → 상세로 스크롤.
@@ -249,6 +254,7 @@ function renderPager(r){
 }
 function resetF(){
   document.querySelectorAll('#t-list input').forEach(i=>i.value='');
+  document.getElementById('f-occ').value='20';   // 예약률 기본값(20%) 유지 — 0% 이론값 상단 노출 방지
   ['f-sido','f-sigungu','f-dong','f-btype','f-rooms'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-sigungu').innerHTML='<option value="">전체</option>';
   document.getElementById('f-dong').innerHTML='<option value="">전체</option>';

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>강남구 네이버 매물 뷰어</title>
+<title>강남구 부동산 매물 뷰어</title>
 <style>
   *{box-sizing:border-box}
   body{margin:0;font-family:"Pretendard","Malgun Gothic","맑은 고딕",sans-serif;background:#f3f5f7;color:#1f2937}
@@ -79,8 +79,8 @@
 </head>
 <body>
 <header>
-  <h1>🏙️ 강남구 네이버부동산 매물 뷰어</h1>
-  <p>네이버부동산 강남구 전수 수집 · 아파트/오피스텔/빌라/원룸/단독·다가구 · 카드 클릭 시 상세 전체 보기 · 단위 만원</p>
+  <h1>🏙️ 강남구 부동산 매물 뷰어</h1>
+  <p>부동산 강남구 전수 수집 · 아파트/오피스텔/빌라/원룸/단독·다가구 · 카드 클릭 시 상세 전체 보기 · 단위 만원</p>
 </header>
 
 <div class="wrap">
@@ -255,7 +255,7 @@ function openM(i){
     });
     if(rows.length) html+=`<div class="sec"><h3>${gname}</h3><div class="kv">${rows.join('')}</div></div>`;
   });
-  if(x.url) html+=`<a class="mlink" href="${x.url}" target="_blank">네이버부동산에서 보기 →</a>`;
+  if(x.url) html+=`<a class="mlink" href="${x.url}" target="_blank">부동산에서 보기 →</a>`;
   html+=`</div>`;
   document.getElementById('modal').innerHTML=html;
   document.getElementById('overlay').classList.add('on');
