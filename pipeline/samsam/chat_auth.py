@@ -23,6 +23,10 @@ class LoginError(Exception):
     pass
 
 
+class SendError(Exception):
+    pass
+
+
 def playwright_available():
     """로그인(브라우저 자동화)이 가능한 환경인지. Vercel 등 서버리스엔 Playwright가 없음 —
     폴러가 로그인을 시도해서 상태를 잘못된 'reauth_needed'로 덮어쓰지 않도록 사전 체크용."""
@@ -39,6 +43,29 @@ def _member_id_from_id_token(id_token):
     padded = payload_b64 + '=' * (-len(payload_b64) % 4)
     payload = json.loads(base64.urlsafe_b64decode(padded))
     return payload.get('user_id') or payload.get('sub')
+
+
+def _login_ui(pg, email, password):
+    """로그인 폼 채우고 제출. 로그인 후 URL에 /sign-in이 남아있으면 실패로 간주."""
+    pg.goto(f'{BASE}/sign-in', wait_until='networkidle', timeout=40000)
+    pg.wait_for_selector('input[type="email"], input[name="email"]', timeout=15000)
+    pg.wait_for_timeout(500)
+
+    email_input = pg.locator('input[type="email"], input[name="email"]').first
+    email_input.click(); email_input.fill(''); email_input.type(email, delay=50)
+    pw_input = pg.locator('input[type="password"]').first
+    pw_input.click(); pw_input.fill(''); pw_input.type(password, delay=50)
+    pg.wait_for_timeout(300)
+
+    btn = pg.locator('button[type="submit"], button:has-text("로그인")').first
+    btn.click()
+    try:
+        pg.wait_for_url(lambda url: '/sign-in' not in url, timeout=10000)
+    except Exception:
+        pg.wait_for_load_state('networkidle', timeout=8000)
+    pg.wait_for_timeout(1500)
+
+    return '/sign-in' not in pg.url
 
 
 def login_and_get_refresh_token(email, password):
@@ -66,25 +93,7 @@ def login_and_get_refresh_token(email, password):
         pg = ctx.new_page()
         pg.on('response', on_response)
         try:
-            pg.goto(f'{BASE}/sign-in', wait_until='networkidle', timeout=40000)
-            pg.wait_for_selector('input[type="email"], input[name="email"]', timeout=15000)
-            pg.wait_for_timeout(500)
-
-            email_input = pg.locator('input[type="email"], input[name="email"]').first
-            email_input.click(); email_input.fill(''); email_input.type(email, delay=50)
-            pw_input = pg.locator('input[type="password"]').first
-            pw_input.click(); pw_input.fill(''); pw_input.type(password, delay=50)
-            pg.wait_for_timeout(300)
-
-            btn = pg.locator('button[type="submit"], button:has-text("로그인")').first
-            btn.click()
-            try:
-                pg.wait_for_url(lambda url: '/sign-in' not in url, timeout=10000)
-            except Exception:
-                pg.wait_for_load_state('networkidle', timeout=8000)
-            pg.wait_for_timeout(1500)
-
-            ok = '/sign-in' not in pg.url
+            ok = _login_ui(pg, email, password)
         finally:
             b.close()
 
@@ -122,6 +131,48 @@ def refresh_id_token(refresh_token):
         'refresh_token': tok['refresh_token'],
         'samsam_member_id': tok['user_id'],
     }
+
+
+def send_message(email, password, room_name, message):
+    """실제 브라우저(Playwright)로 /host/chat UI를 조작해 메시지 전송.
+
+    정찰 결과 삼삼의 메시지 쓰기는 Firebase REST/RTDB가 아니라 Next.js 서버 액션(배포마다
+    바뀔 수 있는 해시 헤더 필요)이라, 그 내부 API를 직접 흉내내는 대신 로그인처럼 실제 UI를
+    그대로 조작한다. room_name은 samsam_chat_rooms.room_name — 채팅 목록에 보이는 매물명
+    텍스트로 방을 찾는다(동일 계정 내 room_name이 완전히 같은 방이 여러 개면 첫 번째가 선택됨).
+
+    실패 시 SendError.
+    """
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        b = p.chromium.launch(headless=True, args=['--disable-blink-features=AutomationControlled'])
+        ctx = b.new_context(user_agent=UA, locale='ko-KR')
+        pg = ctx.new_page()
+        try:
+            if not _login_ui(pg, email, password):
+                raise SendError('로그인 실패 — 이메일/비밀번호를 확인해주세요.')
+
+            pg.goto(f'{BASE}/host/chat', wait_until='networkidle', timeout=20000)
+            pg.wait_for_timeout(4000)  # 채팅 목록 클라이언트 렌더링 대기
+
+            try:
+                pg.locator('li', has_text=room_name).first.click(timeout=8000)
+                pg.wait_for_timeout(1500)
+            except Exception as e:
+                raise SendError(f'채팅방을 찾지 못함({room_name!r}): {repr(e)[:100]}')
+
+            try:
+                input_box = pg.get_by_placeholder('메시지를 입력해 주세요')
+                input_box.click()
+                input_box.type(message, delay=20)
+                pg.wait_for_timeout(300)
+                pg.get_by_text('전송', exact=True).click()
+                pg.wait_for_timeout(2000)
+            except Exception as e:
+                raise SendError(f'메시지 입력/전송 실패: {repr(e)[:100]}')
+        finally:
+            b.close()
 
 
 def rtdb_get(path, id_token, **extra_params):

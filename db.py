@@ -445,6 +445,8 @@ def init_db(force=False):
         UNIQUE (account_id, samsam_room_key)
     )""")
     conn.execute("ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS host_or_guest TEXT")
+    # 마지막으로 이 방을 읽은 시점(last_message_time과 같은 epoch ms) — 미확인 방 표시용.
+    conn.execute("ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS last_read_at BIGINT")
     # 채팅방별 메시지(RTDB live/messagelist/{room_key}).
     conn.execute("""
     CREATE TABLE IF NOT EXISTS samsam_chat_messages (
@@ -459,6 +461,18 @@ def init_db(force=False):
         image         TEXT,
         title         TEXT,
         UNIQUE (room_id, msg_key)
+    )""")
+    # 답장 발송 큐 — 삼삼 쓰기가 REST가 아니라 브라우저 UI 조작(Playwright)으로만 가능해,
+    # 웹(Vercel)에서는 여기 큐잉만 하고 GH Actions가 실제 발송을 처리한다.
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS samsam_chat_outbox (
+        id          SERIAL PRIMARY KEY,
+        room_id     INTEGER NOT NULL REFERENCES samsam_chat_rooms(id) ON DELETE CASCADE,
+        message     TEXT NOT NULL,
+        status      TEXT DEFAULT 'pending',
+        last_error  TEXT,
+        created_at  TEXT,
+        sent_at     TEXT
     )""")
     for idx in [
         "CREATE INDEX IF NOT EXISTS ix_l_region ON listings(sido,sigungu,dong)",
@@ -480,6 +494,7 @@ def init_db(force=False):
         "CREATE INDEX IF NOT EXISTS ix_scr_last_msg ON samsam_chat_rooms(last_message_time)",
         "CREATE INDEX IF NOT EXISTS ix_scm_room ON samsam_chat_messages(room_id)",
         "CREATE INDEX IF NOT EXISTS ix_scm_time ON samsam_chat_messages(message_time)",
+        "CREATE INDEX IF NOT EXISTS ix_sco_status ON samsam_chat_outbox(status)",
     ]:
         conn.execute(idx)
     conn.commit()

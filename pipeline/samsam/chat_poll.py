@@ -150,6 +150,45 @@ def poll_account(conn, acct):
         f"임대인 채팅방 {len(host_rooms)}개 갱신(전체 {len(chatlist)}개 중 게스트모드 제외)")
 
 
+def _mark_outbox(conn, outbox_id, status, error=None):
+    conn.execute(
+        "UPDATE samsam_chat_outbox SET status=%s, last_error=%s, sent_at=%s WHERE id=%s",
+        (status, error, _now(), outbox_id))
+    conn.commit()
+
+
+def process_outbox(conn):
+    """대기 중인 답장(samsam_chat_outbox status='pending')을 실제 발송.
+
+    로그인과 마찬가지로 브라우저 자동화(Playwright)가 필요해 GH Actions에서만 처리한다
+    (Vercel 1분 cron은 poll_all만 돌리고 여긴 안 건드림 — chat_api_cron_poll이 이 함수를
+    호출하지 않는 이유).
+    """
+    if not chat_auth.playwright_available():
+        return 0
+    items = conn.execute(
+        """SELECT o.id, o.room_id, o.message, r.room_name, a.samsam_email, a.password_enc
+           FROM samsam_chat_outbox o
+           JOIN samsam_chat_rooms r ON r.id = o.room_id
+           JOIN samsam_accounts a ON a.id = r.account_id
+           WHERE o.status='pending'"""
+    ).fetchall()
+    for item in items:
+        item = dict(item)
+        if not item['password_enc']:
+            _mark_outbox(conn, item['id'], 'failed', '연결 계정 비밀번호 없음')
+            continue
+        try:
+            password = crypto_util.decrypt(item['password_enc'])
+            chat_auth.send_message(item['samsam_email'], password, item['room_name'], item['message'])
+            _mark_outbox(conn, item['id'], 'sent')
+            log(f"  outbox#{item['id']} 방({item['room_name']}) 발송 완료")
+        except Exception as e:
+            log(f"  outbox#{item['id']} 발송 실패: {repr(e)[:120]}")
+            _mark_outbox(conn, item['id'], 'failed', repr(e)[:200])
+    return len(items)
+
+
 def poll_all(conn):
     """연결된(비활성 아닌) 전체 계정을 폴링. GH Actions(main)와 Vercel cron 엔드포인트가 공용으로 씀."""
     accounts = conn.execute(
@@ -164,8 +203,9 @@ def main():
     db.init_db()
     conn = db.connect()
     n = poll_all(conn)
+    n_sent = process_outbox(conn)
     conn.close()
-    log(f"완료 — 연결된 삼삼 계정 {n}개 폴링")
+    log(f"완료 — 연결된 삼삼 계정 {n}개 폴링, 답장 {n_sent}건 처리")
 
 
 if __name__ == '__main__':
