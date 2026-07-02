@@ -20,9 +20,12 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       SAMSAM_EMAIL: ${{ secrets.SAMSAM_EMAIL }}
       SAMSAM_PASSWORD: ${{ secrets.SAMSAM_PASSWORD }}
-      # 예약률 갱신 동시 요청 수. 4병렬은 서버가 스케줄 API를 소프트차단(200+빈배열)하는 정황이라
-      # 2로 낮춤. 2병렬로도 막히면 1로 내리고 crawler.py의 REQ_SLEEP을 함께 조정한다.
+      # 스케줄 API는 IP당 ~100요청에서 429(멈추면 ~15초 회복). crawler.py가 429 시 공통 쿨다운으로
+      # 회복하며 재시도한다. 매물당 ~2.2초라 전체 10,826건(~397분)은 타임아웃(330분) 초과 →
+      # 하루 5,000건만 오래된 순으로 갱신(로테이션). 전체는 ~2.2일 주기로 순환.
       SAMSAM_REFRESH_WORKERS: '2'
+      SAMSAM_REFRESH_DAILY_LIMIT: '5000'
+      SAMSAM_RL_COOLDOWN: '20'
 
     steps:
       - name: Checkout
