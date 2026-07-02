@@ -95,12 +95,20 @@ def _poll_messages(conn, room_id, room_key, id_token):
 
 def poll_account(conn, acct):
     acct_id = acct['id']
-    refresh_token = crypto_util.decrypt(acct['refresh_token_enc'])
+    tok = None
 
-    try:
-        tok = chat_auth.refresh_id_token(refresh_token)
-    except Exception as e:
-        log(f"  계정#{acct_id} refreshToken 만료 추정({repr(e)[:60]}) — 저장된 비번으로 재로그인 시도")
+    # refresh_token_enc가 아직 없으면(웹에서 Playwright 없이 큐잉만 된 pending_login 계정)
+    # 최초 로그인부터 시도. 있으면 순수 HTTP 갱신을 먼저 시도하고, 실패하면 같은 재로그인
+    # 경로(비번 기반)로 폴백 — 최초 연결과 만료 재연결을 한 경로로 처리.
+    if acct['refresh_token_enc']:
+        try:
+            tok = chat_auth.refresh_id_token(crypto_util.decrypt(acct['refresh_token_enc']))
+        except Exception as e:
+            log(f"  계정#{acct_id} refreshToken 만료 추정({repr(e)[:60]}) — 저장된 비번으로 재로그인 시도")
+    else:
+        log(f"  계정#{acct_id} 최초 로그인 대기 중 — 로그인 시도")
+
+    if tok is None:
         if not acct['password_enc']:
             _mark_status(conn, acct_id, 'reauth_needed', '저장된 비밀번호 없음 — 재연결 필요')
             return
@@ -108,7 +116,7 @@ def poll_account(conn, acct):
             password = crypto_util.decrypt(acct['password_enc'])
             tok = chat_auth.login_and_get_refresh_token(acct['samsam_email'], password)
         except Exception as e2:
-            log(f"  계정#{acct_id} 재로그인 실패: {repr(e2)[:100]}")
+            log(f"  계정#{acct_id} 로그인 실패: {repr(e2)[:100]}")
             _mark_status(conn, acct_id, 'reauth_needed', repr(e2)[:200])
             return
 
