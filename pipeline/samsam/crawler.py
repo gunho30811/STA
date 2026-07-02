@@ -17,7 +17,7 @@
 필요 환경변수 (.env):
   DATABASE_URL, SAMSAM_EMAIL, SAMSAM_PASSWORD
 """
-import argparse, getpass, json, os, re, sys, time
+import argparse, getpass, json, os, re, sys, threading, time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta
@@ -49,8 +49,36 @@ BATCH = 50
 REQ_SLEEP = 0.5
 BLOCK_WAIT = 120
 METRO_SIDO = {'서울특별시', '경기도', '인천광역시'}  # 수도권만 수집·갱신 (그 외 지역은 DB에 남아있어도 갱신 안 함)
-REFRESH_WORKERS = 4       # 기존 매물 예약률 갱신 동시 요청 수
+# 기존 매물 예약률 갱신 동시 요청 수. 서버 차단이 의심되면 env(SAMSAM_REFRESH_WORKERS)로 낮춰 재실험.
+REFRESH_WORKERS = int(os.environ.get('SAMSAM_REFRESH_WORKERS', '2'))
 REFRESH_CHUNK = 2000      # 이 건수마다 세션(로그인)을 새로 고침
+
+# ── 레이트리밋 대응 ─────────────────────────────────────────────────────────────
+# 33m2 스케줄 API는 IP당 짧은 창에서 ~100요청을 넘기면 429로 막고 한동안 안 풀린다.
+# 그래서 (1) 하루에 stalest N건만 갱신하는 '로테이션', (2) 429 시 대기·재시도 '백오프',
+# (3) 여러 러너 IP로 '샤딩'해 수평 분할한다.
+#   - SAMSAM_REFRESH_DAILY_LIMIT: 이번 실행에서 갱신할 최대 매물 수(가장 오래된 것부터). 0=제한없음.
+#   - SAMSAM_SHARD='i/N': room_id % N == i 인 매물만 담당(러너별로 다른 IP). 미설정=전체.
+#   - SAMSAM_RL_COOLDOWN: 429가 연속으로 누적될 때 쉬는 시간(초). 회복시간에 맞춰 조정.
+REFRESH_DAILY_LIMIT = int(os.environ.get('SAMSAM_REFRESH_DAILY_LIMIT', '0'))
+# 실측: ~100요청 소진 시 429, 때리기 멈추면 ~15초 내 회복. 안전하게 20초 쿨다운.
+RL_COOLDOWN = int(os.environ.get('SAMSAM_RL_COOLDOWN', '20'))    # 429 시 전 워커 공통 대기(초)
+RL_RETRY = int(os.environ.get('SAMSAM_RL_RETRY', '6'))           # 429 요청당 재시도 횟수
+EARLY_CHECK = 200         # 예약률 갱신 초반 이 건수까지 데이터 0이면 차단으로 보고 조기 중단
+
+
+def _parse_shard():
+    """SAMSAM_SHARD='i/N' → (i, N). 미설정/형식오류면 (0, 1)=전체."""
+    raw = os.environ.get('SAMSAM_SHARD', '').strip()
+    if '/' in raw:
+        try:
+            i, n = raw.split('/', 1)
+            i, n = int(i), int(n)
+            if n >= 1 and 0 <= i < n:
+                return i, n
+        except ValueError:
+            pass
+    return 0, 1
 
 TODAY = date.today()
 D30 = TODAY + timedelta(days=30)
@@ -205,24 +233,77 @@ def _make_session(cookies):
     return s
 
 
+# ── 레이트리밋 게이트 ────────────────────────────────────────────────────────────
+# 429는 IP 전역(rolling window)이라 워커마다 따로 재시도하면 계속 때려서 회복이 안 된다.
+# 그래서 공유 '재개 시각(resume_at)'을 둬, 한 워커가 429를 만나면 모든 워커가 그 시각까지
+# 함께 멈췄다가(때리기 중단→창 회복) 재개한다.
+_rl_lock = threading.Lock()
+_rl_resume_at = 0.0
+
+
+def _rl_wait():
+    """재개 시각까지 대기(전 워커 공통). 쿨다운 중이면 그만큼 잔다."""
+    while True:
+        with _rl_lock:
+            wait = _rl_resume_at - time.time()
+        if wait <= 0:
+            return
+        time.sleep(min(wait, 3))
+
+
+def _rl_trip(cooldown):
+    """429를 만난 워커가 호출 — 모든 워커의 재개 시각을 now+cooldown 이후로 민다."""
+    global _rl_resume_at
+    with _rl_lock:
+        _rl_resume_at = max(_rl_resume_at, time.time() + cooldown)
+
+
 # ── API 호출 ───────────────────────────────────────────────────────────────────
-def _get(session, url, params=None):
-    """GET 요청 — 403이면 BLOCK_WAIT 후 1회 재시도, 실패 시 None 반환."""
-    try:
-        r = session.get(url, params=params, timeout=15)
-    except Exception:
-        return None
-    if r.status_code == 403:
-        log(f"403 차단, {BLOCK_WAIT}s 대기")
-        time.sleep(BLOCK_WAIT)
+def _get(session, url, params=None, stats=None):
+    """GET 요청 — 403은 BLOCK_WAIT, 429는 공유 쿨다운 후 재시도. 최종 실패 시 None.
+
+    stats(dict)를 주면 응답 결과를 분류해 카운트한다(진단용):
+      'ok'(200+SCSS_001) / 'http_<code>' / 'code_<code>' / 'nojson' / 'exc' / '429_retry'.
+    이렇게 남겨야 "성공했지만 예약 0"과 "차단/에러로 빈값"을 사후에 구분할 수 있다.
+    """
+    def _rec(k):
+        if stats is not None:
+            with _rl_lock:
+                stats[k] = stats.get(k, 0) + 1
+
+    for attempt in range(RL_RETRY + 1):
+        _rl_wait()   # 쿨다운 중이면 대기 후 요청
         try:
             r = session.get(url, params=params, timeout=15)
         except Exception:
+            _rec('exc')
             return None
-    if r.status_code != 200:
+        if r.status_code == 403:
+            _rec('403_retry')
+            time.sleep(BLOCK_WAIT)
+            continue
+        if r.status_code == 429:
+            # 레이트리밋: 전 워커 공통 쿨다운 후 재시도(마지막 시도면 포기).
+            _rec('http_429')
+            if attempt < RL_RETRY:
+                _rl_trip(RL_COOLDOWN)
+                _rl_wait()
+                continue
+            return None
+        if r.status_code != 200:
+            _rec(f'http_{r.status_code}')
+            return None
+        try:
+            d = r.json()
+        except Exception:
+            _rec('nojson')
+            return None
+        if d.get('code') == 'SCSS_001':
+            _rec('ok')
+            return d
+        _rec(f'code_{d.get("code")}')
         return None
-    d = r.json()
-    return d if d.get('code') == 'SCSS_001' else None
+    return None
 
 
 def collect_rids(session):
@@ -265,27 +346,36 @@ def fetch_detail(session, rid):
     return d.get('data') if d else None
 
 
-def fetch_schedules(session, rid):
-    """예약 스케줄 → {날짜:상태} dict. 상태: 'booking'(예약)/'disable'(막힘).
+def fetch_schedules(session, rid, stats=None):
+    """예약 스케줄 → (스케줄 dict, ok). 상태: 'booking'(예약)/'disable'(막힘).
 
     엔드포인트는 year+month(정수) 필수, 응답은 data.schedules = [{date,status}, ...].
     오늘~+90일을 덮는 월(보통 3~4개)을 각각 호출해 병합.
+
+    ok=True  : 조회한 모든 월이 정상 응답(빈 dict여도 '예약 0'이 확정된 값 → 공실).
+    ok=False : 하나라도 요청 실패(차단/에러) → 값 신뢰 불가, DB 갱신에서 제외해야 함.
+
+    스케줄 API는 상태(예약/차단)가 있는 날짜만 돌려주므로, 완전 공실 매물은
+    정상적으로 빈 배열을 반환한다. 이 정상 빈값을 실패와 뭉뚱그리면 공실의 예약률(0%)을
+    영영 기록하지 못하므로 ok 플래그로 반드시 구분한다.
     """
     out = {}
     months = {(TODAY.year, TODAY.month)}
     for off in (30, 60, 90):
         dd = TODAY + timedelta(days=off)
         months.add((dd.year, dd.month))
+    ok = True
     for (y, m) in sorted(months):
         d = _get(session, f'{BASE}/v1/use-auth/rooms/{rid}/schedules',
-                 params={'year': y, 'month': m})
+                 params={'year': y, 'month': m}, stats=stats)
         time.sleep(REQ_SLEEP)
-        if not d:
+        if d is None:
+            ok = False   # 한 달이라도 실패하면 예약수 undercount 위험 → 전체를 신뢰 불가로.
             continue
         for e in (d.get('data', {}).get('schedules') or []):
             if e.get('date'):
                 out[e['date']] = e.get('status')
-    return out
+    return out, ok
 
 
 # ── 행 매핑 ────────────────────────────────────────────────────────────────────
@@ -419,11 +509,13 @@ def main():
 
     conn = db.connect()
 
-    # 이미 적재된 room_id
+    # 이미 적재된 room_id + 마지막 갱신 시각(로테이션에 사용)
     done = set()
+    coll = {}   # room_id → collected_at (오래된 것부터 갱신하기 위한 정렬 키)
     if not args.redo:
-        rows = conn.execute('SELECT room_id FROM samsam_listings').fetchall()
-        done = {r[0] for r in rows}
+        rows = conn.execute('SELECT room_id, collected_at FROM samsam_listings').fetchall()
+        for r in rows:
+            done.add(r[0]); coll[r[0]] = r[1] or ''
         log(f"기존 적재: {len(done)}건 skip")
 
     log("매물 목록 수집 중...")
@@ -451,6 +543,18 @@ def main():
     if args.limit:
         log(f"--limit {args.limit} (적재 목표 건수)")
 
+    # ── 샤딩 + 로테이션: 러너 IP별로 나누고, 가장 오래된 것부터 하루치만 갱신 ──────────
+    shard_i, shard_n = _parse_shard()
+    if shard_n > 1:
+        before = len(refresh_targets)
+        refresh_targets = [rid for rid in refresh_targets if rid % shard_n == shard_i]
+        log(f"샤드 {shard_i}/{shard_n}: 예약률 갱신 대상 {before} → {len(refresh_targets)}건")
+    # 오래된(stale) 순으로 정렬 → 매일 실행하면 자연스럽게 전체를 로테이션.
+    refresh_targets.sort(key=lambda rid: coll.get(rid, ''))
+    if REFRESH_DAILY_LIMIT and len(refresh_targets) > REFRESH_DAILY_LIMIT:
+        log(f"로테이션: 오래된 순 {REFRESH_DAILY_LIMIT}건만 갱신(전체 {len(refresh_targets)}건, 나머지는 다음 실행)")
+        refresh_targets = refresh_targets[:REFRESH_DAILY_LIMIT]
+
     batch, ok, fail = [], 0, 0
     for i, (rid, room) in enumerate(targets, 1):
         if args.limit and ok >= args.limit:
@@ -464,7 +568,7 @@ def main():
             fail += 1
             continue
 
-        schedules = fetch_schedules(session, rid)
+        schedules, _ok = fetch_schedules(session, rid)
         row = map_row(rid, room, detail, schedules)
         batch.append(row)
 
@@ -486,41 +590,98 @@ def main():
     # 기존 매물(수도권) 예약률 갱신 — 상세는 그대로 두고 예약 스케줄만 다시 확인해
     # booked_days_*/blocked_days_1m을 최신화한다 (오르내림 추적용). 매물 수가 많아
     # 동시 요청(REFRESH_WORKERS)으로 처리하고, REFRESH_CHUNK건마다 세션을 새로 고친다.
+    #
+    # 결과를 메모리에 모아 두고(성공/실패/공실 구분), 전체 통과 후 한 번에 커밋한다.
+    # 이렇게 해야 "성공했지만 예약 0인 공실"은 0으로 기록하되, "차단/에러로 못 받은 건"은
+    # 건너뛰어 기존 값을 덮어쓰지 않는다. 또 전면 실패(응답은 오는데 데이터가 전무 = 소프트차단)
+    # 시엔 0으로 도배해 DB를 오염시키지 않도록 커밋 자체를 막고 실패로 끝낸다.
+    # 커밋 전략: 초반 EARLY_CHECK건까지는 버퍼에만 모아 두고 "차단 여부"를 먼저 판정한다.
+    #   - 데이터 수신 0 → 레이트리밋/차단으로 보고 버퍼를 버린 뒤 즉시 실패 종료(0 오염 방지).
+    #   - 데이터 확인됨 → 체크포인트 통과. 버퍼를 커밋하고, 이후로는 BATCH마다 증분 커밋한다.
+    # 증분 커밋 덕에 실행 중에도 DB가 실시간으로 채워져(SELECT로 진행 관찰 가능) 크래시에도 안전하다.
+    # 체크포인트 통과 후 도중에 차단이 나도, 실패건(ok=False)은 커밋에서 빠지므로 기존 값이 보존된다.
     log(f"기존 매물(수도권) 예약률 갱신 대상: {len(refresh_targets)}건, 동시 요청 {REFRESH_WORKERS}개")
-    upd_batch, refreshed, processed = [], 0, 0
+    stats = {}
+    buf, failed, with_data, processed, refreshed = [], 0, 0, 0, 0
+    checkpoint_passed = False
+    rate_limited = False
+
+    def _flush():
+        nonlocal buf, refreshed
+        if buf:
+            update_schedules_batch(conn, buf)
+            refreshed += len(buf)
+            buf = []
+
     for start in range(0, len(refresh_targets), REFRESH_CHUNK):
+        if rate_limited:
+            break
         chunk = refresh_targets[start:start + REFRESH_CHUNK]
         with ThreadPoolExecutor(max_workers=REFRESH_WORKERS) as pool:
-            futs = {pool.submit(fetch_schedules, session, rid): rid for rid in chunk}
+            futs = {pool.submit(fetch_schedules, session, rid, stats): rid for rid in chunk}
             for fut in as_completed(futs):
                 rid = futs[fut]
                 processed += 1
-                schedules = fut.result()
-                if schedules:
+                schedules, sched_ok = fut.result()
+                if not sched_ok:
+                    failed += 1        # 차단/에러 → 신뢰 불가, 갱신 제외(기존 값 보존)
+                else:
+                    # 성공: 빈 dict여도 '예약 0'이 확정된 공실이므로 반드시 기록
                     bk1 = _count_status(schedules, TODAY, D30, BOOKED_STATUSES)
                     bk2 = _count_status(schedules, TODAY, D60, BOOKED_STATUSES)
                     bk3 = _count_status(schedules, TODAY, D90, BOOKED_STATUSES)
                     bl1 = _count_status(schedules, TODAY, D30, BLOCKED_STATUSES)
-                    upd_batch.append(
+                    buf.append(
                         (bk1, bk2, bk3, bl1, datetime.now().isoformat(timespec='seconds'), rid))
-                    if len(upd_batch) >= BATCH:
-                        update_schedules_batch(conn, upd_batch)
-                        refreshed += len(upd_batch)
-                        upd_batch = []
-                if processed % 500 == 0:
-                    log(f"[예약률 갱신 {processed}/{len(refresh_targets)}] {refreshed}건 갱신")
+                    if schedules:
+                        with_data += 1
+                    if checkpoint_passed and len(buf) >= BATCH:
+                        _flush()   # 체크포인트 통과 후: 실시간 증분 커밋
 
-        if start + REFRESH_CHUNK < len(refresh_targets):
+                # 체크포인트 판정:
+                #   - 데이터가 조금이라도 확인되면(차단 아님) 바로 통과 → 실시간 증분 커밋 시작.
+                #     (로테이션으로 배치가 작을 때도 실시간 반영되게 하려고 EARLY_CHECK를 안 기다림.)
+                #   - 초반 EARLY_CHECK건까지 데이터 0이면 차단으로 보고 중단(0 오염 방지).
+                if not checkpoint_passed:
+                    if with_data >= 5:
+                        checkpoint_passed = True
+                        _flush()
+                        log(f"체크포인트 통과({processed}건, 데이터有 {with_data}) — 실시간 증분 커밋 시작.")
+                    elif processed >= EARLY_CHECK and with_data == 0:
+                        log(f"★ 조기 중단: 처음 {processed}건 중 데이터 수신 0건 "
+                            f"(성공 {len(buf)} 실패 {failed}) | HTTP {stats} — 차단 판단, DB 미반영 종료.")
+                        rate_limited = True
+                        break
+
+                if processed % 50 == 0:
+                    log(f"[예약률 갱신 {processed}/{len(refresh_targets)}] "
+                        f"DB반영 {refreshed}+버퍼 {len(buf)}(데이터有 {with_data}) 실패 {failed} | HTTP {stats}")
+
+        if not rate_limited and start + REFRESH_CHUNK < len(refresh_targets):
+            _flush()   # 세션 재로그인 전에 버퍼 비움(진행 보존)
             log("세션 갱신 중...")
             cookies = _get_cookies(email, pw)
             session = _make_session(cookies)
 
-    if upd_batch:
-        update_schedules_batch(conn, upd_batch)
-        refreshed += len(upd_batch)
+    # ── 종료 처리 ────────────────────────────────────────────────────
+    if rate_limited:
+        conn.close()
+        log(f"완료(실패). 신규 적재 {ok}건, 예약률 갱신 중단 — DB반영 {refreshed}건 / 실패 {failed}건")
+        sys.exit(1)
 
+    # 체크포인트를 못 넘겼는데(대상이 EARLY_CHECK보다 적음) 데이터가 전무하면 오염 방지로 미반영.
+    if not checkpoint_passed and with_data == 0 and refresh_targets:
+        conn.close()
+        log(f"★ 예약데이터 수신 0건(대상 {len(refresh_targets)}건) — 차단 의심, DB 미반영 종료.")
+        log(f"  HTTP 응답 분포: {stats}")
+        sys.exit(1)
+
+    _flush()   # 남은 버퍼 커밋
     conn.close()
-    log(f"완료. 신규 적재 {ok}건 / 실패 {fail}건, 예약률 갱신 {refreshed}건")
+    log(f"예약률 갱신 집계: DB반영 {refreshed}건(데이터有 {with_data}, 공실 {refreshed - with_data}) "
+        f"/ 실패 {failed}건 / 대상 {len(refresh_targets)}건")
+    log(f"  HTTP 응답 분포: {stats}")
+    log(f"완료. 신규 적재 {ok}건 / 실패 {fail}건, 예약률 갱신(DB반영) {refreshed}건 / 실패 {failed}건")
 
 
 if __name__ == '__main__':
