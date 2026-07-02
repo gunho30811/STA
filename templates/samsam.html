@@ -18,6 +18,10 @@
   .fg{display:flex;flex-direction:column;gap:4px}
   .fg label{font-size:11px;font-weight:700;color:#4b5563}
   .fg select{padding:7px 9px;border:1px solid #d1d5db;border-radius:7px;font-size:13px;background:#fff;min-width:120px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chips label{display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border:1px solid #d1d5db;border-radius:999px;font-size:13px;font-weight:600;color:#475569;background:#fff;cursor:pointer;user-select:none}
+  .chips label.on{background:#2563eb;border-color:#2563eb;color:#fff}
+  .chips input{display:none}
   .fg input{padding:7px 9px;border:1px solid #d1d5db;border-radius:7px;font-size:13px;background:#fff}
   .btn{cursor:pointer;border:none;border-radius:7px;padding:9px 20px;font-size:13px;font-weight:700}
   .btn-go{background:#2563eb;color:#fff}
@@ -73,7 +77,7 @@
 <div class="wrap">
   <div class="panel">
     <div class="filters">
-      <div class="fg"><label>시/도</label><select id="f-sido"><option value="">전체</option></select></div>
+      <div class="fg"><label>시/도 <span class="mut" style="font-weight:400">(복수선택)</span></label><div id="f-sido" class="chips"></div></div>
       <div class="fg"><label>시군구</label><select id="f-sigungu"><option value="">전체</option></select></div>
       <div class="fg"><label>동</label><select id="f-dong"><option value="">전체</option></select></div>
       <div class="fg"><label>건물유형</label><select id="f-btype"><option value="">전체</option></select></div>
@@ -140,7 +144,9 @@
         <b>고정비</b>(통신·청소 등) <input type="number" id="b-fixed" value="0" style="width:70px" onchange="loadBuildings()"> 만 빼기 ·
         <b>최저예약률</b> <input type="number" id="b-occmin" placeholder="예: 50" style="width:60px" onchange="loadBuildings()"> % 이상 ·
         <b>월순수익</b> <input type="number" id="b-netmin" placeholder="예: 0" style="width:60px" onchange="loadBuildings()"> 만원 이상 ·
-        월순수익=삼삼월매출−네이버월세@보증금−관리비−고정비 (셀에 마우스 올리면 분해) · 헤더 클릭 정렬.
+        <b>손익분기점</b> <input type="number" id="b-bemax" placeholder="예: 3" style="width:55px" onchange="loadBuildings()"> 주 이하 ·<br>
+        월순수익=삼삼월매출−네이버월세@보증금−관리비−고정비 (셀에 마우스 올리면 분해) ·
+        <b>손익분기점(주)</b>=(네이버월세@보증금+관리비)÷삼삼주당 → <b>작을수록 회수 빠름(좋음)</b> · 헤더 클릭 정렬.
       </p>
       <div class="flex">
         <span class="mut" id="b-count" style="font-size:12px"></span>
@@ -211,6 +217,9 @@ const LIST_COLS=[
 let LISTITEMS=[], listSort={col:"vac",dir:"desc"}, listOname="";
 
 function v(id){return document.getElementById(id).value;}
+function selectedSidos(){
+  return [...document.querySelectorAll('#f-sido input:checked')].map(x=>x.value);
+}
 async function init(){
   const f=await (await fetch('api/facets')).json();
   TREE=f.tree;
@@ -220,24 +229,42 @@ async function init(){
   srcEl.textContent='출처: '+f.source+' · 총 '+f.total.toLocaleString()+'건';
   if(f.occ_window)document.getElementById('occwin').textContent='🗓 '+f.occ_window;
   const sido=document.getElementById('f-sido');
-  f.sido.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sido.appendChild(o);});
-  sido.onchange=fillSigungu; document.getElementById('f-sigungu').onchange=fillDong;
+  sido.innerHTML='';
+  f.sido.forEach(s=>{
+    const lab=document.createElement('label');
+    const cb=document.createElement('input');cb.type='checkbox';cb.value=s;
+    cb.onchange=()=>{lab.classList.toggle('on',cb.checked);fillSigungu();};
+    lab.appendChild(cb);lab.appendChild(document.createTextNode(s));
+    sido.appendChild(lab);
+  });
+  document.getElementById('f-sigungu').onchange=fillDong;
   analyze();
 }
 function fillSigungu(){
-  const s=v('f-sido'), sg=document.getElementById('f-sigungu');
+  const sel=selectedSidos(), sg=document.getElementById('f-sigungu');
   sg.innerHTML='<option value="">전체</option>';
   document.getElementById('f-dong').innerHTML='<option value="">전체</option>';
-  if(s&&TREE[s])Object.keys(TREE[s]).sort().forEach(g=>{const o=document.createElement('option');o.value=g;o.textContent=g;sg.appendChild(o);});
+  // 선택한 시/도(없으면 전체) 전역에 걸친 시군구 합집합
+  const srcSidos=sel.length?sel:Object.keys(TREE);
+  const gus=new Set();
+  srcSidos.forEach(s=>{if(TREE[s])Object.keys(TREE[s]).forEach(g=>gus.add(g));});
+  [...gus].sort().forEach(g=>{const o=document.createElement('option');o.value=g;o.textContent=g;sg.appendChild(o);});
 }
 function fillDong(){
-  const s=v('f-sido'), g=v('f-sigungu'), d=document.getElementById('f-dong');
+  const sel=selectedSidos(), g=v('f-sigungu'), d=document.getElementById('f-dong');
   d.innerHTML='<option value="">전체</option>';
-  if(s&&g&&TREE[s]&&TREE[s][g])TREE[s][g].forEach(x=>{const o=document.createElement('option');o.value=x;o.textContent=x;d.appendChild(o);});
+  if(!g)return;
+  const srcSidos=sel.length?sel:Object.keys(TREE);
+  const dongs=new Set();
+  srcSidos.forEach(s=>{if(TREE[s]&&TREE[s][g])TREE[s][g].forEach(x=>dongs.add(x));});
+  [...dongs].sort().forEach(x=>{const o=document.createElement('option');o.value=x;o.textContent=x;d.appendChild(o);});
 }
 function params(){
   const p=new URLSearchParams();
-  ['sido','sigungu','dong','btype'].forEach(k=>{const val=v('f-'+(k==='btype'?'btype':k));if(val)p.set(k==='btype'?'building_type':k,val);});
+  selectedSidos().forEach(s=>p.append('sido',s));   // 복수 시/도
+  if(v('f-sigungu'))p.set('sigungu',v('f-sigungu'));
+  if(v('f-dong'))p.set('dong',v('f-dong'));
+  if(v('f-btype'))p.set('building_type',v('f-btype'));
   const rng=(id,key)=>{const val=document.getElementById(id).value.trim();if(val)p.set(key,val);};
   rng('f-pmin','pyeong_min');rng('f-pmax','pyeong_max');rng('f-wmin','week_min');rng('f-wmax','week_max');
   return p;
@@ -369,7 +396,7 @@ function switchView(v){
 let TRD={dates:[],items:[]}, trdSort={col:'latest',dir:'desc'};
 async function loadTrend(){
   const p=new URLSearchParams();
-  if(v('f-sido'))p.set('sido',v('f-sido'));
+  selectedSidos().forEach(s=>p.append('sido',s));
   if(v('f-sigungu'))p.set('sigungu',v('f-sigungu'));
   TRD=await (await fetch('api/trend?'+p)).json();
   renderTrend();
@@ -405,7 +432,7 @@ const BCOLS=[
   {k:'building',t:'건물명',l:true},{k:'dong',t:'동',l:true},{k:'btype',t:'유형',l:true},
   {k:'pyeong',t:'평'},{k:'station',t:'역',l:true},{k:'n',t:'매물수'},{k:'occ_avg',t:'평균예약률%'},
   {k:'occ_min',t:'최저예약률%'},{k:'occ_max',t:'최고예약률%'},{k:'week_avg',t:'평균주당'},
-  {k:'net_avg',t:'월순수익'},{k:'n_matched',t:'매칭수'},{k:'links',t:'링크',l:true,s:false},
+  {k:'net_avg',t:'월순수익'},{k:'breakeven',t:'손익분기(주)'},{k:'n_matched',t:'매칭수'},{k:'links',t:'링크',l:true,s:false},
 ];
 let BLD_VIEW=[];   // 현재 필터·정렬 적용된 화면 표시분(CSV 다운로드가 이걸 그대로 씀)
 async function loadBuildings(){
@@ -415,6 +442,7 @@ async function loadBuildings(){
   const stn=document.getElementById('b-station').value.trim(); if(stn)p.set('station',stn);
   const occmin=document.getElementById('b-occmin').value.trim(); if(occmin)p.set('occ_min_filter',occmin);
   const netmin=document.getElementById('b-netmin').value.trim(); if(netmin)p.set('net_min_filter',netmin);
+  const bemax=document.getElementById('b-bemax').value.trim(); if(bemax)p.set('breakeven_max',bemax);
   const r=await (await fetch('api/buildings?'+p)).json();
   BLD=r.items; renderBuildings();
 }
@@ -425,15 +453,16 @@ function renderBuildings(){
     th.textContent=c.t+(sortable&&c.k===bSort.col?(bSort.dir==='asc'?' ▲':' ▼'):'');
     if(sortable){th.style.cursor='pointer';th.onclick=()=>{if(bSort.col===c.k)bSort.dir=bSort.dir==='asc'?'desc':'asc';else{bSort.col=c.k;bSort.dir='desc';}renderBuildings();};}
     h.appendChild(th);});
-  const isNum=k=>['pyeong','n','occ_avg','occ_min','occ_max','week_avg','net_avg','n_matched'].includes(k);
+  const isNum=k=>['pyeong','n','occ_avg','occ_min','occ_max','week_avg','net_avg','breakeven','n_matched'].includes(k);
   const k=bSort.col;
+  // 손익분기점은 '작을수록 좋음'이라 정렬 시 null(매칭없음)은 항상 뒤로 보낸다.
   const rows=[...BLD].sort((a,b)=>{let av=a[k],bv=b[k];
-    if(isNum(k)){av=av==null?-Infinity:av;bv=bv==null?-Infinity:bv;return bSort.dir==='asc'?av-bv:bv-av;}
+    if(isNum(k)){const far=bSort.dir==='asc'?Infinity:-Infinity;av=av==null?far:av;bv=bv==null?far:bv;return bSort.dir==='asc'?av-bv:bv-av;}
     return bSort.dir==='asc'?String(av).localeCompare(String(bv),'ko'):String(bv).localeCompare(String(av),'ko');});
   BLD_VIEW=rows;
   document.getElementById('b-count').textContent=rows.length?`${rows.length.toLocaleString()}개 건물`:'';
   const b=document.getElementById('b-b');
-  if(!rows.length){b.innerHTML='<tr><td colspan="13" class="empty">매물수 조건을 만족하는 건물이 없습니다.</td></tr>';return;}
+  if(!rows.length){b.innerHTML='<tr><td colspan="14" class="empty">매물수 조건을 만족하는 건물이 없습니다.</td></tr>';return;}
   b.innerHTML=rows.map(r=>{
     const minc=r.occ_min>=60?'good':(r.occ_min<30?'bad':'mut');
     const netc=r.net_avg==null?'mut':(r.net_avg>=0?'good':'bad');
@@ -445,12 +474,21 @@ function renderBuildings(){
           +(b.fixed?`\n− 고정비 ${b.fixed}`:'')+`\n= 월순수익 ${r.net_avg} 만원`;}
       netv=`<span class="${netc}" style="font-weight:800;cursor:help;border-bottom:1px dotted #94a3b8" title="${tip}">${r.net_avg}</span>`;
     }
+    // 손익분기점: 작을수록 회수 빠름(좋음). 3주 이하 초록 / 6주 초과 빨강.
+    let bev='<span class="mut">-</span>';
+    if(r.breakeven!=null){
+      const bc=r.breakeven<=3?'good':(r.breakeven>6?'bad':'');
+      let btip='';
+      if(r.bd){const b=r.bd;
+        btip=`(네이버월세 ${b.rent} + 관리비 ${b.mgmt}) ÷ 주당 ${r.week_avg}\n= ${r.breakeven}주면 월 고정비용 회수`;}
+      bev=`<span class="${bc}" style="font-weight:800;cursor:help;border-bottom:1px dotted #94a3b8" title="${btip}">${r.breakeven}주</span>`;
+    }
     const links=(r.sam_url?`<a class="lnk" href="${r.sam_url}" target="_blank">삼삼 예시</a>`:'')
       +(r.naver_url?` <a class="lnk" style="background:#2563eb" href="${r.naver_url}" target="_blank">부동산</a>`:'');
     return `<tr><td class="l" style="font-weight:700">${r.building}</td><td class="l">${r.dong}</td><td class="l">${r.btype}</td><td>${r.pyeong??'-'}</td><td class="l">${r.station||'-'}</td>
       <td style="font-weight:800">${r.n}</td><td class="occ">${r.occ_avg}%</td>
       <td class="${minc}" style="font-weight:800">${r.occ_min}%</td><td class="mut">${r.occ_max}%</td><td>${r.week_avg}</td>
-      <td>${netv}</td><td class="mut">${r.n_matched||0}</td><td class="l">${links||'<span class="mut">-</span>'}</td></tr>`;
+      <td>${netv}</td><td>${bev}</td><td class="mut">${r.n_matched||0}</td><td class="l">${links||'<span class="mut">-</span>'}</td></tr>`;
   }).join('');
 }
 function csvCell(v){
@@ -460,11 +498,11 @@ function csvCell(v){
 function downloadBuildingsCsv(){
   if(!BLD_VIEW.length){alert('다운로드할 건물이 없습니다.');return;}
   const header=['건물명','시군구','동','유형','평','역','매물수','평균예약률%','최저예약률%','최고예약률%',
-    '평균주당(만원)','월순수익(만원)','매칭수','부동산링크','삼삼엠투_경쟁예시링크'];
+    '평균주당(만원)','월순수익(만원)','손익분기점(주)','매칭수','부동산링크','삼삼엠투_경쟁예시링크'];
   const lines=[header.map(csvCell).join(',')];
   BLD_VIEW.forEach(r=>{
     lines.push([r.building,r.sigungu,r.dong,r.btype,r.pyeong??'',r.station||'',r.n,r.occ_avg,
-      r.occ_min,r.occ_max,r.week_avg,r.net_avg??'',r.n_matched||0,r.naver_url||'',r.sam_url||'']
+      r.occ_min,r.occ_max,r.week_avg,r.net_avg??'',r.breakeven??'',r.n_matched||0,r.naver_url||'',r.sam_url||'']
       .map(csvCell).join(','));
   });
   const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8;'});

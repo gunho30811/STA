@@ -234,15 +234,26 @@ def _city(sigungu):
     return (sigungu or "").split(" ")[0]
 
 
+def _multi(a, key):
+    """쿼리에서 같은 key로 온 여러 값(복수 선택)을 리스트로 — 콤마로 붙여 보낸 것도 분해.
+    request.args(MultiDict)면 getlist, 일반 dict면 get 폴백."""
+    getlist = getattr(a, "getlist", None)
+    raw = getlist(key) if getlist else ([a.get(key)] if a.get(key) else [])
+    out = []
+    for v in raw:
+        out.extend(p.strip() for p in str(v).split(",") if p.strip())
+    return out
+
+
 def _filtered(a):
     rows = L()
     for key in ("sido", "dong", "building_type"):
-        v = a.get(key)
-        if v:
-            rows = [r for r in rows if r.get(key) == v]
-    sigungu = a.get("sigungu")
+        vals = set(_multi(a, key))
+        if vals:
+            rows = [r for r in rows if r.get(key) in vals]
+    sigungu = set(_multi(a, "sigungu"))
     if sigungu:
-        rows = [r for r in rows if _city(r.get("sigungu")) == sigungu]
+        rows = [r for r in rows if _city(r.get("sigungu")) in sigungu]
 
     def rng(field, lo, hi, scale=1.0):
         nonlocal rows
@@ -425,6 +436,10 @@ def api_buildings():
         net_min_filter = float(a["net_min_filter"]) if a.get("net_min_filter") else None
     except ValueError:
         net_min_filter = None
+    try:
+        be_max_filter = float(a["breakeven_max"]) if a.get("breakeven_max") else None
+    except ValueError:
+        be_max_filter = None
     by = {}
     for r in rows:
         bn = (r.get("building_name") or "").strip()
@@ -443,6 +458,13 @@ def api_buildings():
         avg = (lambda key: round(statistics.mean(c[key] for c in calcs), 1)) if calcs else (lambda key: None)
         # 링크용 대표 매물: 네이버 매칭이 있는 방을 우선(부동산링크까지 같이 나오게), 없으면 그냥 첫 방.
         sample = next((x for x in xs if M().get(x["room_id"], {}).get("nUrl")), xs[0])
+        week_avg = round(statistics.mean(x["sam_week_man"] for x in xs), 1)
+        # 손익분기점(주) = (네이버월세@보증금 + 관리비) ÷ 삼삼 주당매출.
+        # 월 고정비용을 주당 매출로 갚는 데 걸리는 주 수 → 작을수록 회수 빠름(좋음).
+        breakeven = None
+        if calcs and week_avg > 0:
+            monthly_cost = avg("rent") + avg("mgmt")
+            breakeven = round(monthly_cost / week_avg, 1)
         out.append({
             "building": bn, "sigungu": sg, "dong": dong,
             "btype": xs[0].get("building_type", ""),
@@ -451,9 +473,10 @@ def api_buildings():
             "occ_avg": round(statistics.mean(occs), 1),
             "occ_min": round(min(occs), 1),
             "occ_max": round(max(occs), 1),
-            "week_avg": round(statistics.mean(x["sam_week_man"] for x in xs), 1),
+            "week_avg": week_avg,
             "n_matched": len(calcs),
             "net_avg": avg("net"),
+            "breakeven": breakeven,
             # 월순수익 분해(보증금 기준 평균): 삼삼매출 − 네이버월세 − 관리비 − 고정비
             "bd": {"maxRev": avg("maxRev"), "rent": avg("rent"), "mgmt": avg("mgmt"),
                    "dep": dep, "fixed": fixed} if calcs else None,
@@ -466,6 +489,8 @@ def api_buildings():
         out = [r for r in out if r["occ_min"] >= occ_min_filter]
     if net_min_filter is not None:
         out = [r for r in out if r["net_avg"] is not None and r["net_avg"] >= net_min_filter]
+    if be_max_filter is not None:
+        out = [r for r in out if r["breakeven"] is not None and r["breakeven"] <= be_max_filter]
     # 평균예약률 높고 매물 많은 순. (최저예약률도 높으면 전 호실 검증된 건물)
     out.sort(key=lambda r: (-r["occ_avg"], -r["n"]))
     return jsonify({"total": len(out), "items": out})
@@ -476,13 +501,14 @@ def api_trend():
     """주간 스냅샷(samsam_snapshots)으로 지역(동)별 예약률 추이 + 전주대비 변화(Δ)."""
     a = request.args
     rows = []
-    sido_f, sigungu_f = a.get("sido"), a.get("sigungu")
+    sido_f = set(_multi(a, "sido"))            # 복수 시/도
+    sigungu_f = set(_multi(a, "sigungu"))
     try:
         if os.path.exists(SNAP_EXPORT):   # 파일 우선(DB 왕복 없음)
             for r in _load_jsonl(SNAP_EXPORT):
-                if sido_f and r.get("sido") != sido_f:
+                if sido_f and r.get("sido") not in sido_f:
                     continue
-                if sigungu_f and r.get("sigungu") != sigungu_f:
+                if sigungu_f and _city(r.get("sigungu")) not in sigungu_f:
                     continue
                 rows.append(r)
         else:
@@ -490,9 +516,9 @@ def api_trend():
             conn = db.connect()
             where, params = [], []
             if sido_f:
-                where.append("sido=%s"); params.append(sido_f)
+                where.append("sido = ANY(%s)"); params.append(list(sido_f))
             if sigungu_f:
-                where.append("sigungu=%s"); params.append(sigungu_f)
+                where.append("sigungu = ANY(%s)"); params.append(list(sigungu_f))
             w = (" WHERE " + " AND ".join(where)) if where else ""
             rows = [dict(r) for r in conn.execute(
                 "SELECT snapshot_date, sido, sigungu, dong, n, avg_occ_1m"
