@@ -626,8 +626,8 @@ def chat_api_rooms():
     u = current_user()
     conn = db.connect()
     rows = conn.execute(
-        "SELECT r.id, r.room_name, r.last_message, r.last_message_time, r.last_read_at, "
-        "r.chat_room_status, r.contract_status, a.label, a.samsam_email "
+        "SELECT r.id, r.room_name, r.counterpart_nickname, r.last_message, r.last_message_time, "
+        "r.last_read_at, r.chat_room_status, r.contract_status, a.label, a.samsam_email "
         "FROM samsam_chat_rooms r JOIN samsam_accounts a ON a.id = r.account_id "
         "WHERE a.member_id=%s AND r.host_or_guest='host' "
         "ORDER BY r.last_message_time DESC NULLS LAST", (u["id"],)).fetchall()
