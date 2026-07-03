@@ -386,10 +386,12 @@ def init_db(force=False):
         building_type  TEXT,
         n              INTEGER,
         avg_occ_1m     REAL,
+        avg_occ_2m     REAL,
         avg_occ_3m     REAL,
         avg_week       REAL,
         PRIMARY KEY (snapshot_date, sido, sigungu, dong, building_type)
     )""")
+    conn.execute("ALTER TABLE samsam_snapshots ADD COLUMN IF NOT EXISTS avg_occ_2m REAL")
     # 회원/로그인. 관리자는 username, 일반회원은 email로 로그인. 비번은 해시 저장.
     # (이름이 Supabase 예약 auth.users 와 헷갈려 public.members 로 명명)
     conn.execute("""

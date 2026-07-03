@@ -25,7 +25,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 import db
 
 COLS = ["snapshot_date", "sido", "sigungu", "dong", "building_type",
-        "n", "avg_occ_1m", "avg_occ_3m", "avg_week"]
+        "n", "avg_occ_1m", "avg_occ_2m", "avg_occ_3m", "avg_week"]
 
 
 def main():
@@ -38,7 +38,7 @@ def main():
     conn = db.connect()
     rows = [dict(r) for r in conn.execute(
         "SELECT sido, sigungu, dong, building_type,"
-        " booked_days_1m, blocked_days_1m, booked_days_3m, rent_total_weekly"
+        " booked_days_1m, blocked_days_1m, booked_days_2m, booked_days_3m, rent_total_weekly"
         " FROM samsam_listings"
     ).fetchall()]
     print(f"samsam_listings {len(rows)}건 → 스냅샷({args.date})")
@@ -49,10 +49,12 @@ def main():
                r.get("building_type") or "")
         bk1, bl1 = r.get("booked_days_1m") or 0, r.get("blocked_days_1m") or 0
         occ1 = min(1.0, bk1 / max(31 - bl1, 1))
+        occ2 = min(1.0, (r.get("booked_days_2m") or 0) / 61)
         occ3 = min(1.0, (r.get("booked_days_3m") or 0) / 91)
         wk = (r.get("rent_total_weekly") or 0) / 10000
-        groups.setdefault(key, {"occ1": [], "occ3": [], "wk": []})
+        groups.setdefault(key, {"occ1": [], "occ2": [], "occ3": [], "wk": []})
         groups[key]["occ1"].append(occ1)
+        groups[key]["occ2"].append(occ2)
         groups[key]["occ3"].append(occ3)
         groups[key]["wk"].append(wk)
 
@@ -61,6 +63,7 @@ def main():
         out.append([
             args.date, sido, sigungu, dong, bt, len(g["occ1"]),
             round(statistics.mean(g["occ1"]) * 100, 1),
+            round(statistics.mean(g["occ2"]) * 100, 1),
             round(statistics.mean(g["occ3"]) * 100, 1),
             round(statistics.mean(g["wk"]), 1),
         ])

@@ -27,7 +27,7 @@ def main():
     c = db.connect()
     dump(c.execute(f"SELECT {COLS} FROM samsam_listings ORDER BY room_id").fetchall(),
          os.path.join(LAB, "samsam_listings.jsonl"))
-    dump(c.execute("SELECT snapshot_date,sido,sigungu,dong,building_type,n,avg_occ_1m,avg_occ_3m,avg_week "
+    dump(c.execute("SELECT snapshot_date,sido,sigungu,dong,building_type,n,avg_occ_1m,avg_occ_2m,avg_occ_3m,avg_week "
                    "FROM samsam_snapshots "
                    "ORDER BY snapshot_date,sido,sigungu,dong,building_type").fetchall(),
          os.path.join(LAB, "samsam_snapshots.jsonl"))

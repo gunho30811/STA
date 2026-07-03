@@ -545,8 +545,15 @@ def api_buildings():
 
 @app.route("/api/trend")
 def api_trend():
-    """주간 스냅샷(samsam_snapshots)으로 지역(동)별 예약률 추이 + 전주대비 변화(Δ)."""
+    """주간 스냅샷으로 지역(시도·시군구·동)별 예약률(1/2/3달) 추이 + 전주대비 Δ +
+    그 동의 최고 인기 삼삼 오피스텔(현재 매물). 동별 베스트는 예약률 min_occ%(기본 20) 이상만."""
     a = request.args
+    metric = a.get("metric", "occ1")
+    col = {"occ1": "avg_occ_1m", "occ2": "avg_occ_2m", "occ3": "avg_occ_3m"}.get(metric, "avg_occ_1m")
+    try:
+        min_occ = float(a.get("min_occ", 20) or 20)
+    except ValueError:
+        min_occ = 20.0
     rows = []
     sido_f = set(_multi(a, "sido"))            # 복수 시/도
     sigungu_f = set(_multi(a, "sigungu"))
@@ -568,31 +575,48 @@ def api_trend():
                 where.append("sigungu = ANY(%s)"); params.append(list(sigungu_f))
             w = (" WHERE " + " AND ".join(where)) if where else ""
             rows = [dict(r) for r in conn.execute(
-                "SELECT snapshot_date, sido, sigungu, dong, n, avg_occ_1m"
+                "SELECT snapshot_date, sido, sigungu, dong, n, avg_occ_1m, avg_occ_2m, avg_occ_3m"
                 f" FROM samsam_snapshots{w}", params).fetchall()]
             conn.close()
     except Exception as e:
         return jsonify({"dates": [], "items": [], "error": str(e)[:80]})
 
+    # 그 동에서 현재 가장 인기 있는 삼삼 오피스텔(예약률 min_occ%+): (sido,sigungu,dong)->{occ,name,url}
+    top_office = {}
+    for r in L():
+        if r.get("building_type") != "오피스텔":
+            continue
+        occ = round((r.get("occ") or 0) * 100, 1)
+        if occ < min_occ:
+            continue
+        key = (r.get("sido") or "", r.get("sigungu") or "", r.get("dong") or "")
+        cur = top_office.get(key)
+        if not cur or occ > cur["occ"]:
+            top_office[key] = {"occ": occ, "name": r.get("name") or r.get("building_name") or "",
+                               "url": r.get("url") or ""}
+
     dates = sorted({r["snapshot_date"] for r in rows})
-    agg = {}   # (sigungu,dong) -> {date: [sum n*occ, sum n]}
+    agg = {}   # (sido,sigungu,dong) -> {date: [sum n*occ, sum n]}
     for r in rows:
-        key = (r["sigungu"] or "", r["dong"] or "")
+        key = (r.get("sido") or "", r.get("sigungu") or "", r.get("dong") or "")
         cell = agg.setdefault(key, {}).setdefault(r["snapshot_date"], [0.0, 0])
-        cell[0] += (r["avg_occ_1m"] or 0) * (r["n"] or 0)
-        cell[1] += r["n"] or 0
+        cell[0] += (r.get(col) or 0) * (r.get("n") or 0)
+        cell[1] += r.get("n") or 0
 
     out = []
-    for (sg, dong), dd in agg.items():
+    for (sido, sg, dong), dd in agg.items():
         series = {d: (round(v[0] / v[1], 1) if v[1] else None) for d, v in dd.items()}
         latest = series.get(dates[-1]) if dates else None
         prev = series.get(dates[-2]) if len(dates) >= 2 else None
         delta = round(latest - prev, 1) if (latest is not None and prev is not None) else None
         n_latest = dd.get(dates[-1], [0, 0])[1] if dates else 0
-        out.append({"sigungu": sg, "dong": dong, "series": series,
-                    "latest": latest, "delta": delta, "n": n_latest})
-    out.sort(key=lambda r: (r["latest"] is None, -(r["latest"] or 0)))
-    return jsonify({"dates": dates, "items": out})
+        if latest is None or latest < min_occ:   # 동별 베스트: min_occ%(기본 20) 이상만
+            continue
+        out.append({"sido": sido, "sigungu": sg, "dong": dong, "series": series,
+                    "latest": latest, "delta": delta, "n": n_latest,
+                    "top_office": top_office.get((sido, sg, dong))})
+    out.sort(key=lambda r: -(r["latest"] or 0))
+    return jsonify({"dates": dates, "items": out, "metric": metric})
 
 
 GH_REPO = "gunho30811/STA"
