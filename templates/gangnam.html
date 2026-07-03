@@ -97,6 +97,8 @@
       <div class="typebtns" id="f-types"></div>
     </div>
     <div class="filters">
+      <div class="fg"><label>시/도</label><select id="f-sido" onchange="cascadeSido()"><option value="">전체</option></select></div>
+      <div class="fg"><label>시/군/구</label><select id="f-sigungu2" onchange="cascadeSigungu()"><option value="">전체</option></select></div>
       <div class="fg"><label>동</label><select id="f-dong"><option value="">전체</option></select></div>
       <div class="fg"><label>키워드(건물/요약/주소/역)</label><input id="f-kw" placeholder="예: 래미안, 역세권"></div>
       <div class="fg"><label>보증금(만)</label><div style="display:flex;gap:4px"><input type="number" id="f-depmin" placeholder="최소"><input type="number" id="f-depmax" placeholder="최대"></div></div>
@@ -168,8 +170,11 @@ async function init(){
     b.onclick=()=>{ b.classList.toggle('on'); if(selTypes.has(t.code))selTypes.delete(t.code); else selTypes.add(t.code); };
     tb.appendChild(b);
   });
-  const ds=document.getElementById('f-dong');
-  f.dongs.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;ds.appendChild(o);});
+  REGIONS = f.regions||[];
+  const sidos=[...new Set(REGIONS.map(r=>r[0]))].filter(Boolean).sort();
+  const ss=document.getElementById('f-sido');
+  sidos.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;ss.appendChild(o);});
+  cascadeSido();   // 시군구·동 목록 초기화
   if(f.office!=null)document.getElementById('office-n').textContent='('+f.office.toLocaleString()+'건)';
 
   const s = await (await fetch('api/stats')).json();
@@ -182,9 +187,23 @@ async function init(){
   search(1);
 }
 function v(id){return document.getElementById(id).value.trim();}
+let REGIONS=[];
+function cascadeSido(){
+  const sido=v('f-sido');
+  const sgs=[...new Set(REGIONS.filter(r=>!sido||r[0]===sido).map(r=>r[1]))].filter(Boolean).sort();
+  document.getElementById('f-sigungu2').innerHTML='<option value="">전체</option>'+sgs.map(s=>`<option>${s}</option>`).join('');
+  cascadeSigungu();
+}
+function cascadeSigungu(){
+  const sido=v('f-sido'), sg=v('f-sigungu2');
+  const ds=[...new Set(REGIONS.filter(r=>(!sido||r[0]===sido)&&(!sg||r[1]===sg)).map(r=>r[2]))].filter(Boolean).sort();
+  document.getElementById('f-dong').innerHTML='<option value="">전체</option>'+ds.map(d=>`<option>${d}</option>`).join('');
+}
 async function search(page){
   const p=new URLSearchParams();
   if(selTypes.size)p.set('types',[...selTypes].join(','));
+  if(v('f-sido'))p.set('sido',v('f-sido'));
+  if(v('f-sigungu2'))p.set('sigungu',v('f-sigungu2'));
   if(v('f-dong'))p.set('dongs',v('f-dong'));
   if(v('f-kw'))p.set('keyword',v('f-kw'));
   if(v('f-depmin'))p.set('deposit_min',v('f-depmin'));
@@ -277,7 +296,8 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeM();});
 function resetF(){
   selTypes.clear();document.querySelectorAll('#f-types button').forEach(b=>b.classList.remove('on'));
   document.querySelectorAll('.panel input').forEach(i=>i.value='');
-  document.getElementById('f-dong').value='';document.getElementById('f-sort').value='recent';
+  document.getElementById('f-sido').value='';cascadeSido();   // 시군구·동 원복
+  document.getElementById('f-sort').value='recent';
   search(1);
 }
 document.getElementById('f-kw').addEventListener('keydown',e=>{if(e.key==='Enter')search(1);});

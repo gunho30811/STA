@@ -127,11 +127,15 @@ def index():
 @app.route("/api/facets")
 def api_facets():
     dongs = sorted({x.get("dong") for x in L() if x.get("dong")})
+    # 시도→시군구→동 트리(동 필터가 어디 동인지 알게 — 시도부터 좁혀 선택).
+    regions = sorted({(x.get("sido") or "", x.get("sigungu") or "", x.get("dong") or "")
+                      for x in L() if x.get("dong")})
     types = [{"code": c, "name": TYPE_NAMES.get(c, c)}
              for c in ["APT", "OPST", "VL", "OR", "DDDGG", "SG"]
              if any(x.get("building_type_code") == c for x in L())]
     office_n = sum(1 for x in L() if _is_office(x))
-    return jsonify({"dongs": dongs, "types": types, "total": len(L()), "office": office_n})
+    return jsonify({"dongs": dongs, "regions": regions, "types": types,
+                    "total": len(L()), "office": office_n})
 
 
 @app.route("/api/stats")
@@ -164,6 +168,13 @@ def api_listings():
     types = [t for t in a.get("types", "").split(",") if t]
     if types:
         items = [x for x in items if x.get("building_type_code") in types]
+
+    sido = a.get("sido", "").strip()
+    if sido:
+        items = [x for x in items if x.get("sido") == sido]
+    sigungu = a.get("sigungu", "").strip()
+    if sigungu:
+        items = [x for x in items if x.get("sigungu") == sigungu]
 
     dongs = [d for d in a.get("dongs", "").split(",") if d]
     if dongs:
