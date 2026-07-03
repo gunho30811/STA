@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-강남구 네이버부동산 매물 뷰어 (Flask).
+수도권 네이버부동산 매물 뷰어 (Flask).
 
-lab/naver_listings_gangnam.jsonl (naver_listings 스키마, 강남 5타입 전수 10,363건)을
+lab/naver_listings.jsonl (naver_listings 스키마, 서울·경기·인천 전 유형)을
 그대로 읽어 카드 그리드 + 상세 모달로 보여준다. DB 불필요(로컬 jsonl만 읽음).
+export: python pipeline/naver/export_jsonl.py
 
     python web/gangnam_app.py        # http://127.0.0.1:5002
 """
@@ -13,7 +14,7 @@ import os
 from flask import Flask, jsonify, render_template, request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA = os.path.join(ROOT, "lab", "naver_listings_gangnam.jsonl")
+DATA = os.path.join(ROOT, "lab", "naver_listings.jsonl")
 M2_PER_PYEONG = 3.305785
 
 app = Flask(__name__, template_folder=os.path.join(ROOT, "templates"))
@@ -154,7 +155,7 @@ def _n(v):
 
 if __name__ == "__main__":
     import socket
-    print(f"강남 매물 {len(L())}건 로드됨")
+    print(f"수도권 부동산 매물 {len(L())}건 로드됨")
     try:
         ip = socket.gethostbyname(socket.gethostname())
     except Exception:

@@ -57,8 +57,8 @@ box-shadow:0 10px 30px rgba(0,0,0,.25);transition:.15s}
     <p>삼삼 단기임대 풀가동 시 부동산 월세 대비 최대수익·순수익, 동/역 순위</p></a>
   <a class=card href="/samsam/"><div class=ic>🛋️</div><h2>삼삼 분석</h2>
     <p>옵션별 예약률 영향, 건물 인기(월순수익), 지역 예약률 트렌드</p></a>
-  <a class=card href="/gangnam/"><div class=ic>🏙️</div><h2>부동산 강남 매물</h2>
-    <p>강남구 부동산 매물 카드/상세 탐색</p></a>
+  <a class=card href="/gangnam/"><div class=ic>🏙️</div><h2>부동산 매물</h2>
+    <p>수도권(서울·경기·인천) 부동산 매물 카드/상세 탐색</p></a>
 </div>
 {% if user.role == 'admin' %}<div class=admin><a href="/auth/crawl">📊 크롤링 현황</a>
   &nbsp;·&nbsp; <a href="/auth/members">👥 회원 관리 →</a></div>{% endif %}
