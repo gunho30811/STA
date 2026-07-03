@@ -500,11 +500,13 @@ function csvCell(v){
 function downloadBuildingsCsv(){
   if(!BLD_VIEW.length){alert('다운로드할 건물이 없습니다.');return;}
   const header=['건물명','시군구','동','유형','평','역','매물수','평균예약률%','최저예약률%','최고예약률%',
-    '평균주당(만원)','월순수익(만원)','손익분기점(주)','매칭수','부동산링크','삼삼엠투_경쟁예시링크'];
+    '평균주당(만원)','월순수익(만원)','손익분기점(주)','매칭수',
+    '부동산번호','중개사무소','대표월세(만원)','대표보증금(만원)','대표층수','부동산링크','삼삼엠투_경쟁예시링크'];
   const lines=[header.map(csvCell).join(',')];
   BLD_VIEW.forEach(r=>{
     lines.push([r.building,r.sigungu,r.dong,r.btype,r.pyeong??'',r.station||'',r.n,r.occ_avg,
-      r.occ_min,r.occ_max,r.week_avg,r.net_avg??'',r.breakeven??'',r.n_matched||0,r.naver_url||'',r.sam_url||'']
+      r.occ_min,r.occ_max,r.week_avg,r.net_avg??'',r.breakeven??'',r.n_matched||0,
+      r.phone||'',r.office||'',r.nv_rent??'',r.nv_dep??'',r.nv_floor||'',r.naver_url||'',r.sam_url||'']
       .map(csvCell).join(','));
   });
   const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8;'});
