@@ -111,6 +111,7 @@
         <option value="area_desc">면적 넓은순</option>
         <option value="area_asc">면적 좁은순</option>
       </select></div>
+      <div class="fg"><label>🏢 업무용</label><label style="display:flex;align-items:center;gap:6px;font-weight:700;cursor:pointer;padding:7px 0"><input type="checkbox" id="f-office" onchange="search(1)"> 업무용 오피스텔만 <span class="mut" id="office-n" style="font-weight:400"></span></label></div>
       <div class="fg"><label>&nbsp;</label><button class="btn btn-go" onclick="search(1)">검색</button></div>
       <div class="fg"><label>&nbsp;</label><button class="btn btn-reset" onclick="resetF()">초기화</button></div>
     </div>
@@ -169,6 +170,7 @@ async function init(){
   });
   const ds=document.getElementById('f-dong');
   f.dongs.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;ds.appendChild(o);});
+  if(f.office!=null)document.getElementById('office-n').textContent='('+f.office.toLocaleString()+'건)';
 
   const s = await (await fetch('api/stats')).json();
   document.getElementById('c-total').textContent = s.total.toLocaleString();
@@ -191,6 +193,7 @@ async function search(page){
   if(v('f-rentmax'))p.set('rent_max',v('f-rentmax'));
   if(v('f-pmin'))p.set('pyeong_min',v('f-pmin'));
   if(v('f-pmax'))p.set('pyeong_max',v('f-pmax'));
+  if(document.getElementById('f-office').checked)p.set('office','1');
   p.set('sort',v('f-sort'));p.set('page',page);p.set('size',24);
   const r=await (await fetch('api/listings?'+p)).json();
   curItems=r.items;
