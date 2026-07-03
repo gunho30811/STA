@@ -88,6 +88,9 @@ def source_articles(args):
     if ex:
         q += f" AND (realEstateType IS NULL OR realEstateType NOT IN ({','.join('?' * len(ex))}))"
         p += ex
+    # 최신 수집분(방금 리스트 크롤한 살아있는 매물) 우선 상세. 안 그러면 몇 주 전 죽은 backlog부터
+    # 집어 articleDetail 없는 만료매물만 훑느라 상세가 0건이 된다(실측 확인).
+    q += " ORDER BY crawled_at DESC"
     out = []
     for r in conn.execute(q, p):
         no = r[0]

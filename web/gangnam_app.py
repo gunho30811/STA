@@ -26,6 +26,15 @@ TYPE_NAMES = {
     "OR": "원룸", "DDDGG": "단독/다가구", "SG": "상가",
 }
 
+# 업무용 오피스텔 판별: 부동산이 상세 summary에 '업무용' 또는 '전입(신고) 불가'라고 써놓은 것.
+# 주의: '전입신고'만 매칭하면 '전입신고 가능'(주거용)까지 잡히므로, 반드시 '불가'가 붙은 문구만.
+OFFICE_KW = ("업무용", "전입불가", "전입 불가", "전입신고 불가", "전입신고불가")
+
+
+def _is_office(x):
+    return x.get("building_type_code") == "OPST" and \
+        any(k in (x.get("summary") or "") for k in OFFICE_KW)
+
 
 def _load():
     rows = []
@@ -65,7 +74,8 @@ def api_facets():
     types = [{"code": c, "name": TYPE_NAMES.get(c, c)}
              for c in ["APT", "OPST", "VL", "OR", "DDDGG", "SG"]
              if any(x.get("building_type_code") == c for x in L())]
-    return jsonify({"dongs": dongs, "types": types, "total": len(L())})
+    office_n = sum(1 for x in L() if _is_office(x))
+    return jsonify({"dongs": dongs, "types": types, "total": len(L()), "office": office_n})
 
 
 @app.route("/api/stats")
@@ -124,6 +134,10 @@ def api_listings():
                     return True
             return False
         items = [x for x in items if hit(x)]
+
+    # 업무용 오피스텔: 부동산이 상세에 '업무용'·'전입신고 불가'라고 명시한 오피스텔만.
+    if a.get("office") == "1":
+        items = [x for x in items if _is_office(x)]
 
     sort = a.get("sort", "recent")
     keyf = {
