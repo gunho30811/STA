@@ -88,13 +88,13 @@
   </div>
 
   <div class="tabs2">
-    <button id="tab-option" class="on" onclick="switchView('option')">옵션 영향</button>
-    <button id="tab-building" onclick="switchView('building')">건물 인기</button>
+    <button id="tab-building" class="on" onclick="switchView('building')">건물 인기</button>
     <button id="tab-ranking" onclick="switchView('ranking')">🏆 랭킹</button>
     <button id="tab-trend" onclick="switchView('trend')">지역 트렌드</button>
+    <button id="tab-option" onclick="switchView('option')">옵션 영향</button>
   </div>
 
-  <div id="view-option">
+  <div id="view-option" style="display:none">
   <div class="cards">
     <div class="card"><div class="lbl">대상 매물수</div><div class="val" id="c-n">-</div></div>
     <div class="card"><div class="lbl">평균 예약률</div><div class="val" id="c-occ">-<small> %</small></div></div>
@@ -134,7 +134,7 @@
   </div>
   </div><!-- /view-option -->
 
-  <div id="view-building" style="display:none">
+  <div id="view-building">
     <div class="panel">
       <h2 class="sec">건물(오피스텔) 인기 순위 — 한 건물에 삼삼 여러 채가 <b>다 잘 나가면</b> 검증된 건물 🔥</h2>
       <p class="hint">
@@ -170,7 +170,12 @@
         매주 크롤 직후 <code>snapshot.py</code> 실행분이 쌓여요. <b>최신예약률</b>·<b>전주대비 Δ</b>(▲상승=수요↑, ▼하락) + 주차별 값.
         스냅샷이 1개뿐이면 현재값만 보이고, 2주차부터 변화가 나타나요. 위 시/도·시군구 필터 적용.
       </p>
-      <div style="margin:4px 0 10px">최소 매물수 <input type="number" id="tr-minn" value="5" style="width:70px;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px" onchange="renderTrend()">개 이상만 보기 <span class="mut" style="font-size:11.5px">(표본 적은 동네 노이즈 제외)</span></div>
+      <div style="margin:4px 0 10px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:12.5px">
+        <span>예약률 기준 <select id="tr-metric" onchange="loadTrend()" style="padding:6px 8px;border:1px solid #d1d5db;border-radius:6px">
+          <option value="occ1">1달</option><option value="occ2">2달</option><option value="occ3">3달</option></select></span>
+        <span>최소 매물수 <input type="number" id="tr-minn" value="5" style="width:64px;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px" onchange="renderTrend()">개 이상</span>
+        <span class="mut" style="font-size:11.5px">예약률 20%↑ 동만(베스트) · 표본 적은 동 제외</span>
+      </div>
       <div id="trend-empty" class="empty" style="display:none">아직 스냅샷이 없어요. 크롤 후 <code>python pipeline/samsam/snapshot.py</code> 실행하면 첫 데이터가 쌓여요.</div>
       <div class="scroll">
         <table>
@@ -267,7 +272,7 @@ async function init(){
     sido.appendChild(lab);
   });
   document.getElementById('f-sigungu').onchange=fillDong;
-  analyze();
+  loadBuildings();   // 기본 탭: 건물 인기
 }
 function fillSigungu(){
   const sel=selectedSidos(), sg=document.getElementById('f-sigungu');
@@ -411,7 +416,7 @@ function renderListBody(){
   });
 }
 // ── 뷰 전환 (옵션 영향 / 건물 인기 / 지역 트렌드) ──
-let currentView='option';
+let currentView='building';
 function runView(){
   if(currentView==='option')return analyze();
   if(currentView==='building')return loadBuildings();
@@ -470,14 +475,16 @@ async function loadTrend(){
   const p=new URLSearchParams();
   selectedSidos().forEach(s=>p.append('sido',s));
   if(v('f-sigungu'))p.set('sigungu',v('f-sigungu'));
+  p.set('metric',document.getElementById('tr-metric').value);
   TRD=await (await fetch('api/trend?'+p)).json();
   renderTrend();
 }
 function renderTrend(){
   const empty=document.getElementById('trend-empty');
   empty.style.display=TRD.items.length?'none':'';
-  const cols=[{k:'dong',t:'동',l:true},{k:'sigungu',t:'시군구',l:true},{k:'n',t:'매물수'},
-    {k:'latest',t:'최신예약률%'},{k:'delta',t:'전주대비Δ'}];
+  const mlabel={occ1:'1달',occ2:'2달',occ3:'3달'}[TRD.metric||'occ1'];
+  const cols=[{k:'sido',t:'시도',l:true},{k:'sigungu',t:'시군구',l:true},{k:'dong',t:'동',l:true},{k:'n',t:'매물수'},
+    {k:'latest',t:mlabel+'예약률%'},{k:'delta',t:'전주대비Δ'},{k:'top',t:'최고 인기 오피스텔(현재)',l:true}];
   TRD.dates.forEach(d=>cols.push({k:'d:'+d,t:d.slice(5),date:true}));
   const h=document.getElementById('tr-h');h.innerHTML='';
   cols.forEach(c=>{const th=document.createElement('th');if(c.l)th.className='l';th.style.cursor='pointer';
@@ -485,18 +492,22 @@ function renderTrend(){
     th.onclick=()=>{if(trdSort.col===c.k)trdSort.dir=trdSort.dir==='asc'?'desc':'asc';else{trdSort.col=c.k;trdSort.dir='desc';}renderTrend();};
     h.appendChild(th);});
   const val=(x,k)=>k.startsWith('d:')?(x.series[k.slice(2)]??null):x[k];
-  const k=trdSort.col, isNum=(k!=='dong'&&k!=='sigungu');
+  const k=trdSort.col, isNum=(k==='n'||k==='latest'||k==='delta'||k.startsWith('d:'));
   const minN=parseInt((document.getElementById('tr-minn')||{}).value)||0;
   const rows=TRD.items.filter(x=>(x.n||0)>=minN).sort((a,b)=>{let av=val(a,k),bv=val(b,k);
     if(isNum){av=av==null?-Infinity:av;bv=bv==null?-Infinity:bv;return trdSort.dir==='asc'?av-bv:bv-av;}
     return trdSort.dir==='asc'?String(av).localeCompare(String(bv),'ko'):String(bv).localeCompare(String(av),'ko');});
   const b=document.getElementById('tr-b');
-  if(!rows.length&&TRD.items.length){b.innerHTML='<tr><td colspan="20" class="empty">매물수 '+minN+'개 이상인 동이 없어요. 숫자를 낮춰보세요.</td></tr>';return;}
+  if(!rows.length&&TRD.items.length){b.innerHTML='<tr><td colspan="20" class="empty">조건(예약률 20%↑·매물수 '+minN+'↑)에 맞는 동이 없어요.</td></tr>';return;}
+  if(!TRD.items.length){b.innerHTML='';return;}
   b.innerHTML=rows.map(x=>{
     const dcell=x.delta==null?'<span class="mut">-</span>':(x.delta>0?`<span class="bad">▲${x.delta}</span>`:(x.delta<0?`<span style="color:#2563eb;font-weight:700">▼${Math.abs(x.delta)}</span>`:'0'));
     const dates=TRD.dates.map(d=>`<td class="mut">${x.series[d]??'-'}</td>`).join('');
-    return `<tr><td class="l" style="font-weight:700">${x.dong}</td><td class="l">${x.sigungu}</td>
-      <td>${x.n}</td><td class="occ">${x.latest??'-'}%</td><td>${dcell}</td>${dates}</tr>`;
+    const to=x.top_office;
+    const topcell=to?`<a href="${to.url}" target="_blank" class="lnk" style="background:#0369a1">${to.name} · ${to.occ}%</a>`:'<span class="mut">-</span>';
+    return `<tr><td class="l mut">${x.sido||'-'}</td><td class="l">${x.sigungu}</td><td class="l" style="font-weight:700">${x.dong}</td>
+      <td>${x.n}</td><td class="occ" style="font-weight:800">${x.latest??'-'}%</td><td>${dcell}</td>
+      <td class="l">${topcell}</td>${dates}</tr>`;
   }).join('');
 }
 let BLD=[], bSort={col:'occ_avg',dir:'desc'};
