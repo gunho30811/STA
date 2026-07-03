@@ -62,6 +62,11 @@ REFRESH_CHUNK = 2000      # 이 건수마다 세션(로그인)을 새로 고침
 #   - SAMSAM_SHARD='i/N': room_id % N == i 인 매물만 담당(러너별로 다른 IP). 미설정=전체.
 #   - SAMSAM_RL_COOLDOWN: 429가 연속으로 누적될 때 쉬는 시간(초). 회복시간에 맞춰 조정.
 REFRESH_DAILY_LIMIT = int(os.environ.get('SAMSAM_REFRESH_DAILY_LIMIT', '0'))
+# 예약이 이미 잡힌 매물(booked_days_1m>0)은 한동안 안 바뀌므로, 마지막 확인 후 이 기간(일)
+# 안이면 재갱신 대상에서 뺀다. 공실(예약 0) 매물은 매 실행 갱신해 '새 예약이 잡히는' 신호를
+# 빨리 잡는다. 예약 있던 매물도 쿨다운이 지나면 다시 로테이션에 들어와 취소/변동을 반영한다.
+# 0=쿨다운 없음(예약 유무 무관 전부 로테이션).
+BOOKED_COOLDOWN_DAYS = int(os.environ.get('SAMSAM_BOOKED_COOLDOWN_DAYS', '7'))
 # 실측: ~100요청 소진 시 429, 때리기 멈추면 ~15초 내 회복. 안전하게 20초 쿨다운.
 RL_COOLDOWN = int(os.environ.get('SAMSAM_RL_COOLDOWN', '20'))    # 429 시 전 워커 공통 대기(초)
 RL_RETRY = int(os.environ.get('SAMSAM_RL_RETRY', '6'))           # 429 요청당 재시도 횟수
@@ -550,13 +555,15 @@ def main():
 
     conn = db.connect()
 
-    # 이미 적재된 room_id + 마지막 갱신 시각(로테이션에 사용)
+    # 이미 적재된 room_id + 마지막 갱신 시각(로테이션에 사용) + 현재 예약 상태(공실 우선용)
     done = set()
-    coll = {}   # room_id → collected_at (오래된 것부터 갱신하기 위한 정렬 키)
+    coll = {}    # room_id → collected_at (오래된 것부터 갱신하기 위한 정렬 키 = 마지막 확인 시각)
+    booked = {}  # room_id → booked_days_1m (예약 쿨다운 판정용; 0이면 공실)
     if not args.redo:
-        rows = conn.execute('SELECT room_id, collected_at FROM samsam_listings').fetchall()
+        rows = conn.execute(
+            'SELECT room_id, collected_at, booked_days_1m FROM samsam_listings').fetchall()
         for r in rows:
-            done.add(r[0]); coll[r[0]] = r[1] or ''
+            done.add(r[0]); coll[r[0]] = r[1] or ''; booked[r[0]] = r[2] or 0
         log(f"기존 적재: {len(done)}건 skip")
 
     log("매물 목록 수집 중...")
@@ -590,6 +597,25 @@ def main():
         before = len(refresh_targets)
         refresh_targets = [rid for rid in refresh_targets if rid % shard_n == shard_i]
         log(f"샤드 {shard_i}/{shard_n}: 예약률 갱신 대상 {before} → {len(refresh_targets)}건")
+    # ── 공실 우선 로테이션 ──────────────────────────────────────────────────────
+    # 이미 예약이 잡힌 매물은 (예: 한 달치 예약) 매일 다시 봐도 대개 그대로다. 그래서
+    # 예약 있는 매물은 마지막 확인 후 BOOKED_COOLDOWN_DAYS일 동안 재갱신에서 빼고,
+    # 공실(예약 0) 매물 위주로 자주 돌려 '새로 예약이 잡히는' 변화를 빨리 포착한다.
+    # 쿨다운이 지난 예약 매물은 다시 대상에 들어와 예약 취소/연장도 놓치지 않는다.
+    if BOOKED_COOLDOWN_DAYS > 0:
+        cutoff = (datetime.now() - timedelta(days=BOOKED_COOLDOWN_DAYS)
+                  ).isoformat(timespec='seconds')
+        # collected_at은 timespec='seconds' ISO(예: 2026-07-02T22:16:20) — 같은 포맷이라
+        # 문자열 비교로 시점 대소가 성립(파싱 예외 없이 안전). 빈값('')은 항상 cutoff 미만 = 대상.
+        def _due(rid):
+            if (booked.get(rid) or 0) <= 0:
+                return True                      # 공실: 항상 갱신 대상
+            return coll.get(rid, '') < cutoff    # 예약有: 마지막 확인이 쿨다운보다 오래됐을 때만
+        before = len(refresh_targets)
+        refresh_targets = [rid for rid in refresh_targets if _due(rid)]
+        skipped = before - len(refresh_targets)
+        log(f"공실 우선(쿨다운 {BOOKED_COOLDOWN_DAYS}일): 예약有 최근확인분 {skipped}건 제외 "
+            f"→ {len(refresh_targets)}건 (공실+쿨다운경과)")
     # 오래된(stale) 순으로 정렬 → 매일 실행하면 자연스럽게 전체를 로테이션.
     refresh_targets.sort(key=lambda rid: coll.get(rid, ''))
     if REFRESH_DAILY_LIMIT and len(refresh_targets) > REFRESH_DAILY_LIMIT:
@@ -659,7 +685,8 @@ def main():
         if rate_limited:
             break
         chunk = refresh_targets[start:start + REFRESH_CHUNK]
-        with ThreadPoolExecutor(max_workers=REFRESH_WORKERS) as pool:
+        pool = ThreadPoolExecutor(max_workers=REFRESH_WORKERS)
+        try:
             futs = {pool.submit(fetch_schedules, session, rid, stats): rid for rid in chunk}
             for fut in as_completed(futs):
                 rid = futs[fut]
@@ -703,6 +730,11 @@ def main():
                 if DEPLOY_PUSH and refreshed - last_deploy >= DEPLOY_CHUNK:
                     deploy_lab(f"{refreshed}건 갱신")
                     last_deploy = refreshed
+        finally:
+            # 조기 중단(차단 판단) 시엔 아직 시작 안 한 요청을 취소하고 기다리지 않는다.
+            # (기존 `with` 종료는 제출된 청크 전체가 끝날 때까지 최대 수십 분 블로킹됐음 —
+            #  200건에서 차단 판단해도 남은 ~1800건을 다 훑느라 실패 종료가 30분 지연됐다.)
+            pool.shutdown(wait=not rate_limited, cancel_futures=rate_limited)
 
         if not rate_limited and start + REFRESH_CHUNK < len(refresh_targets):
             _flush()   # 세션 재로그인 전에 버퍼 비움(진행 보존)
