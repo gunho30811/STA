@@ -11,8 +11,8 @@ import db
 
 LAB = os.path.join(BASE, "lab")
 COLS = ("room_id,url,name,building_type,building_name,sido,sigungu,dong,area_pyeong,"
-        "rent_total_weekly,booked_days_1m,blocked_days_1m,basic_options,extra_options,"
-        "station_500m_names,collected_at")
+        "rent_total_weekly,booked_days_1m,booked_days_2m,booked_days_3m,blocked_days_1m,"
+        "basic_options,extra_options,station_500m_names,collected_at")
 
 def dump(rows, path):
     with open(path, "w", encoding="utf-8") as f:

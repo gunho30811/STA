@@ -50,8 +50,8 @@ import search  # noqa: E402  (건물명·역명 텍스트 검색 색인 — 외�
 
 SAM_COLS = ("room_id", "url", "name", "building_type", "building_name",
             "sido", "sigungu", "dong", "area_pyeong", "rent_total_weekly",
-            "booked_days_1m", "blocked_days_1m", "basic_options", "extra_options",
-            "station_500m_names", "collected_at")
+            "booked_days_1m", "booked_days_2m", "booked_days_3m", "blocked_days_1m",
+            "basic_options", "extra_options", "station_500m_names", "collected_at")
 
 # 삼삼 옵션 영문 코드 → 한글 표시명
 OPTION_KO = {
@@ -95,8 +95,12 @@ def _enrich(r):
     blocked = r.get("blocked_days_1m") or 0
     booked = r.get("booked_days_1m") or 0
     avail = max(31 - blocked, 1)   # 수집 윈도우 오늘~+30일=31일(양끝 포함)
-    r["occ"] = min(1.0, booked / avail)        # 예약률
-    r["vac"] = 1 - r["occ"]                     # 공실률
+    r["occ"] = min(1.0, booked / avail)        # 예약률(1달)
+    r["vac"] = 1 - r["occ"]                     # 공실률(1달)
+    # 2·3달 예약률: 누적 예약일(booked_days_2m=0~60일, 3m=0~90일)을 창 길이로 나눔.
+    # 2·3달치 blocked는 수집을 안 해(1m만) 보정 없이 계산 — snapshot.py의 avg_occ_3m과 동일 관례.
+    r["occ2"] = min(1.0, (r.get("booked_days_2m") or 0) / 61)
+    r["occ3"] = min(1.0, (r.get("booked_days_3m") or 0) / 91)
     r["sam_week_man"] = round((r.get("rent_total_weekly") or 0) / 10000, 1)
     st = _parse_list(r.get("station_500m_names"))
     r["stations"] = st
@@ -429,6 +433,7 @@ def api_listings():
         "week": r["sam_week_man"], "booked": r.get("booked_days_1m"),
         "blocked": r.get("blocked_days_1m"),
         "occ": round(r["occ"] * 100, 1), "vac": round(r["vac"] * 100, 1),
+        "occ2": round(r["occ2"] * 100, 1), "occ3": round(r["occ3"] * 100, 1),
         "options": [ko(o) for o in sorted(r["options"])], "url": r.get("url", ""),
     } for r in rows]
     return jsonify({"total": len(items), "items": items, "optionName": ko(option)})
@@ -485,6 +490,8 @@ def api_buildings():
         if len(xs) < min_n:
             continue
         occs = [x["occ"] * 100 for x in xs]
+        occs2 = [x["occ2"] * 100 for x in xs]
+        occs3 = [x["occ3"] * 100 for x in xs]
         calcs = [calc_at_deposit(x["room_id"], dep, fixed) for x in xs]
         calcs = [c for c in calcs if c is not None]
         avg = (lambda key: round(statistics.mean(c[key] for c in calcs), 1)) if calcs else (lambda key: None)
@@ -505,6 +512,8 @@ def api_buildings():
             "occ_avg": round(statistics.mean(occs), 1),
             "occ_min": round(min(occs), 1),
             "occ_max": round(max(occs), 1),
+            "occ2_avg": round(statistics.mean(occs2), 1),   # 2달 평균 예약률
+            "occ3_avg": round(statistics.mean(occs3), 1),   # 3달 평균 예약률
             "week_avg": week_avg,
             "n_matched": len(calcs),
             "net_avg": avg("net"),
