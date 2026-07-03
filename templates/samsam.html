@@ -90,6 +90,7 @@
   <div class="tabs2">
     <button id="tab-option" class="on" onclick="switchView('option')">옵션 영향</button>
     <button id="tab-building" onclick="switchView('building')">건물 인기</button>
+    <button id="tab-ranking" onclick="switchView('ranking')">🏆 랭킹</button>
     <button id="tab-trend" onclick="switchView('trend')">지역 트렌드</button>
   </div>
 
@@ -175,6 +176,31 @@
         <table>
           <thead><tr id="tr-h"></tr></thead>
           <tbody id="tr-b"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="view-ranking" style="display:none">
+    <div class="panel">
+      <h2 class="sec">🏆 건물 예약률 랭킹 — 수도권 전체 리더보드 (위 지역 필터 무시, 전 지역 1등부터)</h2>
+      <p class="hint">
+        같은 건물(오피스텔)·평수로 묶은 <b>평균 예약률</b> 순위. <b>1달/2달/3달</b> 중 정렬 기준 선택 —
+        <b>3달</b>로 정렬하면 <b>몇 달치가 이미 찬 검증된 핫 건물</b>이 위로 와요. 매물수 조건으로 표본 적은 건물 노이즈 제외.
+      </p>
+      <div style="margin:4px 0 12px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:12.5px">
+        <span>시/도 <select id="rk-sido" onchange="loadRanking()" style="padding:6px 8px;border:1px solid #d1d5db;border-radius:6px">
+          <option value="">수도권 전체</option><option>서울특별시</option><option>경기도</option><option>인천광역시</option></select></span>
+        <span>정렬 <select id="rk-by" onchange="renderRanking()" style="padding:6px 8px;border:1px solid #d1d5db;border-radius:6px">
+          <option value="occ_avg">1달 예약률</option><option value="occ2_avg">2달 예약률</option><option value="occ3_avg">3달 예약률</option></select></span>
+        <span>최소 매물수 <select id="rk-minn" onchange="loadRanking()" style="padding:6px 8px;border:1px solid #d1d5db;border-radius:6px"><option>2</option><option>1</option><option>3</option><option>5</option></select>채 이상</span>
+        <span>표시 <select id="rk-top" onchange="renderRanking()" style="padding:6px 8px;border:1px solid #d1d5db;border-radius:6px"><option>100</option><option>50</option><option>200</option><option value="0">전체</option></select>위</span>
+        <span class="mut" id="rk-count"></span>
+      </div>
+      <div class="scroll">
+        <table>
+          <thead><tr id="rk-h"></tr></thead>
+          <tbody id="rk-b"></tbody>
         </table>
       </div>
     </div>
@@ -386,14 +412,57 @@ function renderListBody(){
 }
 // ── 뷰 전환 (옵션 영향 / 건물 인기 / 지역 트렌드) ──
 let currentView='option';
-function runView(){ currentView==='option'?analyze():(currentView==='building'?loadBuildings():loadTrend()); }
+function runView(){
+  if(currentView==='option')return analyze();
+  if(currentView==='building')return loadBuildings();
+  if(currentView==='ranking')return loadRanking();
+  return loadTrend();
+}
 function switchView(v){
   currentView=v;
-  ['option','building','trend'].forEach(t=>{
+  ['option','building','ranking','trend'].forEach(t=>{
     document.getElementById('tab-'+t).classList.toggle('on',t===v);
     document.getElementById('view-'+t).style.display=(t===v)?'':'none';
   });
   runView();
+}
+// ── 랭킹 (수도권 전체 리더보드 — 위 지역 필터 무시하고 자체 컨트롤만 사용) ──
+let RANK=[];
+async function loadRanking(){
+  const p=new URLSearchParams();
+  p.set('min_n',document.getElementById('rk-minn').value);
+  const sido=document.getElementById('rk-sido').value; if(sido)p.set('sido',sido);
+  const r=await (await fetch('api/buildings?'+p)).json();
+  RANK=r.items||[]; renderRanking();
+}
+function renderRanking(){
+  const by=document.getElementById('rk-by').value;
+  const topN=parseInt(document.getElementById('rk-top').value,10)||0;
+  const rows=[...RANK].sort((a,b)=>(b[by]??-1)-(a[by]??-1));
+  const shown=topN>0?rows.slice(0,topN):rows;
+  document.getElementById('rk-count').textContent=RANK.length?`${RANK.length.toLocaleString()}개 건물 중 ${shown.length}개 표시`:'';
+  const cols=['순위','건물명','지역','유형','평','매물수','1달%','2달%','3달%','평균주당','월순수익'];
+  const h=document.getElementById('rk-h');h.innerHTML='';
+  cols.forEach((t,i)=>{const th=document.createElement('th');if(i===1||i===2||i===3)th.className='l';th.textContent=t;h.appendChild(th);});
+  const b=document.getElementById('rk-b');
+  if(!shown.length){b.innerHTML='<tr><td colspan="11" class="empty">조건에 맞는 건물이 없습니다.</td></tr>';return;}
+  const medal=r=>r===1?'🥇':r===2?'🥈':r===3?'🥉':r;
+  b.innerHTML=shown.map((r,i)=>{
+    const rk=i+1;
+    const occc=v=>v>=80?'good':(v<40?'bad':'occ');
+    const val=r[by];
+    const netv=r.net_avg==null?'<span class="mut">-</span>':`<span class="${r.net_avg>=0?'good':'bad'}" style="font-weight:700">${r.net_avg}</span>`;
+    return `<tr>
+      <td style="font-weight:800;font-size:${rk<=3?'16px':'13px'}">${medal(rk)}</td>
+      <td class="l" style="font-weight:700">${r.building}</td>
+      <td class="l">${r.sigungu} ${r.dong}</td>
+      <td class="l">${r.btype}</td><td>${r.pyeong??'-'}</td>
+      <td style="font-weight:700">${r.n}</td>
+      <td class="${occc(r.occ_avg)}" style="font-weight:${by==='occ_avg'?800:400}">${r.occ_avg}%</td>
+      <td class="${by==='occ2_avg'?occc(r.occ2_avg):'mut'}" style="font-weight:${by==='occ2_avg'?800:400}">${r.occ2_avg}%</td>
+      <td class="${by==='occ3_avg'?occc(r.occ3_avg):'mut'}" style="font-weight:${by==='occ3_avg'?800:400}">${r.occ3_avg}%</td>
+      <td>${r.week_avg}</td><td>${netv}</td></tr>`;
+  }).join('');
 }
 // ── 지역 트렌드 ──
 let TRD={dates:[],items:[]}, trdSort={col:'latest',dir:'desc'};
