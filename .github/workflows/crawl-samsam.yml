@@ -19,6 +19,10 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       SAMSAM_EMAIL: ${{ secrets.SAMSAM_EMAIL }}
       SAMSAM_PASSWORD: ${{ secrets.SAMSAM_PASSWORD }}
+      # 2번째 계정(선택). 시크릿 SAMSAM_EMAIL2/PASSWORD2가 있으면 crawler가 계정을 순환해
+      # 하루 커버리지를 배로(계정 수 × REFRESH_DAILY_LIMIT) 늘린다. 없으면 빈값 → 1계정만 사용.
+      SAMSAM_EMAIL2: ${{ secrets.SAMSAM_EMAIL2 }}
+      SAMSAM_PASSWORD2: ${{ secrets.SAMSAM_PASSWORD2 }}
       # 스케줄 API는 IP당 ~100요청에서 429(멈추면 ~15초 회복). crawler.py가 429 시 공통 쿨다운으로
       # 회복하며 재시도한다. 매물당 ~2.2초라 전체 10,826건(~397분)은 타임아웃(330분) 초과 →
       # 하루치만 오래된 순으로 갱신(로테이션).

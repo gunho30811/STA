@@ -184,6 +184,35 @@ def _get_credentials():
     return email, pw
 
 
+def _mask(email):
+    """로그용 이메일 마스킹: 'abcd@x.com' → 'ab***@x.com'."""
+    e = email or ''
+    if '@' not in e:
+        return (e[:2] + '***') if e else '(빈)'
+    name, dom = e.split('@', 1)
+    return name[:2] + '***@' + dom
+
+
+def _get_accounts():
+    """스케줄 갱신에 쓸 계정 목록. SAMSAM_EMAIL/PASSWORD + (EMAIL2/PASSWORD2 … EMAIL9)를 모은다.
+
+    스케줄 조회는 계정당 일일 소프트한도가 있어(초과 시 200+빈배열), 한 계정이 소진되면 다음
+    계정으로 순환해 하루 커버리지를 배로 늘린다. 아무 것도 없으면 대화형 입력으로 폴백(로컬)."""
+    accts = []
+    e0 = (os.environ.get('SAMSAM_EMAIL') or '').strip()
+    p0 = os.environ.get('SAMSAM_PASSWORD') or ''
+    if e0 and p0:
+        accts.append((e0, p0))
+    for i in range(2, 10):
+        e = (os.environ.get(f'SAMSAM_EMAIL{i}') or '').strip()
+        p = os.environ.get(f'SAMSAM_PASSWORD{i}') or ''
+        if e and p:
+            accts.append((e, p))
+    if not accts:
+        accts.append(_get_credentials())
+    return accts
+
+
 def _get_cookies(email, password):
     for attempt in range(8):
         try:
@@ -555,7 +584,10 @@ def main():
     ap.add_argument('--sigungu', default='', help='시군구 필터 예) 강남구')
     args = ap.parse_args()
 
-    email, pw = _get_credentials()
+    accounts = _get_accounts()
+    acct_i = 0
+    email, pw = accounts[acct_i]
+    log(f"계정 {len(accounts)}개 로드 — 1번({_mask(email)})으로 시작")
     cookies = _get_cookies(email, pw)
     session = _make_session(cookies)
 
@@ -624,9 +656,12 @@ def main():
             f"→ {len(refresh_targets)}건 (공실+쿨다운경과)")
     # 오래된(stale) 순으로 정렬 → 매일 실행하면 자연스럽게 전체를 로테이션.
     refresh_targets.sort(key=lambda rid: coll.get(rid, ''))
-    if REFRESH_DAILY_LIMIT and len(refresh_targets) > REFRESH_DAILY_LIMIT:
-        log(f"로테이션: 오래된 순 {REFRESH_DAILY_LIMIT}건만 갱신(전체 {len(refresh_targets)}건, 나머지는 다음 실행)")
-        refresh_targets = refresh_targets[:REFRESH_DAILY_LIMIT]
+    # 계정당 REFRESH_DAILY_LIMIT건씩 담당하므로, 하루 상한 = 한도 × 계정 수(계정 늘면 커버리지 배증).
+    day_cap = REFRESH_DAILY_LIMIT * len(accounts) if REFRESH_DAILY_LIMIT else 0
+    if day_cap and len(refresh_targets) > day_cap:
+        log(f"로테이션: 오래된 순 {day_cap}건만 갱신"
+            f"(계정 {len(accounts)}개×{REFRESH_DAILY_LIMIT}, 전체 {len(refresh_targets)}건, 나머지는 다음 실행)")
+        refresh_targets = refresh_targets[:day_cap]
 
     batch, ok, fail = [], 0, 0
     for i, (rid, room) in enumerate(targets, 1):
@@ -673,12 +708,18 @@ def main():
     #   - 데이터 확인됨 → 체크포인트 통과. 버퍼를 커밋하고, 이후로는 BATCH마다 증분 커밋한다.
     # 증분 커밋 덕에 실행 중에도 DB가 실시간으로 채워져(SELECT로 진행 관찰 가능) 크래시에도 안전하다.
     # 체크포인트 통과 후 도중에 차단이 나도, 실패건(ok=False)은 커밋에서 빠지므로 기존 값이 보존된다.
-    log(f"기존 매물(수도권) 예약률 갱신 대상: {len(refresh_targets)}건, 동시 요청 {REFRESH_WORKERS}개")
+    # 계정을 여러 개 쓰면 대상을 계정 수만큼 연속 슬라이스로 나눠, 각 계정이 자기 몫(≤ 한도)만
+    # 처리한다. 슬라이스가 계정 한도 아래라 한 계정이 도중에 소진될 일이 거의 없고, 소진되더라도
+    # 그 계정 몫만 스킵하고 다음 계정으로 넘어간다(전체 실패 아님). 계정당 한도를 넘겨 처리하면
+    # 체크포인트 통과 후 소진 시 빈값을 커밋할 수 있으므로, 슬라이스 크기(=REFRESH_DAILY_LIMIT)는
+    # 실측 한도(~5000)보다 여유 있게 작게 유지한다.
+    per_acct = REFRESH_DAILY_LIMIT or len(refresh_targets)
+    log(f"기존 매물(수도권) 예약률 갱신 대상: {len(refresh_targets)}건, 동시 요청 {REFRESH_WORKERS}개, "
+        f"계정 {len(accounts)}개(계정당 ≤{per_acct}건)")
     stats = {}
-    buf, failed, with_data, processed, refreshed = [], 0, 0, 0, 0
-    last_deploy = 0   # 마지막으로 배포(lab 커밋)한 시점의 refreshed 값
-    checkpoint_passed = False
-    rate_limited = False
+    buf, failed, total_data, processed, refreshed = [], 0, 0, 0, 0
+    last_deploy = 0    # 마지막으로 배포(lab 커밋)한 시점의 refreshed 값
+    any_data = False   # 어느 계정에서든 실제 스케줄 데이터를 하나라도 받았는지(전면차단 판정용)
 
     def _flush():
         nonlocal buf, refreshed
@@ -687,83 +728,98 @@ def main():
             refreshed += len(buf)
             buf = []
 
-    for start in range(0, len(refresh_targets), REFRESH_CHUNK):
-        if rate_limited:
+    for acct_i in range(len(accounts)):
+        slice_ = refresh_targets[acct_i * per_acct:(acct_i + 1) * per_acct]
+        if not slice_:
             break
-        chunk = refresh_targets[start:start + REFRESH_CHUNK]
-        pool = ThreadPoolExecutor(max_workers=REFRESH_WORKERS)
-        try:
-            futs = {pool.submit(fetch_schedules, session, rid, stats): rid for rid in chunk}
-            for fut in as_completed(futs):
-                rid = futs[fut]
-                processed += 1
-                schedules, sched_ok = fut.result()
-                if not sched_ok:
-                    failed += 1        # 차단/에러 → 신뢰 불가, 갱신 제외(기존 값 보존)
-                else:
-                    # 성공: 빈 dict여도 '예약 0'이 확정된 공실이므로 반드시 기록
-                    bk1 = _count_status(schedules, TODAY, D30, BOOKED_STATUSES)
-                    bk2 = _count_status(schedules, TODAY, D60, BOOKED_STATUSES)
-                    bk3 = _count_status(schedules, TODAY, D90, BOOKED_STATUSES)
-                    bl1 = _count_status(schedules, TODAY, D30, BLOCKED_STATUSES)
-                    buf.append(
-                        (bk1, bk2, bk3, bl1, datetime.now().isoformat(timespec='seconds'), rid))
-                    if schedules:
-                        with_data += 1
-                    if checkpoint_passed and len(buf) >= BATCH:
-                        _flush()   # 체크포인트 통과 후: 실시간 증분 커밋
-
-                # 체크포인트 판정:
-                #   - 데이터가 조금이라도 확인되면(차단 아님) 바로 통과 → 실시간 증분 커밋 시작.
-                #     (로테이션으로 배치가 작을 때도 실시간 반영되게 하려고 EARLY_CHECK를 안 기다림.)
-                #   - 초반 EARLY_CHECK건까지 데이터 0이면 차단으로 보고 중단(0 오염 방지).
-                if not checkpoint_passed:
-                    if with_data >= 5:
-                        checkpoint_passed = True
-                        _flush()
-                        log(f"체크포인트 통과({processed}건, 데이터有 {with_data}) — 실시간 증분 커밋 시작.")
-                    elif processed >= EARLY_CHECK and with_data == 0:
-                        log(f"★ 조기 중단: 처음 {processed}건 중 데이터 수신 0건 "
-                            f"(성공 {len(buf)} 실패 {failed}) | HTTP {stats} — 차단 판단, DB 미반영 종료.")
-                        rate_limited = True
-                        break
-
-                if processed % 50 == 0:
-                    log(f"[예약률 갱신 {processed}/{len(refresh_targets)}] "
-                        f"DB반영 {refreshed}+버퍼 {len(buf)}(데이터有 {with_data}) 실패 {failed} | HTTP {stats}")
-
-                # 점진 배포: DEPLOY_CHUNK건 DB 반영될 때마다 lab 재생성·커밋·push (CI에서만).
-                if DEPLOY_PUSH and refreshed - last_deploy >= DEPLOY_CHUNK:
-                    deploy_lab(f"{refreshed}건 갱신")
-                    last_deploy = refreshed
-        finally:
-            # 조기 중단(차단 판단) 시엔 아직 시작 안 한 요청을 취소하고 기다리지 않는다.
-            # (기존 `with` 종료는 제출된 청크 전체가 끝날 때까지 최대 수십 분 블로킹됐음 —
-            #  200건에서 차단 판단해도 남은 ~1800건을 다 훑느라 실패 종료가 30분 지연됐다.)
-            pool.shutdown(wait=not rate_limited, cancel_futures=rate_limited)
-
-        if not rate_limited and start + REFRESH_CHUNK < len(refresh_targets):
-            _flush()   # 세션 재로그인 전에 버퍼 비움(진행 보존)
-            log("세션 갱신 중...")
+        email, pw = accounts[acct_i]
+        if acct_i > 0:   # 첫 계정은 main 시작부에서 이미 로그인됨
+            log(f"▶ 계정 {acct_i + 1}/{len(accounts)}({_mask(email)}) 로그인 — 담당 {len(slice_)}건")
             cookies = _get_cookies(email, pw)
             session = _make_session(cookies)
+        else:
+            log(f"▶ 계정 1/{len(accounts)}({_mask(email)}) 담당 {len(slice_)}건")
+
+        checkpoint_passed = False
+        with_data = 0      # 이 계정 세션의 체크포인트/차단 판정용(계정마다 한도가 따로)
+        proc_acct = 0
+        blocked = False
+
+        for start in range(0, len(slice_), REFRESH_CHUNK):
+            if blocked:
+                break
+            chunk = slice_[start:start + REFRESH_CHUNK]
+            pool = ThreadPoolExecutor(max_workers=REFRESH_WORKERS)
+            try:
+                futs = {pool.submit(fetch_schedules, session, rid, stats): rid for rid in chunk}
+                for fut in as_completed(futs):
+                    rid = futs[fut]
+                    processed += 1
+                    proc_acct += 1
+                    schedules, sched_ok = fut.result()
+                    if not sched_ok:
+                        failed += 1        # 차단/에러 → 신뢰 불가, 갱신 제외(기존 값 보존)
+                    else:
+                        # 성공: 빈 dict여도 '예약 0'이 확정된 공실이므로 반드시 기록
+                        bk1 = _count_status(schedules, TODAY, D30, BOOKED_STATUSES)
+                        bk2 = _count_status(schedules, TODAY, D60, BOOKED_STATUSES)
+                        bk3 = _count_status(schedules, TODAY, D90, BOOKED_STATUSES)
+                        bl1 = _count_status(schedules, TODAY, D30, BLOCKED_STATUSES)
+                        buf.append(
+                            (bk1, bk2, bk3, bl1, datetime.now().isoformat(timespec='seconds'), rid))
+                        if schedules:
+                            with_data += 1
+                            total_data += 1
+                            any_data = True
+                        if checkpoint_passed and len(buf) >= BATCH:
+                            _flush()   # 체크포인트 통과 후: 실시간 증분 커밋
+
+                    # 체크포인트/차단 판정(이 계정 기준):
+                    #   - 데이터가 조금이라도 확인되면(차단 아님) 바로 통과 → 실시간 증분 커밋 시작.
+                    #   - 초반 EARLY_CHECK건까지 데이터 0이면 이 계정은 소진/차단 → 다음 계정으로.
+                    if not checkpoint_passed:
+                        if with_data >= 5:
+                            checkpoint_passed = True
+                            _flush()
+                            log(f"체크포인트 통과(계정 {acct_i + 1}, {proc_acct}건, 데이터有 {with_data}) — 실시간 증분 커밋.")
+                        elif proc_acct >= EARLY_CHECK and with_data == 0:
+                            log(f"★ 계정 {acct_i + 1}/{len(accounts)}({_mask(email)}) 소진/차단: "
+                                f"처음 {proc_acct}건 데이터 0 | HTTP {stats} — 미반영 버퍼 폐기, 다음 계정으로.")
+                            blocked = True
+                            break
+
+                    if processed % 50 == 0:
+                        log(f"[예약률 갱신 {processed}/{len(refresh_targets)}] "
+                            f"DB반영 {refreshed}+버퍼 {len(buf)}(데이터有 {total_data}) 실패 {failed} | 계정 {acct_i + 1}")
+
+                    # 점진 배포: DEPLOY_CHUNK건 DB 반영될 때마다 lab 재생성·커밋·push (CI에서만).
+                    if DEPLOY_PUSH and refreshed - last_deploy >= DEPLOY_CHUNK:
+                        deploy_lab(f"{refreshed}건 갱신")
+                        last_deploy = refreshed
+            finally:
+                # 소진/차단 시엔 아직 시작 안 한 요청을 취소하고 기다리지 않는다(30분 블로킹 방지).
+                pool.shutdown(wait=not blocked, cancel_futures=blocked)
+
+            if not blocked and start + REFRESH_CHUNK < len(slice_):
+                _flush()   # 세션 재로그인 전에 버퍼 비움(진행 보존)
+                log("세션 갱신 중...")
+                cookies = _get_cookies(email, pw)
+                session = _make_session(cookies)
+
+        if blocked:
+            buf = []       # 이 계정의 미반영(빈값 오염) 버퍼 폐기 후 다음 계정으로
+        else:
+            _flush()       # 이 계정 정상 완료분 커밋
 
     # ── 종료 처리 ────────────────────────────────────────────────────
-    if rate_limited:
-        conn.close()
-        log(f"완료(실패). 신규 적재 {ok}건, 예약률 갱신 중단 — DB반영 {refreshed}건 / 실패 {failed}건")
-        sys.exit(1)
-
-    # 체크포인트를 못 넘겼는데(대상이 EARLY_CHECK보다 적음) 데이터가 전무하면 오염 방지로 미반영.
-    if not checkpoint_passed and with_data == 0 and refresh_targets:
-        conn.close()
-        log(f"★ 예약데이터 수신 0건(대상 {len(refresh_targets)}건) — 차단 의심, DB 미반영 종료.")
+    conn.close()
+    # 모든 계정이 데이터를 전혀 못 받았으면(전면 소진/차단) 0 오염 방지로 실패 종료.
+    if not any_data and refresh_targets:
+        log(f"★ 전 계정({len(accounts)}개) 스케줄 데이터 0(대상 {len(refresh_targets)}건) — 차단/한도, DB 미반영 종료.")
         log(f"  HTTP 응답 분포: {stats}")
         sys.exit(1)
 
-    _flush()   # 남은 버퍼 커밋
-    conn.close()
-    log(f"예약률 갱신 집계: DB반영 {refreshed}건(데이터有 {with_data}, 공실 {refreshed - with_data}) "
+    log(f"예약률 갱신 집계: DB반영 {refreshed}건(데이터有 {total_data}, 공실 {refreshed - total_data}) "
         f"/ 실패 {failed}건 / 대상 {len(refresh_targets)}건")
     log(f"  HTTP 응답 분포: {stats}")
     if refreshed - last_deploy > 0:
