@@ -17,7 +17,7 @@
 필요 환경변수 (.env):
   DATABASE_URL, SAMSAM_EMAIL, SAMSAM_PASSWORD
 """
-import argparse, getpass, json, os, re, subprocess, sys, threading, time
+import argparse, getpass, json, os, re, subprocess, sys, threading, time, uuid
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta
@@ -41,6 +41,8 @@ sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 BASE = 'https://web.33m2.co.kr'
 UA = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
       'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+# 브라우저 앱이 API마다 함께 보내는 익명 식별자(abid). 실행당 1개 발급해 세션 내내 고정.
+ABID = str(uuid.uuid4())
 PROPERTY_TYPES = ['OFFICETEL', 'APARTMENT', 'VILLA', 'HOUSE', 'STORE', 'OFFICE']
 BTYPE_KO = {
     'OFFICETEL': '오피스텔', 'APARTMENT': '아파트', 'VILLA': '빌라',
@@ -241,6 +243,10 @@ def _make_session(cookies):
         'Sec-Fetch-Site': 'same-origin',
         'Sec-Fetch-Mode': 'cors',
         'Sec-Fetch-Dest': 'empty',
+        # 브라우저(SPA)가 API 호출에 함께 싣는 헤더. 스케줄 API가 SCSS_001은 주면서 데이터를
+        # 비우는 소프트차단이 봇 식별 때문일 수 있어, 실제 앱 요청처럼 보이게 맞춘다(쿠키 인증엔 영향 없음).
+        'abid': ABID,               # 브라우저 익명 식별자(앱이 항상 보냄)
+        'client-language': 'ko',
     })
     for c in cookies:
         s.cookies.set(c['name'], c['value'], domain=c['domain'].lstrip('.'))
