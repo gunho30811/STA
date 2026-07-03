@@ -21,9 +21,12 @@ jobs:
       SAMSAM_PASSWORD: ${{ secrets.SAMSAM_PASSWORD }}
       # 스케줄 API는 IP당 ~100요청에서 429(멈추면 ~15초 회복). crawler.py가 429 시 공통 쿨다운으로
       # 회복하며 재시도한다. 매물당 ~2.2초라 전체 10,826건(~397분)은 타임아웃(330분) 초과 →
-      # 하루 5,000건만 오래된 순으로 갱신(로테이션). 전체는 ~2.2일 주기로 순환.
+      # 하루치만 오래된 순으로 갱신(로테이션).
+      # 2026-07-03: 계정당 스케줄 조회에 일일 소프트한도(초과 시 200+빈배열)가 있는 정황 —
+      # 오전 4,998건 갱신 후 저녁 실행이 처음부터 빈값. 한도 아래로 여유를 두려 5,000→3,500 하향.
+      # 공실 우선 로테이션(booked 7일 쿨다운)으로 실제 갱신 대상도 줄어 이 상한엔 잘 안 닿는다.
       SAMSAM_REFRESH_WORKERS: '2'
-      SAMSAM_REFRESH_DAILY_LIMIT: '5000'
+      SAMSAM_REFRESH_DAILY_LIMIT: '3500'
       SAMSAM_RL_COOLDOWN: '20'
       # 리프레시 도중 1,000건마다 lab/*.jsonl 을 main에 직접 커밋·push → 배포(Vercel) 점진 갱신.
       SAMSAM_DEPLOY_PUSH: '1'
