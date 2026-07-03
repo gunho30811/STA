@@ -37,6 +37,16 @@ def _is_office(x):
         any(k in (x.get("summary") or "") for k in OFFICE_KW)
 
 
+def _split_sgg(sigungu):
+    """'수원시 영통구'→('수원시','영통구') · '강남구'→('','강남구') · '화성시'→('화성시','') ·
+    '가평군'→('가평군','')  (시/군 과 구 분리)."""
+    parts = (sigungu or "").split()
+    if len(parts) >= 2:
+        return parts[0], parts[1]
+    p = parts[0] if parts else ""
+    return ("", p) if p.endswith("구") else (p, "")
+
+
 PYEONG_TOL = 3   # '평수도 같은' 허용 오차(평)
 
 _SAMOFF = None
@@ -127,8 +137,8 @@ def index():
 @app.route("/api/facets")
 def api_facets():
     dongs = sorted({x.get("dong") for x in L() if x.get("dong")})
-    # 시도→시군구→동 트리(동 필터가 어디 동인지 알게 — 시도부터 좁혀 선택).
-    regions = sorted({(x.get("sido") or "", x.get("sigungu") or "", x.get("dong") or "")
+    # 도→시/군→구→동 트리(시·도·구 분리해 좁혀 선택). 경기 '수원시 영통구'를 시/구로 나눔.
+    regions = sorted({(x.get("sido") or "", *_split_sgg(x.get("sigungu")), x.get("dong") or "")
                       for x in L() if x.get("dong")})
     types = [{"code": c, "name": TYPE_NAMES.get(c, c)}
              for c in ["APT", "OPST", "VL", "OR", "DDDGG", "SG"]
@@ -172,9 +182,13 @@ def api_listings():
     sido = a.get("sido", "").strip()
     if sido:
         items = [x for x in items if x.get("sido") == sido]
-    sigungu = a.get("sigungu", "").strip()
-    if sigungu:
-        items = [x for x in items if x.get("sigungu") == sigungu]
+    sigun = a.get("sigun", "").strip()   # 시/군 (예: 수원시)
+    gu = a.get("gu", "").strip()          # 구 (예: 영통구 / 강남구)
+    if sigun or gu:
+        def _match(x):
+            si, g = _split_sgg(x.get("sigungu"))
+            return (not sigun or si == sigun) and (not gu or g == gu)
+        items = [x for x in items if _match(x)]
 
     dongs = [d for d in a.get("dongs", "").split(",") if d]
     if dongs:

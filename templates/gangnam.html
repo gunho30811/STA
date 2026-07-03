@@ -98,7 +98,8 @@
     </div>
     <div class="filters">
       <div class="fg"><label>시/도</label><select id="f-sido" onchange="cascadeSido()"><option value="">전체</option></select></div>
-      <div class="fg"><label>시/군/구</label><select id="f-sigungu2" onchange="cascadeSigungu()"><option value="">전체</option></select></div>
+      <div class="fg"><label>시/군</label><select id="f-sigun" onchange="cascadeSigun()"><option value="">전체</option></select></div>
+      <div class="fg"><label>구</label><select id="f-gu" onchange="cascadeGu()"><option value="">전체</option></select></div>
       <div class="fg"><label>동</label><select id="f-dong"><option value="">전체</option></select></div>
       <div class="fg"><label>키워드(건물/요약/주소/역)</label><input id="f-kw" placeholder="예: 래미안, 역세권"></div>
       <div class="fg"><label>보증금(만)</label><div style="display:flex;gap:4px"><input type="number" id="f-depmin" placeholder="최소"><input type="number" id="f-depmax" placeholder="최대"></div></div>
@@ -187,23 +188,28 @@ async function init(){
   search(1);
 }
 function v(id){return document.getElementById(id).value.trim();}
-let REGIONS=[];
+let REGIONS=[];   // [sido, 시/군, 구, 동]
+function _fill(id,opts){document.getElementById(id).innerHTML='<option value="">전체</option>'+[...new Set(opts)].filter(Boolean).sort().map(o=>`<option>${o}</option>`).join('');}
 function cascadeSido(){
   const sido=v('f-sido');
-  const sgs=[...new Set(REGIONS.filter(r=>!sido||r[0]===sido).map(r=>r[1]))].filter(Boolean).sort();
-  document.getElementById('f-sigungu2').innerHTML='<option value="">전체</option>'+sgs.map(s=>`<option>${s}</option>`).join('');
-  cascadeSigungu();
+  _fill('f-sigun',REGIONS.filter(r=>!sido||r[0]===sido).map(r=>r[1]));
+  cascadeSigun();
 }
-function cascadeSigungu(){
-  const sido=v('f-sido'), sg=v('f-sigungu2');
-  const ds=[...new Set(REGIONS.filter(r=>(!sido||r[0]===sido)&&(!sg||r[1]===sg)).map(r=>r[2]))].filter(Boolean).sort();
-  document.getElementById('f-dong').innerHTML='<option value="">전체</option>'+ds.map(d=>`<option>${d}</option>`).join('');
+function cascadeSigun(){
+  const sido=v('f-sido'), si=v('f-sigun');
+  _fill('f-gu',REGIONS.filter(r=>(!sido||r[0]===sido)&&(!si||r[1]===si)).map(r=>r[2]));
+  cascadeGu();
+}
+function cascadeGu(){
+  const sido=v('f-sido'), si=v('f-sigun'), gu=v('f-gu');
+  _fill('f-dong',REGIONS.filter(r=>(!sido||r[0]===sido)&&(!si||r[1]===si)&&(!gu||r[2]===gu)).map(r=>r[3]));
 }
 async function search(page){
   const p=new URLSearchParams();
   if(selTypes.size)p.set('types',[...selTypes].join(','));
   if(v('f-sido'))p.set('sido',v('f-sido'));
-  if(v('f-sigungu2'))p.set('sigungu',v('f-sigungu2'));
+  if(v('f-sigun'))p.set('sigun',v('f-sigun'));
+  if(v('f-gu'))p.set('gu',v('f-gu'));
   if(v('f-dong'))p.set('dongs',v('f-dong'));
   if(v('f-kw'))p.set('keyword',v('f-kw'));
   if(v('f-depmin'))p.set('deposit_min',v('f-depmin'));
