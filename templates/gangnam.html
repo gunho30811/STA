@@ -256,7 +256,7 @@ function renderGrid(items){
       <span class="badge b-${tc}">${TYPES[tc]||tc}</span>
       <div class="nm">${title}</div>
       <div class="addr">${addr}</div>
-      <div class="price"><span class="dep">보증 ${dep}</span> / 월 ${rentTxt}</div>
+      <div class="price"><span class="dep">보증 ${dep}</span> / 월 ${rentTxt}${(x.maintenance_monthly>0)?` <span class="mut" style="font-weight:600;font-size:11.5px">+관리 ${won(x.maintenance_monthly)}만</span>`:''}</div>
       <div class="specs">${specs.map(s=>`<span class="spec">${s}</span>`).join('')}</div>
       ${sub?`<div class="sub">${sub}</div>`:''}
       ${smry?`<div class="smry">${smry}</div>`:''}
