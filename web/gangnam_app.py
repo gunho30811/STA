@@ -37,16 +37,18 @@ def _is_office(x):
         any(k in (x.get("summary") or "") for k in OFFICE_KW)
 
 
-_SAM = None
-def _sam_area():
-    """(시군구, 동) → {occ: 삼삼 오피스텔 평균 예약률%, n, top:{name,occ,url}}. 동만으로도 조회 가능.
+PYEONG_TOL = 3   # '평수도 같은' 허용 오차(평)
 
-    네이버 매물(삼삼엔 없음)에 '이 근처 삼삼 단기임대가 얼마나 잘 나가나 + 최고 인기 오피스텔'을
-    붙여, 근처라서 괜찮을지 가늠하게 한다. lab/samsam_listings.jsonl(오피스텔)로 집계."""
-    global _SAM
-    if _SAM is not None:
-        return _SAM
-    agg = {}
+_SAMOFF = None
+def _sam_offices():
+    """동 → [삼삼 오피스텔 {occ%, pyeong, week(주당 만원), name, url}]. (시군구,동)+동 키 둘 다.
+
+    네이버 매물에 '근처(같은 동)·같은 평수 삼삼 오피스텔'의 주당 평균·잘나가는/안나가는 걸
+    붙여, 삼삼엔 없어도 근처라 괜찮을지 가늠하게 한다. lab/samsam_listings.jsonl(오피스텔)로 색인."""
+    global _SAMOFF
+    if _SAMOFF is not None:
+        return _SAMOFF
+    idx = {}
     if os.path.exists(SAMSAM):
         with open(SAMSAM, encoding="utf-8") as f:
             for line in f:
@@ -60,22 +62,34 @@ def _sam_area():
                 if r.get("building_type") != "오피스텔":
                     continue
                 bk, bl = r.get("booked_days_1m") or 0, r.get("blocked_days_1m") or 0
-                occ = round(min(1.0, bk / max(31 - bl, 1)) * 100, 1)
+                o = {"occ": round(min(1.0, bk / max(31 - bl, 1)) * 100, 1),
+                     "pyeong": r.get("area_pyeong"),
+                     "week": round((r.get("rent_total_weekly") or 0) / 10000, 1),
+                     "name": r.get("name") or r.get("building_name") or "",
+                     "url": r.get("url") or ""}
                 sg, dong = r.get("sigungu") or "", r.get("dong") or ""
-                for key in {(sg, dong), ("", dong)}:   # (시군구,동) + 동-only 폴백
-                    a = agg.setdefault(key, {"occs": [], "top": None})
-                    a["occs"].append(occ)
-                    if a["top"] is None or occ > a["top"]["occ"]:
-                        a["top"] = {"name": r.get("name") or r.get("building_name") or "",
-                                    "occ": occ, "url": r.get("url") or ""}
-    _SAM = {k: {"occ": round(sum(a["occs"]) / len(a["occs"]), 1), "n": len(a["occs"]), "top": a["top"]}
-            for k, a in agg.items()}
-    return _SAM
+                for key in {(sg, dong), ("", dong)}:
+                    idx.setdefault(key, []).append(o)
+    _SAMOFF = idx
+    return idx
 
 
 def _area_of(x):
-    sam = _sam_area()
-    return sam.get((x.get("sigungu") or "", x.get("dong") or "")) or sam.get(("", x.get("dong") or ""))
+    """이 네이버 매물 근처(같은 동)·같은 평수 삼삼 오피스텔: 주당 평균 + 잘나가는/안나가는 것."""
+    idx = _sam_offices()
+    lst = idx.get((x.get("sigungu") or "", x.get("dong") or "")) or idx.get(("", x.get("dong") or "")) or []
+    if not lst:
+        return None
+    py = x.get("pyeong")
+    same = [o for o in lst if py and o["pyeong"] and abs(o["pyeong"] - py) <= PYEONG_TOL]
+    comp = same or lst                      # 같은 평수 없으면 동 전체로 폴백
+    weeks = [o["week"] for o in comp if o["week"]]
+    best = max(comp, key=lambda o: o["occ"])
+    worst = min(comp, key=lambda o: o["occ"])
+    pick = lambda o: {"name": o["name"], "occ": o["occ"], "week": o["week"], "url": o["url"]}
+    return {"n": len(comp), "same_pyeong": bool(same),
+            "avg_week": round(sum(weeks) / len(weeks), 1) if weeks else None,
+            "best": pick(best), "worst": pick(worst)}
 
 
 def _load():
