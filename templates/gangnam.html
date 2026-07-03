@@ -203,10 +203,11 @@ async function search(page){
 }
 function samAreaHtml(sa){
   if(!sa) return '';
-  const c = sa.occ>=60?'#059669':(sa.occ<30?'#dc2626':'#0369a1');
-  const top = sa.top?`<br>👑 최고 인기 <a href="${sa.top.url}" target="_blank" onclick="event.stopPropagation()" style="color:#0369a1;font-weight:700;text-decoration:underline">${sa.top.name}</a> <b style="color:${sa.top.occ>=60?'#059669':'#0369a1'}">${sa.top.occ}%</b>`:'';
-  return `<div style="margin-top:8px;padding:7px 10px;background:#eff6ff;border:1px solid #dbeafe;border-radius:8px;font-size:12px;color:#1e3a5f;line-height:1.55">
-    🛋️ 이 근처 삼삼(단기임대) 예약률 <b style="color:${c};font-size:13px">${sa.occ}%</b> <span style="color:#94a3b8">· 오피스텔 ${sa.n}실</span>${top}</div>`;
+  const oc=v=>v>=60?'#059669':(v<30?'#dc2626':'#0369a1');
+  const lnk=(o,label,emoji)=>o?`<div style="margin-top:3px">${emoji} ${label} <a href="${o.url}" target="_blank" onclick="event.stopPropagation()" style="color:#0369a1;font-weight:700;text-decoration:underline">${o.name}</a> 예약률 <b style="color:${oc(o.occ)}">${o.occ}%</b> <span style="color:#64748b">· 주당 ${o.week}만</span></div>`:'';
+  const head=`🛋️ 근처 ${sa.same_pyeong?'같은 평수':'같은 동'} 삼삼 오피스텔 <b>${sa.n}실</b>${sa.avg_week!=null?` · 주당 평균 <b style="color:#0369a1">${sa.avg_week}만</b>`:''}`;
+  const rows = sa.n>=2 ? (lnk(sa.best,'잘나감','👑')+lnk(sa.worst,'안나감','🥶')) : lnk(sa.best,'예시','🛋️');
+  return `<div style="margin-top:8px;padding:7px 10px;background:#eff6ff;border:1px solid #dbeafe;border-radius:8px;font-size:12px;color:#1e3a5f;line-height:1.5">${head}${rows}</div>`;
 }
 function renderGrid(items){
   const g=document.getElementById('grid');g.innerHTML='';
