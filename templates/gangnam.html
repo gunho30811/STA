@@ -201,6 +201,13 @@ async function search(page){
   renderGrid(r.items);renderPager(r);
   window.scrollTo({top:0,behavior:'smooth'});
 }
+function samAreaHtml(sa){
+  if(!sa) return '';
+  const c = sa.occ>=60?'#059669':(sa.occ<30?'#dc2626':'#0369a1');
+  const top = sa.top?`<br>👑 최고 인기 <a href="${sa.top.url}" target="_blank" onclick="event.stopPropagation()" style="color:#0369a1;font-weight:700;text-decoration:underline">${sa.top.name}</a> <b style="color:${sa.top.occ>=60?'#059669':'#0369a1'}">${sa.top.occ}%</b>`:'';
+  return `<div style="margin-top:8px;padding:7px 10px;background:#eff6ff;border:1px solid #dbeafe;border-radius:8px;font-size:12px;color:#1e3a5f;line-height:1.55">
+    🛋️ 이 근처 삼삼(단기임대) 예약률 <b style="color:${c};font-size:13px">${sa.occ}%</b> <span style="color:#94a3b8">· 오피스텔 ${sa.n}실</span>${top}</div>`;
+}
 function renderGrid(items){
   const g=document.getElementById('grid');g.innerHTML='';
   if(!items.length){g.innerHTML='<div class="empty" style="grid-column:1/-1">조건에 맞는 매물이 없습니다.</div>';return;}
@@ -226,7 +233,8 @@ function renderGrid(items){
       <div class="price"><span class="dep">보증 ${dep}</span> / 월 ${rentTxt}</div>
       <div class="specs">${specs.map(s=>`<span class="spec">${s}</span>`).join('')}</div>
       ${sub?`<div class="sub">${sub}</div>`:''}
-      ${smry?`<div class="smry">${smry}</div>`:''}`;
+      ${smry?`<div class="smry">${smry}</div>`:''}
+      ${samAreaHtml(x.sam_area)}`;
     g.appendChild(d);
   });
 }
