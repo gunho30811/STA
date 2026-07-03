@@ -33,12 +33,12 @@ jobs:
       - name: Playwright Chromium 설치
         run: python -m playwright install chromium --with-deps
 
-      - name: 네이버 목록 크롤 (listings 갱신)
-        run: python pipeline/naver/crawler.py
+      - name: 네이버 목록 크롤 (수도권 주거 전 유형 — 오피스텔/아파트/빌라/원룸/단독다가구)
+        run: python pipeline/naver/crawler.py --types APT,OPST,VL,OR,DDDGG
         continue-on-error: true   # 목록 실패해도 상세 시도
 
-      - name: 네이버 상세 크롤 (naver_listings 갱신, 신규분만)
-        run: python pipeline/naver/crawl_detail.py
+      - name: 네이버 상세 크롤 (naver_listings 갱신, 신규분만 · 상가 제외)
+        run: python pipeline/naver/crawl_detail.py --exclude-types 상가
 
       - name: 네이버 JSONL export (수도권 부동산 뷰어용 lab 파일 갱신)
         run: python pipeline/naver/export_jsonl.py
