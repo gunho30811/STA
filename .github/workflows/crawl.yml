@@ -40,6 +40,10 @@ jobs:
       - name: 네이버 상세 크롤 (naver_listings 갱신, 신규분만)
         run: python pipeline/naver/crawl_detail.py
 
+      - name: 네이버 JSONL export (수도권 부동산 뷰어용 lab 파일 갱신)
+        run: python pipeline/naver/export_jsonl.py
+        continue-on-error: true
+
       - name: 수익성 CSV 재생성
         run: python pipeline/integrate/build_integrated.py
         continue-on-error: true   # 삼삼 JSONL 없으면 스킵
@@ -50,7 +54,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/net_profit_integrated.csv
+          git add data/net_profit_integrated.csv lab/naver_listings.jsonl
           if git diff --cached --quiet; then
             echo "변경분 없음 — 커밋 스킵"
           else

@@ -147,13 +147,13 @@ def _load_jsonl(path):
 def load_listings():
     # 1순위: export 파일(빠름, DB 왕복 없음) → 2순위: DB → 3순위: 합성 샘플
     if os.path.exists(EXPORT):
-        rows, src = _load_jsonl(EXPORT), f"파일({os.path.basename(EXPORT)})"
+        rows, src = _load_jsonl(EXPORT), "파일"
     else:
         rows = _load_db()
-        src = "DB(samsam_listings)"
+        src = "DB"
         if not rows:
             rows = _load_sample()
-            src = f"샘플({os.path.basename(SAMPLE)}, 합성 프리뷰)"
+            src = "샘플(합성 프리뷰)"
     rows = [_enrich(r) for r in rows]
     print(f"[samsam_app] {len(rows)}건 로드 — 출처: {src}", flush=True)
     return rows, src
