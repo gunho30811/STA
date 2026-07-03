@@ -105,8 +105,10 @@
       <div class="fg"><label>보증금(만)</label><div style="display:flex;gap:4px"><input type="number" id="f-depmin" placeholder="최소"><input type="number" id="f-depmax" placeholder="최대"></div></div>
       <div class="fg"><label>월세(만)</label><div style="display:flex;gap:4px"><input type="number" id="f-rentmin" placeholder="최소"><input type="number" id="f-rentmax" placeholder="최대"></div></div>
       <div class="fg"><label>평수</label><div style="display:flex;gap:4px"><input type="number" id="f-pmin" placeholder="최소"><input type="number" id="f-pmax" placeholder="최대"></div></div>
+      <div class="fg"><label>💰 월순수익(만) 이상</label><input type="number" id="f-netmin" placeholder="예: 0" style="width:110px"></div>
       <div class="fg"><label>정렬</label><select id="f-sort">
         <option value="recent">최신순</option>
+        <option value="net_desc">💰 순수익 높은순</option>
         <option value="rent_asc">월세 낮은순</option>
         <option value="rent_desc">월세 높은순</option>
         <option value="deposit_asc">보증금 낮은순</option>
@@ -218,6 +220,7 @@ async function search(page){
   if(v('f-rentmax'))p.set('rent_max',v('f-rentmax'));
   if(v('f-pmin'))p.set('pyeong_min',v('f-pmin'));
   if(v('f-pmax'))p.set('pyeong_max',v('f-pmax'));
+  if(v('f-netmin'))p.set('net_min',v('f-netmin'));
   if(document.getElementById('f-office').checked)p.set('office','1');
   p.set('sort',v('f-sort'));p.set('page',page);p.set('size',24);
   const r=await (await fetch('api/listings?'+p)).json();
