@@ -217,6 +217,12 @@ def _load_matches():
                 "nDep": num(r.get("네이버보증금_만원")),
                 "nEquiv": num(r.get("네이버환산월세_만원")),
                 "nUrl": (r.get("네이버링크") or "").strip(),
+                # 대표 네이버 매물 연락처·조건(전화 문의용). 구 CSV엔 없을 수 있어 .get으로 방어.
+                "phone": (r.get("부동산번호") or "").strip(),
+                "office": (r.get("중개사무소") or "").strip(),
+                "repRent": num(r.get("대표월세_만원")),
+                "repDep": num(r.get("대표보증금_만원")),
+                "repFloor": (r.get("대표층수") or "").strip(),
             }
     return out
 
@@ -510,6 +516,12 @@ def api_buildings():
             "room_ids": [x["room_id"] for x in xs],
             "sam_url": sample.get("url", "") or "",
             "naver_url": M().get(sample["room_id"], {}).get("nUrl", "") or "",
+            # 대표(sample) 매물의 네이버 연락처·조건 — CSV에서 전화 문의용.
+            "phone": M().get(sample["room_id"], {}).get("phone", "") or "",
+            "office": M().get(sample["room_id"], {}).get("office", "") or "",
+            "nv_rent": M().get(sample["room_id"], {}).get("repRent"),
+            "nv_dep": M().get(sample["room_id"], {}).get("repDep"),
+            "nv_floor": M().get(sample["room_id"], {}).get("repFloor", "") or "",
         })
     if occ_min_filter is not None:
         out = [r for r in out if r["occ_min"] >= occ_min_filter]

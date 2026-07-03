@@ -92,6 +92,7 @@ def load_nav():
     rows = [dict(r) for r in conn.execute(
         "SELECT article_no, url, building_name, area_exclusive_m2,"
         " rent_monthly, deposit, maintenance_monthly, floor_current,"
+        " agent_phone, agent_office,"
         " lat, lng, dong"
         " FROM naver_listings"
         " WHERE rent_monthly BETWEEN 5 AND 2000 AND lat IS NOT NULL"
@@ -102,6 +103,20 @@ def load_nav():
 
 
 # ── 매칭 로직 ──────────────────────────────────────────────────────────────────
+def _fmt_phone(v):
+    """agent_phone은 detail_map에서 JSON 배열 문자열(예: '["02-..","010-.."]')로 저장됨.
+    사람이 읽는 ' / ' 결합 문자열로 변환. 파싱 실패 시 원문 그대로."""
+    if not v:
+        return ''
+    try:
+        arr = json.loads(v)
+        if isinstance(arr, list):
+            return ' / '.join(str(x) for x in arr if x)
+    except Exception:
+        pass
+    return str(v)
+
+
 def _floor_ok(nav_floor, sam_floor):
     if not sam_floor or nav_floor is None:
         return True
@@ -226,6 +241,13 @@ def build_rows(sam, nav, max_deposit=None):
             'n': len(use),
             'nv_bldg': rep['building_name'],
             'nv_url': nav_url,
+            # 대표(중앙값) 네이버 매물의 연락처·조건 — "전화해서 물어보기"용. 한 실제 매물 기준이라
+            # 전화·월세·보증금·층수가 서로 일관됨(중앙값 median과 달리 실재하는 한 건).
+            'nv_phone': _fmt_phone(rep.get('agent_phone')),
+            'nv_office': rep.get('agent_office') or '',
+            'nv_rep_rent': rep.get('rent_monthly') if rep.get('rent_monthly') is not None else '',
+            'nv_rep_dep': rep.get('deposit') if rep.get('deposit') is not None else '',
+            'nv_rep_floor': rep.get('floor_current') if rep.get('floor_current') is not None else '',
             'eff': round(nav_tot / sam_week, 2) if sam_week else 0,
             'real_eff': round(realized / nav_tot, 2) if nav_tot else 0,
             'real_eff_rent': round(realized / equiv, 2) if equiv else 0,
@@ -254,6 +276,7 @@ def write_csv(rows):
             '현실효율(1달실현÷네이버환산월세)', '순수익_만원(1달실현−환산월세−관리비)',
             '건물네이버매물수', '건물월세최저_만원', '건물월세중간_만원', '건물월세최고_만원',
             '네이버건물', '네이버링크', '삼삼링크',
+            '부동산번호', '중개사무소', '대표월세_만원', '대표보증금_만원', '대표층수',
         ])
         for r in rows:
             w.writerow([
@@ -267,6 +290,7 @@ def write_csv(rows):
                 r['bldg_cnt'], r['bldg_rent_min'], r['bldg_rent_med'], r['bldg_rent_max'],
                 r['nv_bldg'], r['nv_url'],
                 f"https://web.33m2.co.kr/guest/room/{r['rid']}",
+                r['nv_phone'], r['nv_office'], r['nv_rep_rent'], r['nv_rep_dep'], r['nv_rep_floor'],
             ])
 
 
