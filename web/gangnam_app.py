@@ -15,6 +15,7 @@ from flask import Flask, jsonify, render_template, request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "lab", "naver_listings.jsonl")
+SAMSAM = os.path.join(ROOT, "lab", "samsam_listings.jsonl")   # 근처 삼삼(단기임대) 수요 붙이기용
 M2_PER_PYEONG = 3.305785
 
 app = Flask(__name__, template_folder=os.path.join(ROOT, "templates"))
@@ -34,6 +35,47 @@ OFFICE_KW = ("업무용", "전입불가", "전입 불가", "전입신고 불가"
 def _is_office(x):
     return x.get("building_type_code") == "OPST" and \
         any(k in (x.get("summary") or "") for k in OFFICE_KW)
+
+
+_SAM = None
+def _sam_area():
+    """(시군구, 동) → {occ: 삼삼 오피스텔 평균 예약률%, n, top:{name,occ,url}}. 동만으로도 조회 가능.
+
+    네이버 매물(삼삼엔 없음)에 '이 근처 삼삼 단기임대가 얼마나 잘 나가나 + 최고 인기 오피스텔'을
+    붙여, 근처라서 괜찮을지 가늠하게 한다. lab/samsam_listings.jsonl(오피스텔)로 집계."""
+    global _SAM
+    if _SAM is not None:
+        return _SAM
+    agg = {}
+    if os.path.exists(SAMSAM):
+        with open(SAMSAM, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    r = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if r.get("building_type") != "오피스텔":
+                    continue
+                bk, bl = r.get("booked_days_1m") or 0, r.get("blocked_days_1m") or 0
+                occ = round(min(1.0, bk / max(31 - bl, 1)) * 100, 1)
+                sg, dong = r.get("sigungu") or "", r.get("dong") or ""
+                for key in {(sg, dong), ("", dong)}:   # (시군구,동) + 동-only 폴백
+                    a = agg.setdefault(key, {"occs": [], "top": None})
+                    a["occs"].append(occ)
+                    if a["top"] is None or occ > a["top"]["occ"]:
+                        a["top"] = {"name": r.get("name") or r.get("building_name") or "",
+                                    "occ": occ, "url": r.get("url") or ""}
+    _SAM = {k: {"occ": round(sum(a["occs"]) / len(a["occs"]), 1), "n": len(a["occs"]), "top": a["top"]}
+            for k, a in agg.items()}
+    return _SAM
+
+
+def _area_of(x):
+    sam = _sam_area()
+    return sam.get((x.get("sigungu") or "", x.get("dong") or "")) or sam.get(("", x.get("dong") or ""))
 
 
 def _load():
@@ -156,10 +198,13 @@ def api_listings():
     page = max(1, int(a.get("page", 1)))
     size = min(120, max(1, int(a.get("size", 24))))
     start = (page - 1) * size
+    page_items = items[start:start + size]
+    for it in page_items:      # 이 매물 근처(같은 동) 삼삼 단기임대 수요 부착
+        it["sam_area"] = _area_of(it)
     return jsonify({
         "total": total, "page": page, "size": size,
         "pages": (total + size - 1) // size,
-        "items": items[start:start + size],
+        "items": page_items,
     })
 
 
