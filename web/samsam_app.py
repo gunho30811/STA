@@ -46,6 +46,7 @@ import chat_auth  # noqa: E402
 import chat_poll  # noqa: E402
 import crypto_util  # noqa: E402
 import db  # noqa: E402
+import search  # noqa: E402  (건물명·역명 텍스트 검색 색인 — 외부 엔진 없이 순수 파이썬 n-gram)
 
 SAM_COLS = ("room_id", "url", "name", "building_type", "building_name",
             "sido", "sigungu", "dong", "area_pyeong", "rent_total_weekly",
@@ -164,6 +165,26 @@ def L():
     return _ensure()[0]
 def SRC():
     return _ensure()[1]
+
+
+# ── 검색 색인(건물명·역명) ──────────────────────────────────────────────────────
+# 앱의 텍스트 검색은 search 패키지의 n-gram 역색인을 거친다. 데이터가 프로세스당 1회
+# 로드(_LC)되므로 색인도 최초 사용 때 한 번만 구축한다. 데이터가 적어 메모리로 충분.
+_IDX = None
+def _indexes():
+    global _IDX
+    if _IDX is None:
+        bi, si = search.TextIndex(), search.TextIndex()
+        for r in L():
+            bn = (r.get("building_name") or "").strip()
+            if bn:
+                bi.add(bn)
+            for s in (r.get("stations") or []):
+                if s:
+                    si.add(s)
+        _IDX = {"building": bi, "station": si}
+        print(f"[samsam_app] 검색 색인 구축 — 건물명 {len(bi)} · 역명 {len(si)}", flush=True)
+    return _IDX
 
 
 # ── 네이버 매칭 결과(net_profit_integrated.csv) → room_id별 수익 정보 ──
@@ -414,8 +435,13 @@ def api_buildings():
     a = request.args
     rows = _filtered(a)
     st = a.get("station", "").strip()
-    if st:   # 역 검색: 매물 500m 내 역명에 검색어 포함
-        rows = [r for r in rows if any(st in s for s in r.get("stations", []))]
+    if st:   # 역 검색: 매물 500m 내 역명에 검색어 부분일치(search 색인)
+        hits = _indexes()["station"].search(st)
+        rows = [r for r in rows if hits.intersection(r.get("stations", []))]
+    bq = a.get("building", "").strip()
+    if bq:   # 건물명(오피스텔 명) 검색: 부분일치(search 색인)
+        hits = _indexes()["building"].search(bq)
+        rows = [r for r in rows if (r.get("building_name") or "").strip() in hits]
     try:
         min_n = max(1, int(a.get("min_n", 2)))
     except ValueError:
