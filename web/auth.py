@@ -195,11 +195,18 @@ def signup():
             err = "비밀번호가 일치하지 않습니다."
         else:
             err = pw_ok(pw)
+        existing = None
         if not err:
             conn = db.connect()
-            if conn.execute("SELECT id FROM members WHERE email=%s", (email,)).fetchone():
-                err = "이미 가입된 이메일입니다."
-        if not err:
+            existing = conn.execute(
+                "SELECT id, email_verified FROM members WHERE email=%s", (email,)).fetchone()
+            # 인증 완료된 계정만 '이미 가입'으로 막는다. 미인증 레코드(가입 도중 이탈·더블클릭·
+            # 뒤로가기로 생김)는 재시도로 간주해 아래에서 갱신·재발송한다 —
+            # "처음 가입하는데 이미 가입됐다며 막히고, 메일은 이미 옴" 버그의 원인이 이 미인증 잔재.
+            if existing and existing["email_verified"]:
+                err = "이미 가입된 이메일입니다. 로그인해 주세요."
+        # 하루 가입 한도는 '신규 가입'에만 적용(미인증 재시도는 새 가입이 아니므로 제외).
+        if not err and existing is None:
             today = _now().date().isoformat()
             cnt = conn.execute(
                 "SELECT count(*) FROM members WHERE role='member' AND created_at >= %s",
@@ -211,17 +218,23 @@ def signup():
         else:
             code = _gen_code()
             exp = (_now() + dt.timedelta(minutes=CODE_TTL_MIN)).isoformat(timespec="seconds")
-            conn.execute(
-                "INSERT INTO members(email,password_hash,name,birthdate,role,email_verified,"
-                "verify_code,verify_expires,created_at) "
-                "VALUES(%s,%s,%s,%s,'member',FALSE,%s,%s,%s)",
-                (email, generate_password_hash(pw), name, birth, code, exp,
-                 _now().isoformat(timespec="seconds")))
+            if existing:   # 미인증 레코드 재사용: 입력값·인증코드 갱신 후 재발송
+                conn.execute(
+                    "UPDATE members SET password_hash=%s,name=%s,birthdate=%s,"
+                    "verify_code=%s,verify_expires=%s WHERE id=%s",
+                    (generate_password_hash(pw), name, birth, code, exp, existing["id"]))
+            else:
+                conn.execute(
+                    "INSERT INTO members(email,password_hash,name,birthdate,role,email_verified,"
+                    "verify_code,verify_expires,created_at) "
+                    "VALUES(%s,%s,%s,%s,'member',FALSE,%s,%s,%s)",
+                    (email, generate_password_hash(pw), name, birth, code, exp,
+                     _now().isoformat(timespec="seconds")))
             conn.commit()
             shown = send_verify_email(email, code)
             return redirect(url_for("auth.verify", email=email, dev=shown))
     body = f"""<h1>📝 회원가입</h1><p class="sub">이름·생년월일·이메일 · 비밀번호는 특수문자 필수</p>{msg}
-    <form method=post>
+    <form method=post onsubmit="var b=this.querySelector('button');if(b)setTimeout(function(){{b.disabled=true;b.textContent='처리 중…';}},0)">
       <label>이름</label><input name=name value="{f.get('name','')}">
       <label>생년월일</label><input name=birthdate type=date value="{f.get('birthdate','')}">
       <label>이메일</label><input name=email type=email value="{f.get('email','')}">
