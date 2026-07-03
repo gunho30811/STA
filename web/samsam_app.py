@@ -46,6 +46,7 @@ import chat_auth  # noqa: E402
 import chat_poll  # noqa: E402
 import crypto_util  # noqa: E402
 import db  # noqa: E402
+import search  # noqa: E402  (건물명·역명 텍스트 검색 색인 — 외부 엔진 없이 순수 파이썬 n-gram)
 
 SAM_COLS = ("room_id", "url", "name", "building_type", "building_name",
             "sido", "sigungu", "dong", "area_pyeong", "rent_total_weekly",
@@ -166,6 +167,26 @@ def SRC():
     return _ensure()[1]
 
 
+# ── 검색 색인(건물명·역명) ──────────────────────────────────────────────────────
+# 앱의 텍스트 검색은 search 패키지의 n-gram 역색인을 거친다. 데이터가 프로세스당 1회
+# 로드(_LC)되므로 색인도 최초 사용 때 한 번만 구축한다. 데이터가 적어 메모리로 충분.
+_IDX = None
+def _indexes():
+    global _IDX
+    if _IDX is None:
+        bi, si = search.TextIndex(), search.TextIndex()
+        for r in L():
+            bn = (r.get("building_name") or "").strip()
+            if bn:
+                bi.add(bn)
+            for s in (r.get("stations") or []):
+                if s:
+                    si.add(s)
+        _IDX = {"building": bi, "station": si}
+        print(f"[samsam_app] 검색 색인 구축 — 건물명 {len(bi)} · 역명 {len(si)}", flush=True)
+    return _IDX
+
+
 # ── 네이버 매칭 결과(net_profit_integrated.csv) → room_id별 수익 정보 ──
 MATCH_CSV = os.path.join(ROOT, "data", "net_profit_integrated.csv")
 CONV_PER_MONTH = 0.06 / 12   # 전월세 전환율(월). 보증금 D → 월세환산 = 환산월세 − D×CONV
@@ -195,6 +216,7 @@ def _load_matches():
                 "nMgmt": num(r.get("네이버관리비_만원")),
                 "nDep": num(r.get("네이버보증금_만원")),
                 "nEquiv": num(r.get("네이버환산월세_만원")),
+                "nUrl": (r.get("네이버링크") or "").strip(),
             }
     return out
 
@@ -226,12 +248,33 @@ def net_at_deposit(rid, dep, fixed=0.0):
     return c["net"] if c else None
 
 
+def _city(sigungu):
+    """시군구 표기를 시 단위로 정규화 — 수집 소스에 따라 같은 도시가 '부천시'(구 없이)와
+    '부천시 원미구'(구 포함) 두 가지 문자열로 갈라져 필터에 중복으로 뜨는 문제를 막는다.
+    '강남구'처럼 애초에 한 토큰인 서울/인천 구는 그대로 유지된다."""
+    return (sigungu or "").split(" ")[0]
+
+
+def _multi(a, key):
+    """쿼리에서 같은 key로 온 여러 값(복수 선택)을 리스트로 — 콤마로 붙여 보낸 것도 분해.
+    request.args(MultiDict)면 getlist, 일반 dict면 get 폴백."""
+    getlist = getattr(a, "getlist", None)
+    raw = getlist(key) if getlist else ([a.get(key)] if a.get(key) else [])
+    out = []
+    for v in raw:
+        out.extend(p.strip() for p in str(v).split(",") if p.strip())
+    return out
+
+
 def _filtered(a):
     rows = L()
-    for key in ("sido", "sigungu", "dong", "building_type"):
-        v = a.get(key)
-        if v:
-            rows = [r for r in rows if r.get(key) == v]
+    for key in ("sido", "dong", "building_type"):
+        vals = set(_multi(a, key))
+        if vals:
+            rows = [r for r in rows if r.get(key) in vals]
+    sigungu = set(_multi(a, "sigungu"))
+    if sigungu:
+        rows = [r for r in rows if _city(r.get("sigungu")) in sigungu]
 
     def rng(field, lo, hi, scale=1.0):
         nonlocal rows
@@ -297,7 +340,7 @@ def api_facets():
     sidos = sorted({r["sido"] for r in L() if r.get("sido")})
     tree = {}
     for r in L():
-        tree.setdefault(r.get("sido", ""), {}).setdefault(r.get("sigungu", ""), set()).add(r.get("dong", ""))
+        tree.setdefault(r.get("sido", ""), {}).setdefault(_city(r.get("sigungu")), set()).add(r.get("dong", ""))
     tree = {s: {g: sorted(d) for g, d in gg.items()} for s, gg in tree.items()}
     btypes = sorted({r["building_type"] for r in L() if r.get("building_type")})
     opts = [{"code": c, "name": ko(c)} for c in sorted({o for r in L() for o in r["options"]})]
@@ -392,8 +435,13 @@ def api_buildings():
     a = request.args
     rows = _filtered(a)
     st = a.get("station", "").strip()
-    if st:   # 역 검색: 매물 500m 내 역명에 검색어 포함
-        rows = [r for r in rows if any(st in s for s in r.get("stations", []))]
+    if st:   # 역 검색: 매물 500m 내 역명에 검색어 부분일치(search 색인)
+        hits = _indexes()["station"].search(st)
+        rows = [r for r in rows if hits.intersection(r.get("stations", []))]
+    bq = a.get("building", "").strip()
+    if bq:   # 건물명(오피스텔 명) 검색: 부분일치(search 색인)
+        hits = _indexes()["building"].search(bq)
+        rows = [r for r in rows if (r.get("building_name") or "").strip() in hits]
     try:
         min_n = max(1, int(a.get("min_n", 2)))
     except ValueError:
@@ -406,6 +454,18 @@ def api_buildings():
         fixed = float(a.get("fixed", 0) or 0)          # 고정비(통신비·청소비 등, 만원/월)
     except ValueError:
         fixed = 0.0
+    try:
+        occ_min_filter = float(a["occ_min_filter"]) if a.get("occ_min_filter") else None
+    except ValueError:
+        occ_min_filter = None
+    try:
+        net_min_filter = float(a["net_min_filter"]) if a.get("net_min_filter") else None
+    except ValueError:
+        net_min_filter = None
+    try:
+        be_max_filter = float(a["breakeven_max"]) if a.get("breakeven_max") else None
+    except ValueError:
+        be_max_filter = None
     by = {}
     for r in rows:
         bn = (r.get("building_name") or "").strip()
@@ -422,6 +482,15 @@ def api_buildings():
         calcs = [calc_at_deposit(x["room_id"], dep, fixed) for x in xs]
         calcs = [c for c in calcs if c is not None]
         avg = (lambda key: round(statistics.mean(c[key] for c in calcs), 1)) if calcs else (lambda key: None)
+        # 링크용 대표 매물: 네이버 매칭이 있는 방을 우선(부동산링크까지 같이 나오게), 없으면 그냥 첫 방.
+        sample = next((x for x in xs if M().get(x["room_id"], {}).get("nUrl")), xs[0])
+        week_avg = round(statistics.mean(x["sam_week_man"] for x in xs), 1)
+        # 손익분기점(주) = (네이버월세@보증금 + 관리비) ÷ 삼삼 주당매출.
+        # 월 고정비용을 주당 매출로 갚는 데 걸리는 주 수 → 작을수록 회수 빠름(좋음).
+        breakeven = None
+        if calcs and week_avg > 0:
+            monthly_cost = avg("rent") + avg("mgmt")
+            breakeven = round(monthly_cost / week_avg, 1)
         out.append({
             "building": bn, "sigungu": sg, "dong": dong,
             "btype": xs[0].get("building_type", ""),
@@ -430,15 +499,24 @@ def api_buildings():
             "occ_avg": round(statistics.mean(occs), 1),
             "occ_min": round(min(occs), 1),
             "occ_max": round(max(occs), 1),
-            "week_avg": round(statistics.mean(x["sam_week_man"] for x in xs), 1),
+            "week_avg": week_avg,
             "n_matched": len(calcs),
             "net_avg": avg("net"),
+            "breakeven": breakeven,
             # 월순수익 분해(보증금 기준 평균): 삼삼매출 − 네이버월세 − 관리비 − 고정비
             "bd": {"maxRev": avg("maxRev"), "rent": avg("rent"), "mgmt": avg("mgmt"),
                    "dep": dep, "fixed": fixed} if calcs else None,
             "station": next((x["station"] for x in xs if x.get("station")), ""),
             "room_ids": [x["room_id"] for x in xs],
+            "sam_url": sample.get("url", "") or "",
+            "naver_url": M().get(sample["room_id"], {}).get("nUrl", "") or "",
         })
+    if occ_min_filter is not None:
+        out = [r for r in out if r["occ_min"] >= occ_min_filter]
+    if net_min_filter is not None:
+        out = [r for r in out if r["net_avg"] is not None and r["net_avg"] >= net_min_filter]
+    if be_max_filter is not None:
+        out = [r for r in out if r["breakeven"] is not None and r["breakeven"] <= be_max_filter]
     # 평균예약률 높고 매물 많은 순. (최저예약률도 높으면 전 호실 검증된 건물)
     out.sort(key=lambda r: (-r["occ_avg"], -r["n"]))
     return jsonify({"total": len(out), "items": out})
@@ -449,13 +527,14 @@ def api_trend():
     """주간 스냅샷(samsam_snapshots)으로 지역(동)별 예약률 추이 + 전주대비 변화(Δ)."""
     a = request.args
     rows = []
-    sido_f, sigungu_f = a.get("sido"), a.get("sigungu")
+    sido_f = set(_multi(a, "sido"))            # 복수 시/도
+    sigungu_f = set(_multi(a, "sigungu"))
     try:
         if os.path.exists(SNAP_EXPORT):   # 파일 우선(DB 왕복 없음)
             for r in _load_jsonl(SNAP_EXPORT):
-                if sido_f and r.get("sido") != sido_f:
+                if sido_f and r.get("sido") not in sido_f:
                     continue
-                if sigungu_f and r.get("sigungu") != sigungu_f:
+                if sigungu_f and _city(r.get("sigungu")) not in sigungu_f:
                     continue
                 rows.append(r)
         else:
@@ -463,9 +542,9 @@ def api_trend():
             conn = db.connect()
             where, params = [], []
             if sido_f:
-                where.append("sido=%s"); params.append(sido_f)
+                where.append("sido = ANY(%s)"); params.append(list(sido_f))
             if sigungu_f:
-                where.append("sigungu=%s"); params.append(sigungu_f)
+                where.append("sigungu = ANY(%s)"); params.append(list(sigungu_f))
             w = (" WHERE " + " AND ".join(where)) if where else ""
             rows = [dict(r) for r in conn.execute(
                 "SELECT snapshot_date, sido, sigungu, dong, n, avg_occ_1m"
