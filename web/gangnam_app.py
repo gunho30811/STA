@@ -94,12 +94,22 @@ def _area_of(x):
     same = [o for o in lst if py and o["pyeong"] and abs(o["pyeong"] - py) <= PYEONG_TOL]
     comp = same or lst                      # 같은 평수 없으면 동 전체로 폴백
     weeks = [o["week"] for o in comp if o["week"]]
+    avg_week = round(sum(weeks) / len(weeks), 1) if weeks else None
     best = max(comp, key=lambda o: o["occ"])
     worst = min(comp, key=lambda o: o["occ"])
     pick = lambda o: {"name": o["name"], "occ": o["occ"], "week": o["week"], "url": o["url"]}
-    return {"n": len(comp), "same_pyeong": bool(same),
-            "avg_week": round(sum(weeks) / len(weeks), 1) if weeks else None,
-            "best": pick(best), "worst": pick(worst)}
+    res = {"n": len(comp), "same_pyeong": bool(same), "avg_week": avg_week,
+           "best": pick(best), "worst": pick(worst),
+           "net": None, "sam_rev": None, "mgmt": None}
+    # 순수익(월): 예약률 높은(잘나감) 삼삼 오피스텔 매출 − 네이버 월세 − 관리비(없으면 기본 20).
+    #   삼삼 월매출 = 주당 × 예약률 × 30/7 (build_integrated 관례).
+    rent = x.get("rent_monthly")
+    if best["week"] and isinstance(rent, (int, float)) and rent > 0:
+        mm = x.get("maintenance_monthly")
+        mgmt = mm if isinstance(mm, (int, float)) and mm > 0 else 20
+        sam_rev = round(best["week"] * (best["occ"] / 100) * 30 / 7, 1)
+        res.update(sam_rev=sam_rev, mgmt=mgmt, net=round(sam_rev - rent - mgmt, 1))
+    return res
 
 
 def _load():
