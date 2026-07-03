@@ -88,6 +88,9 @@ def source_articles(args):
     if ex:
         q += f" AND (realEstateType IS NULL OR realEstateType NOT IN ({','.join('?' * len(ex))}))"
         p += ex
+    since = getattr(args, "since", "") or ""
+    if since:   # 이 날짜 이후 수집분만(방금 재크롤한 신선·살아있는 매물만 타겟, 죽은 backlog 제외)
+        q += " AND crawled_at >= ?"; p.append(since)
     # 최신 수집분(방금 리스트 크롤한 살아있는 매물) 우선 상세. 안 그러면 몇 주 전 죽은 backlog부터
     # 집어 articleDetail 없는 만료매물만 훑느라 상세가 0건이 된다(실측 확인).
     q += " ORDER BY crawled_at DESC"
@@ -108,6 +111,7 @@ def main():
     ap.add_argument("--types", default="", help="콤마구분 포함 타입(한글, 예: 오피스텔). 비우면 전체")
     ap.add_argument("--exclude-types", default="", help="콤마구분 제외 타입(한글, 예: 상가)")
     ap.add_argument("--gu")
+    ap.add_argument("--since", default="", help="이 날짜(YYYY-MM-DD 등) 이후 수집분만 상세(신선분 타겟)")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--redo", action="store_true")
     ap.add_argument("--show", action="store_true")
