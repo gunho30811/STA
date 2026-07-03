@@ -231,6 +231,22 @@ def api_listings():
         items = [x for x in items if _is_office(x)]
 
     sort = a.get("sort", "recent")
+    try:
+        net_min = float(a["net_min"]) if a.get("net_min") not in (None, "") else None
+    except ValueError:
+        net_min = None
+    # 월순수익 필터/정렬은 매물별 순수익이 필요 → 그때만 전체 대상으로 계산(캐시).
+    if net_min is not None or sort == "net_desc":
+        for x in items:
+            if "sam_area" not in x:
+                x["sam_area"] = _area_of(x)
+        if net_min is not None:
+            items = [x for x in items if (x.get("sam_area") or {}).get("net") is not None
+                     and x["sam_area"]["net"] >= net_min]
+
+    def _netkey(x):
+        n = (x.get("sam_area") or {}).get("net")
+        return -(n if n is not None else -1e9)
     keyf = {
         "rent_asc": lambda x: (_n(x.get("rent_monthly")) is None, _n(x.get("rent_monthly")) or 0),
         "rent_desc": lambda x: -(_n(x.get("rent_monthly")) or 0),
@@ -238,6 +254,7 @@ def api_listings():
         "deposit_desc": lambda x: -(_n(x.get("deposit")) or 0),
         "area_desc": lambda x: -(_n(x.get("pyeong")) or 0),
         "area_asc": lambda x: (_n(x.get("pyeong")) is None, _n(x.get("pyeong")) or 0),
+        "net_desc": _netkey,
         "recent": lambda x: x.get("confirmed_at") or "",
     }.get(sort, lambda x: x.get("confirmed_at") or "")
     rev = sort in ("recent",)
@@ -248,8 +265,9 @@ def api_listings():
     size = min(120, max(1, int(a.get("size", 24))))
     start = (page - 1) * size
     page_items = items[start:start + size]
-    for it in page_items:      # 이 매물 근처(같은 동) 삼삼 단기임대 수요 부착
-        it["sam_area"] = _area_of(it)
+    for it in page_items:      # 이 매물 근처(같은 동) 삼삼 수요·순수익 부착(이미 있으면 재사용)
+        if "sam_area" not in it:
+            it["sam_area"] = _area_of(it)
     return jsonify({
         "total": total, "page": page, "size": size,
         "pages": (total + size - 1) // size,
