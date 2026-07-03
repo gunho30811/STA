@@ -210,7 +210,9 @@ const LIST_COLS=[
   {k:"week",t:"주당"},
   {k:"booked",t:"예약일"},
   {k:"blocked",t:"막힘"},
-  {k:"occ",t:"예약률%"},
+  {k:"occ",t:"1달예약률%"},
+  {k:"occ2",t:"2달%"},
+  {k:"occ3",t:"3달%"},
   {k:"vac",t:"공실률%"},
   {k:"options",t:"옵션",l:true,s:false},
   {k:"url",t:"링크",l:true,s:false},
@@ -361,9 +363,9 @@ function sortList(col){
 }
 function renderListBody(){
   const tb=document.getElementById('list-b');tb.innerHTML='';
-  if(!LISTITEMS.length){tb.innerHTML='<tr><td colspan="11" class="empty">해당 매물이 없습니다.</td></tr>';return;}
+  if(!LISTITEMS.length){tb.innerHTML='<tr><td colspan="13" class="empty">해당 매물이 없습니다.</td></tr>';return;}
   const k=listSort.dir, col=listSort.col;
-  const numCols={pyeong:1,week:1,booked:1,blocked:1,occ:1,vac:1};
+  const numCols={pyeong:1,week:1,booked:1,blocked:1,occ:1,occ2:1,occ3:1,vac:1};
   const items=[...LISTITEMS].sort((a,b)=>{
     let av=a[col],bv=b[col];
     if(numCols[col]){av=av==null?-Infinity:av;bv=bv==null?-Infinity:bv;const c=av-bv;return k==='asc'?c:-c;}
@@ -376,7 +378,7 @@ function renderListBody(){
     tr.innerHTML=`<td class="l">${x.name}<br><span class="mut">${x.building_name}</span></td>
       <td class="l">${x.sigungu} ${x.dong}</td><td class="l">${x.station||'-'}</td>
       <td>${x.pyeong??'-'}</td><td>${x.week}</td><td>${x.booked}</td><td>${x.blocked}</td>
-      <td>${x.occ}%</td><td>${x.vac}%</td>
+      <td class="occ">${x.occ}%</td><td class="mut">${x.occ2}%</td><td class="mut">${x.occ3}%</td><td>${x.vac}%</td>
       <td class="l" style="white-space:normal;max-width:280px">${pills}</td>
       <td class="l"><a class="lnk" href="${x.url}" target="_blank">삼삼</a></td>`;
     tb.appendChild(tr);
@@ -431,8 +433,9 @@ function renderTrend(){
 let BLD=[], bSort={col:'occ_avg',dir:'desc'};
 const BCOLS=[
   {k:'building',t:'건물명',l:true},{k:'dong',t:'동',l:true},{k:'btype',t:'유형',l:true},
-  {k:'pyeong',t:'평'},{k:'station',t:'역',l:true},{k:'n',t:'매물수'},{k:'occ_avg',t:'평균예약률%'},
-  {k:'occ_min',t:'최저예약률%'},{k:'occ_max',t:'최고예약률%'},{k:'week_avg',t:'평균주당'},
+  {k:'pyeong',t:'평'},{k:'station',t:'역',l:true},{k:'n',t:'매물수'},{k:'occ_avg',t:'1달예약률%'},
+  {k:'occ2_avg',t:'2달%'},{k:'occ3_avg',t:'3달%'},
+  {k:'occ_min',t:'최저(1달)%'},{k:'occ_max',t:'최고(1달)%'},{k:'week_avg',t:'평균주당'},
   {k:'net_avg',t:'월순수익'},{k:'breakeven',t:'손익분기(주)'},{k:'n_matched',t:'매칭수'},{k:'links',t:'링크',l:true,s:false},
 ];
 let BLD_VIEW=[];   // 현재 필터·정렬 적용된 화면 표시분(CSV 다운로드가 이걸 그대로 씀)
@@ -455,7 +458,7 @@ function renderBuildings(){
     th.textContent=c.t+(sortable&&c.k===bSort.col?(bSort.dir==='asc'?' ▲':' ▼'):'');
     if(sortable){th.style.cursor='pointer';th.onclick=()=>{if(bSort.col===c.k)bSort.dir=bSort.dir==='asc'?'desc':'asc';else{bSort.col=c.k;bSort.dir='desc';}renderBuildings();};}
     h.appendChild(th);});
-  const isNum=k=>['pyeong','n','occ_avg','occ_min','occ_max','week_avg','net_avg','breakeven','n_matched'].includes(k);
+  const isNum=k=>['pyeong','n','occ_avg','occ2_avg','occ3_avg','occ_min','occ_max','week_avg','net_avg','breakeven','n_matched'].includes(k);
   const k=bSort.col;
   // 손익분기점은 '작을수록 좋음'이라 정렬 시 null(매칭없음)은 항상 뒤로 보낸다.
   const rows=[...BLD].sort((a,b)=>{let av=a[k],bv=b[k];
@@ -464,7 +467,7 @@ function renderBuildings(){
   BLD_VIEW=rows;
   document.getElementById('b-count').textContent=rows.length?`${rows.length.toLocaleString()}개 건물`:'';
   const b=document.getElementById('b-b');
-  if(!rows.length){b.innerHTML='<tr><td colspan="14" class="empty">매물수 조건을 만족하는 건물이 없습니다.</td></tr>';return;}
+  if(!rows.length){b.innerHTML='<tr><td colspan="16" class="empty">매물수 조건을 만족하는 건물이 없습니다.</td></tr>';return;}
   b.innerHTML=rows.map(r=>{
     const minc=r.occ_min>=60?'good':(r.occ_min<30?'bad':'mut');
     const netc=r.net_avg==null?'mut':(r.net_avg>=0?'good':'bad');
@@ -489,6 +492,7 @@ function renderBuildings(){
       +(r.naver_url?` <a class="lnk" style="background:#2563eb" href="${r.naver_url}" target="_blank">부동산</a>`:'');
     return `<tr><td class="l" style="font-weight:700">${r.building}</td><td class="l">${r.dong}</td><td class="l">${r.btype}</td><td>${r.pyeong??'-'}</td><td class="l">${r.station||'-'}</td>
       <td style="font-weight:800">${r.n}</td><td class="occ">${r.occ_avg}%</td>
+      <td class="mut">${r.occ2_avg}%</td><td class="mut">${r.occ3_avg}%</td>
       <td class="${minc}" style="font-weight:800">${r.occ_min}%</td><td class="mut">${r.occ_max}%</td><td>${r.week_avg}</td>
       <td>${netv}</td><td>${bev}</td><td class="mut">${r.n_matched||0}</td><td class="l">${links||'<span class="mut">-</span>'}</td></tr>`;
   }).join('');
@@ -499,13 +503,13 @@ function csvCell(v){
 }
 function downloadBuildingsCsv(){
   if(!BLD_VIEW.length){alert('다운로드할 건물이 없습니다.');return;}
-  const header=['건물명','시군구','동','유형','평','역','매물수','평균예약률%','최저예약률%','최고예약률%',
+  const header=['건물명','시군구','동','유형','평','역','매물수','1달예약률%','2달예약률%','3달예약률%','최저예약률%(1달)','최고예약률%(1달)',
     '평균주당(만원)','월순수익(만원)','손익분기점(주)','매칭수',
     '부동산번호','중개사무소','대표월세(만원)','대표보증금(만원)','대표층수','부동산링크','삼삼엠투_경쟁예시링크'];
   const lines=[header.map(csvCell).join(',')];
   BLD_VIEW.forEach(r=>{
     lines.push([r.building,r.sigungu,r.dong,r.btype,r.pyeong??'',r.station||'',r.n,r.occ_avg,
-      r.occ_min,r.occ_max,r.week_avg,r.net_avg??'',r.breakeven??'',r.n_matched||0,
+      r.occ2_avg,r.occ3_avg,r.occ_min,r.occ_max,r.week_avg,r.net_avg??'',r.breakeven??'',r.n_matched||0,
       r.phone||'',r.office||'',r.nv_rent??'',r.nv_dep??'',r.nv_floor||'',r.naver_url||'',r.sam_url||'']
       .map(csvCell).join(','));
   });
