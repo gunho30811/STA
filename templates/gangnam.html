@@ -279,8 +279,8 @@ function renderPager(r){
   if(e<r.pages-1)pg.appendChild(document.createTextNode('…'));if(e<r.pages)add(r.pages,String(r.pages));
   if(cur<r.pages)add(cur+1,'›');
 }
-function openM(i){
-  const x=curItems[i];const tc=x.building_type_code||'';
+function renderM(x){
+  const tc=x.building_type_code||'';
   const title=x.building_name||TYPES[tc]||'매물';
   const rent=x.rent_monthly?`월 <em>${won(x.rent_monthly)}</em>`:'매매/기타';
   let html=`<div class="mhead"><div><h2>${title} <span class="chip">${TYPES[tc]||tc}</span></h2>
@@ -296,10 +296,20 @@ function openM(i){
     });
     if(rows.length) html+=`<div class="sec"><h3>${gname}</h3><div class="kv">${rows.join('')}</div></div>`;
   });
+  html+=samAreaHtml(x.sam_area);
   if(x.url) html+=`<a class="mlink" href="${x.url}" target="_blank">부동산에서 보기 →</a>`;
   html+=`</div>`;
   document.getElementById('modal').innerHTML=html;
+}
+async function openM(i){
+  const base=curItems[i];
+  renderM(base);                       // 리스트에 있는 값으로 즉시 표시
   document.getElementById('overlay').classList.add('on');
+  try{                                 // 상세 전체는 DB에서 그 매물 1건만(리스트 파일은 경량 유지)
+    const full=await (await fetch('api/detail/'+base.article_no)).json();
+    if(full && !full.error && document.getElementById('overlay').classList.contains('on'))
+      renderM(Object.assign({}, base, full));
+  }catch(e){}
 }
 function closeM(){document.getElementById('overlay').classList.remove('on');}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeM();});
