@@ -10,10 +10,12 @@ export: python pipeline/naver/export_jsonl.py
 """
 import json
 import os
+import sys
 
 from flask import Flask, jsonify, render_template, request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)   # db 모듈 import용(상세 모달이 DB에서 전체 컬럼을 가져옴)
 DATA = os.path.join(ROOT, "lab", "naver_listings.jsonl")
 SAMSAM = os.path.join(ROOT, "lab", "samsam_listings.jsonl")   # 근처 삼삼(단기임대) 수요 붙이기용
 M2_PER_PYEONG = 3.305785
@@ -127,6 +129,7 @@ def _load():
                 continue
             area = r.get("area_exclusive_m2")
             r["pyeong"] = round(area / M2_PER_PYEONG, 1) if isinstance(area, (int, float)) else None
+            r["url"] = f"https://new.land.naver.com/offices?articleNo={r.get('article_no')}"
             rows.append(r)
     return rows
 
@@ -273,6 +276,25 @@ def api_listings():
         "pages": (total + size - 1) // size,
         "items": page_items,
     })
+
+
+@app.route("/api/detail/<int:no>")
+def api_detail(no):
+    """매물 1건 전체 컬럼(DB). 리스트 파일은 경량이라, 상세 모달만 클릭 시 DB에서 채운다."""
+    try:
+        import db
+        conn = db.connect()
+        r = conn.execute("SELECT * FROM naver_listings WHERE article_no=%s", (no,)).fetchone()
+        conn.close()
+        if not r:
+            return jsonify({})
+        d = dict(r)
+        area = d.get("area_exclusive_m2")
+        d["pyeong"] = round(area / M2_PER_PYEONG, 1) if isinstance(area, (int, float)) else None
+        d["url"] = f"https://new.land.naver.com/offices?articleNo={no}"
+        return jsonify(d)
+    except Exception as e:
+        return jsonify({"error": str(e)[:100]})
 
 
 def _n(v):

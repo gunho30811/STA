@@ -13,15 +13,14 @@ import db
 
 OUT = os.path.join(BASE, "lab", "naver_listings.jsonl")
 
-# 뷰어(gangnam_app + templates/gangnam.html)가 실제 쓰는 컬럼만 — 전 컬럼(65개, ~48MB) 대신
-# 이 29개만 뽑아 파일을 가볍게 유지(수도권 21k여도 ~16MB, 기존 강남 전수 파일 22MB보다 작다).
+# 뷰어가 실제 쓰는 컬럼만. 수도권 전 유형 115k라 파일이 커져(전컬럼 100MB+, GitHub 100MB 한도 초과),
+# 무거운·미사용 컬럼을 뺀다: url(article_no로 재구성), tags/lat/lng/road_address/agent_office/
+# floor_total/bathrooms/subway_walk/building_type(코드와 중복). → ~70MB 수준.
 COLS = (
-    "article_no,url,building_name,building_type,building_type_code,"
+    "article_no,building_name,building_type_code,"
     "sido,sigungu,dong,deposit,rent_monthly,maintenance_monthly,"
-    "area_exclusive_m2,floor_current,floor_total,direction,rooms,bathrooms,"
-    "subway_station,subway_distance_m,subway_walk_min,"
-    "jibun_address,road_address,summary,tags,confirmed_at,"
-    "agent_office,agent_phone,lat,lng"
+    "area_exclusive_m2,floor_current,direction,rooms,"
+    "subway_station,subway_distance_m,jibun_address,summary,confirmed_at,agent_phone"
 )
 
 
