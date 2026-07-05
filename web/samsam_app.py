@@ -548,8 +548,6 @@ def api_trend():
     """주간 스냅샷으로 지역(시도·시군구·동)별 예약률(1/2/3달) 추이 + 전주대비 Δ +
     그 동의 최고 인기 삼삼 오피스텔(현재 매물). 동별 베스트는 예약률 min_occ%(기본 20) 이상만."""
     a = request.args
-    metric = a.get("metric", "occ1")
-    col = {"occ1": "avg_occ_1m", "occ2": "avg_occ_2m", "occ3": "avg_occ_3m"}.get(metric, "avg_occ_1m")
     try:
         min_occ = float(a.get("min_occ", 20) or 20)
     except ValueError:
@@ -581,42 +579,55 @@ def api_trend():
     except Exception as e:
         return jsonify({"dates": [], "items": [], "error": str(e)[:80]})
 
-    # 그 동에서 현재 가장 인기 있는 삼삼 오피스텔(예약률 min_occ%+): (sido,sigungu,dong)->{occ,name,url}
-    top_office = {}
+    # 동별: 현재 최고 인기 오피스텔 + 평균 월순수익(오피스텔, 보증금 1000 기준 네이버 매칭).
+    top_office, net_by = {}, {}
     for r in L():
         if r.get("building_type") != "오피스텔":
             continue
-        occ = round((r.get("occ") or 0) * 100, 1)
-        if occ < min_occ:
-            continue
         key = (r.get("sido") or "", r.get("sigungu") or "", r.get("dong") or "")
-        cur = top_office.get(key)
-        if not cur or occ > cur["occ"]:
-            top_office[key] = {"occ": occ, "name": r.get("name") or r.get("building_name") or "",
-                               "url": r.get("url") or ""}
+        occ = round((r.get("occ") or 0) * 100, 1)
+        if occ >= min_occ:
+            cur = top_office.get(key)
+            if not cur or occ > cur["occ"]:
+                top_office[key] = {"occ": occ, "name": r.get("name") or r.get("building_name") or "",
+                                   "url": r.get("url") or ""}
+        c = calc_at_deposit(r["room_id"], 1000, 0)
+        if c is not None:
+            net_by.setdefault(key, []).append(c["net"])
+    avg_net = {k: round(statistics.mean(v), 1) for k, v in net_by.items() if v}
 
     dates = sorted({r["snapshot_date"] for r in rows})
-    agg = {}   # (sido,sigungu,dong) -> {date: [sum n*occ, sum n]}
+    last = dates[-1] if dates else None
+    # (sido,sigungu,dong) → date → [sum n*occ1, sum n*occ2, sum n*occ3, sum n]
+    agg = {}
     for r in rows:
         key = (r.get("sido") or "", r.get("sigungu") or "", r.get("dong") or "")
-        cell = agg.setdefault(key, {}).setdefault(r["snapshot_date"], [0.0, 0])
-        cell[0] += (r.get(col) or 0) * (r.get("n") or 0)
-        cell[1] += r.get("n") or 0
+        cell = agg.setdefault(key, {}).setdefault(r["snapshot_date"], [0.0, 0.0, 0.0, 0])
+        nn = r.get("n") or 0
+        cell[0] += (r.get("avg_occ_1m") or 0) * nn
+        cell[1] += (r.get("avg_occ_2m") or 0) * nn
+        cell[2] += (r.get("avg_occ_3m") or 0) * nn
+        cell[3] += nn
+
+    def _wavg(cell, i):
+        return round(cell[i] / cell[3], 1) if cell and cell[3] else None
 
     out = []
     for (sido, sg, dong), dd in agg.items():
-        series = {d: (round(v[0] / v[1], 1) if v[1] else None) for d, v in dd.items()}
-        latest = series.get(dates[-1]) if dates else None
+        series = {d: _wavg(c, 0) for d, c in dd.items()}   # 날짜별 1달 예약률(추이)
+        lastcell = dd.get(last)
+        occ1, occ2, occ3 = _wavg(lastcell, 0), _wavg(lastcell, 1), _wavg(lastcell, 2)
         prev = series.get(dates[-2]) if len(dates) >= 2 else None
-        delta = round(latest - prev, 1) if (latest is not None and prev is not None) else None
-        n_latest = dd.get(dates[-1], [0, 0])[1] if dates else 0
-        if latest is None or latest < min_occ:   # 동별 베스트: min_occ%(기본 20) 이상만
+        delta = round(occ1 - prev, 1) if (occ1 is not None and prev is not None) else None
+        if occ1 is None or occ1 < min_occ:   # 예약률(1달) min_occ%+ 동만
             continue
         out.append({"sido": sido, "sigungu": sg, "dong": dong, "series": series,
-                    "latest": latest, "delta": delta, "n": n_latest,
+                    "occ1": occ1, "occ2": occ2, "occ3": occ3, "delta": delta,
+                    "n": lastcell[3] if lastcell else 0,
+                    "net": avg_net.get((sido, sg, dong)),
                     "top_office": top_office.get((sido, sg, dong))})
-    out.sort(key=lambda r: -(r["latest"] or 0))
-    return jsonify({"dates": dates, "items": out, "metric": metric})
+    out.sort(key=lambda r: -(r["occ1"] or 0))
+    return jsonify({"dates": dates, "items": out})
 
 
 GH_REPO = "gunho30811/STA"
