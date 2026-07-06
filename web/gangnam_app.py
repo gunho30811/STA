@@ -16,6 +16,10 @@ from flask import Flask, jsonify, render_template, request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)   # db 모듈 import용(상세 모달이 DB에서 전체 컬럼을 가져옴)
+sys.path.insert(0, os.path.join(ROOT, "pipeline", "naver"))   # subway(역 좌표·하버사인)
+import subway  # noqa: E402  # 역 반경 검색: 매물 lat/lng ↔ 역 좌표 거리 계산
+# 역명(N역) → (lat, lng). data/subway_stations.csv(수도권 589역). '역 반경 검색' 자동완성·거리계산에 씀.
+STATION_COORDS = {f"{n}역": (y, x) for n, y, x in subway._load()}
 DATA = os.path.join(ROOT, "lab", "naver_listings.jsonl")
 SAMSAM = os.path.join(ROOT, "lab", "samsam_listings.jsonl")   # 근처 삼삼(단기임대) 수요 붙이기용
 M2_PER_PYEONG = 3.305785
@@ -158,6 +162,7 @@ def api_facets():
              if any(x.get("building_type_code") == c for x in L())]
     office_n = sum(1 for x in L() if _is_office(x))
     return jsonify({"dongs": dongs, "regions": regions, "types": types,
+                    "stations": sorted(STATION_COORDS.keys()),
                     "total": len(L()), "office": office_n})
 
 
@@ -206,6 +211,54 @@ def api_listings():
     dongs = [d for d in a.get("dongs", "").split(",") if d]
     if dongs:
         items = [x for x in items if x.get("dong") in dongs]
+
+    # 지역 다중선택: region 파라미터 반복(각 "sido|sigun|gu|dong", 빈 칸은 와일드카드).
+    # 여러 시도/구/동을 섞어 union(OR). 예: region=서울시||강남구|역삼동 & region=경기||| 처럼.
+    regs = [r.split("|") for r in a.getlist("region") if r]
+    if regs:
+        regs = [(r + ["", "", "", ""])[:4] for r in regs]   # 4칸 패딩
+
+        def _rmatch(x):
+            si, g = _split_sgg(x.get("sigungu"))
+            for sido, sigun, gu, dong in regs:
+                if sido and x.get("sido") != sido:
+                    continue
+                if sigun and si != sigun:
+                    continue
+                if gu and g != gu:
+                    continue
+                if dong and x.get("dong") != dong:
+                    continue
+                return True
+            return False
+        items = [x for x in items if _rmatch(x)]
+
+    # 방 개수 다중선택: rooms 파라미터 반복(1/2/3 정수 또는 '4+'=4개 이상).
+    rooms_sel = a.getlist("rooms")
+    if rooms_sel:
+        exact = {int(r) for r in rooms_sel if r.isdigit()}
+        fourplus = "4+" in rooms_sel
+
+        def _rmroom(x):
+            rc = x.get("rooms")
+            return rc is not None and (rc in exact or (fourplus and rc >= 4))
+        items = [x for x in items if _rmroom(x)]
+
+    # 역 반경 검색: station 파라미터 반복(역명) + radius(m, 기본 1000). 선택 역들 반경 내 매물 union.
+    stns = [s for s in a.getlist("station") if s in STATION_COORDS]
+    if stns:
+        try:
+            radius = float(a.get("radius") or 1000)
+        except ValueError:
+            radius = 1000.0
+        coords = [STATION_COORDS[s] for s in stns]
+
+        def _near(x):
+            la, ln = x.get("lat"), x.get("lng")
+            if la is None or ln is None:
+                return False
+            return any(subway.haversine_m(la, ln, sy, sx) <= radius for sy, sx in coords)
+        items = [x for x in items if _near(x)]
 
     def rng(field, lo, hi):
         nonlocal items
