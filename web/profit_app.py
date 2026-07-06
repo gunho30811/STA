@@ -133,6 +133,13 @@ def _filter(a):
     if kw:
         items = [x for x in items if kw in (x.get("name") or "") or kw in (x.get("bldg") or "")]
 
+    st = a.get("station", "").strip()   # 역 검색(인근역 부분일치)
+    if st:
+        items = [x for x in items if st in (x.get("station") or "")]
+    dq = a.get("dong_kw", "").strip()   # 동 검색(부분일치 — 드롭다운 대신 타이핑)
+    if dq:
+        items = [x for x in items if dq in (x.get("dong") or "")]
+
     def fnum(key):
         v = a.get(key)
         try:
@@ -154,7 +161,7 @@ def _filter(a):
 
     ge("net", "net_min"); ge("maxRev", "maxrev_min"); ge("occ", "occ_min")
     ge("dongOcc", "dongocc_min"); ge("pyeong", "pyeong_min"); le("pyeong", "pyeong_max")
-    le("nDep", "dep_max")
+    le("nDep", "dep_max"); ge("matches", "matches_min")
     return items
 
 
@@ -188,30 +195,103 @@ def api_profit():
                     "items": items[(page - 1) * size: page * size]})
 
 
-@app.route("/api/rank")
-def api_rank():
-    """동별·역별 순위 — 어디서 운영하는 게 제일 좋은지(평균 순수익/예약률/최대수익)."""
-    def agg(field):
-        by = {}
-        for x in P():
-            k = x.get(field) or ""
+def _agg(groups):
+    """{label: [rows]} → 그룹별 집계(매칭수·경쟁삼삼·평균 순수익/예약률/최대수익). 순수익 높은 순."""
+    out = []
+    for label, xs in groups.items():
+        nets = [v["net"] for v in xs if v.get("net") is not None]
+        occs = [v["occ"] for v in xs if v.get("occ") is not None]
+        maxs = [v["maxRev"] for v in xs if v.get("maxRev") is not None]
+        comps = [v["dongCnt"] for v in xs if v.get("dongCnt") is not None]
+        out.append({
+            "name": label, "n": len(xs),
+            "comp": max(comps) if comps else len(xs),   # 경쟁(그 지역 삼삼 매물수)
+            "net": round(statistics.mean(nets), 1) if nets else None,
+            "occ": round(statistics.mean(occs), 1) if occs else None,
+            "maxRev": round(statistics.mean(maxs), 1) if maxs else None,
+        })
+    out.sort(key=lambda r: (r["net"] is None, -(r["net"] or 0)))
+    return out
+
+
+def _group(field_or_key):
+    """P()를 동(시군구+동)/역 단위로 묶는다. dong은 구 다르면 분리(같은 동명 병합 방지)."""
+    by = {}
+    for x in P():
+        if field_or_key == "dong":
+            sg, dg = x.get("sigungu") or "", x.get("dong") or ""
+            if not dg:
+                continue
+            by.setdefault(f"{sg} {dg}".strip(), []).append(x)
+        else:
+            k = x.get(field_or_key) or ""
             if not k:
                 continue
             by.setdefault(k, []).append(x)
+    return by
+
+
+@app.route("/api/rank")
+def api_rank():
+    """동별·역별 순위 — 어디서 운영하는 게 제일 좋은지(평균 순수익/예약률/최대수익 + 경쟁 삼삼 매물수).
+    동은 '시군구 동'으로 묶어 같은 동명(구 다른)이 섞이지 않게 한다."""
+    return jsonify({"dong": _agg(_group("dong")), "station": _agg(_group("station"))})
+
+
+@app.route("/api/recommend")
+def api_recommend():
+    """신규진입 추천(블루오션): 수요(예약률) 있고 순수익 좋은데 경쟁 삼삼 매물이 적은 동/역/오피스텔.
+    기회점수 = 평균순수익 × 평균예약률/100 ÷ √경쟁수 (수익·수요 높을수록↑, 경쟁 많을수록↓)."""
+    a = request.args
+
+    def fnum(key, default=None):
+        try:
+            return float(a[key]) if a.get(key) not in (None, "") else default
+        except ValueError:
+            return default
+    min_occ = fnum("min_occ", 30)      # 최소 평균예약률(수요 검증)
+    min_n = int(fnum("min_n", 2))       # 최소 표본(매칭 매물수) — 노이즈 제외
+    max_comp = fnum("max_comp", None)   # 최대 경쟁 삼삼 매물수(비우면 제한 없음)
+
+    def score(net, occ, comp):
+        if net is None or occ is None or net <= 0:
+            return None
+        return round(net * (occ / 100) / max(comp, 1) ** 0.5, 1)
+
+    def build(groups):
         out = []
-        for k, xs in by.items():
-            nets = [v["net"] for v in xs if v.get("net") is not None]
-            occs = [v["occ"] for v in xs if v.get("occ") is not None]
-            maxs = [v["maxRev"] for v in xs if v.get("maxRev") is not None]
-            out.append({
-                "name": k, "n": len(xs),
-                "net": round(statistics.mean(nets), 1) if nets else None,
-                "occ": round(statistics.mean(occs), 1) if occs else None,
-                "maxRev": round(statistics.mean(maxs), 1) if maxs else None,
-            })
-        out.sort(key=lambda r: (r["net"] is None, -(r["net"] or 0)))
+        for r in _agg(groups):
+            if r["n"] < min_n or r["occ"] is None or r["occ"] < min_occ:
+                continue
+            if max_comp is not None and r["comp"] > max_comp:
+                continue
+            sc = score(r["net"], r["occ"], r["comp"])
+            if sc is None:
+                continue
+            out.append({**r, "score": sc})
+        out.sort(key=lambda r: -r["score"])
         return out
-    return jsonify({"dong": agg("dong"), "station": agg("station")})
+
+    # 오피스텔: 개별 매물(오피스텔 유형) 중 수요·수익 좋고 그 동 경쟁 적은 것. 경쟁=동삼삼매물수.
+    offices = []
+    for x in P():
+        if "오피스텔" not in (x.get("btype") or ""):
+            continue
+        if x.get("occ") is None or x["occ"] < min_occ or x.get("net") is None or x["net"] <= 0:
+            continue
+        comp = x.get("dongCnt") or 1
+        if max_comp is not None and comp > max_comp:
+            continue
+        offices.append({
+            "name": x.get("name") or "", "dong": f"{x.get('sigungu','')} {x.get('dong','')}".strip(),
+            "station": x.get("station") or "", "pyeong": x.get("pyeong"),
+            "comp": comp, "occ": x["occ"], "net": x["net"], "maxRev": x.get("maxRev"),
+            "score": score(x["net"], x["occ"], comp),
+            "samUrl": x.get("samUrl") or "", "naverUrl": x.get("naverUrl") or "",
+        })
+    offices.sort(key=lambda r: -(r["score"] or 0))
+    return jsonify({"dong": build(_group("dong")), "station": build(_group("station")),
+                    "office": offices[:200]})
 
 
 def _median(xs):
