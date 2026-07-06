@@ -214,10 +214,17 @@ def _agg(groups):
     return out
 
 
-def _group(field_or_key):
-    """P()를 동(시군구+동)/역 단위로 묶는다. dong은 구 다르면 분리(같은 동명 병합 방지)."""
+def _rows_for(a):
+    """공통 방 타입(rooms) 필터 — 순위·추천을 방 타입별로 볼 수 있게. 같은 동이라도 원룸/투룸/
+    쓰리룸+ 예약률이 다르므로(예: 서초동 투룸 62.6% vs 원룸 53.0%)."""
+    rm = a.get("rooms")
+    return [x for x in P() if x.get("rooms") == rm] if rm else P()
+
+
+def _group(field_or_key, rows=None):
+    """rows(기본 P())를 동(시군구+동)/역 단위로 묶는다. dong은 구 다르면 분리(같은 동명 병합 방지)."""
     by = {}
-    for x in P():
+    for x in (P() if rows is None else rows):
         if field_or_key == "dong":
             sg, dg = x.get("sigungu") or "", x.get("dong") or ""
             if not dg:
@@ -234,8 +241,9 @@ def _group(field_or_key):
 @app.route("/api/rank")
 def api_rank():
     """동별·역별 순위 — 어디서 운영하는 게 제일 좋은지(평균 순수익/예약률/최대수익 + 경쟁 삼삼 매물수).
-    동은 '시군구 동'으로 묶어 같은 동명(구 다른)이 섞이지 않게 한다."""
-    return jsonify({"dong": _agg(_group("dong")), "station": _agg(_group("station"))})
+    동은 '시군구 동'으로 묶어 같은 동명(구 다른)이 섞이지 않게 한다. rooms로 방 타입별 조회 가능."""
+    rows = _rows_for(request.args)
+    return jsonify({"dong": _agg(_group("dong", rows)), "station": _agg(_group("station", rows))})
 
 
 @app.route("/api/recommend")
@@ -252,6 +260,7 @@ def api_recommend():
     min_occ = fnum("min_occ", 30)      # 최소 평균예약률(수요 검증)
     min_n = int(fnum("min_n", 2))       # 최소 표본(매칭 매물수) — 노이즈 제외
     max_comp = fnum("max_comp", None)   # 최대 경쟁 삼삼 매물수(비우면 제한 없음)
+    rows = _rows_for(a)                 # 방 타입(원룸/투룸/쓰리룸+)별 조회
 
     def score(net, occ, comp):
         if net is None or occ is None or net <= 0:
@@ -274,7 +283,7 @@ def api_recommend():
 
     # 오피스텔: 개별 매물(오피스텔 유형) 중 수요·수익 좋고 그 동 경쟁 적은 것. 경쟁=동삼삼매물수.
     offices = []
-    for x in P():
+    for x in rows:
         if "오피스텔" not in (x.get("btype") or ""):
             continue
         if x.get("occ") is None or x["occ"] < min_occ or x.get("net") is None or x["net"] <= 0:
@@ -290,7 +299,7 @@ def api_recommend():
             "samUrl": x.get("samUrl") or "", "naverUrl": x.get("naverUrl") or "",
         })
     offices.sort(key=lambda r: -(r["score"] or 0))
-    return jsonify({"dong": build(_group("dong")), "station": build(_group("station")),
+    return jsonify({"dong": build(_group("dong", rows)), "station": build(_group("station", rows)),
                     "office": offices[:200]})
 
 
