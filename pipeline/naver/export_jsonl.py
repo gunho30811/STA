@@ -14,12 +14,13 @@ import db
 OUT = os.path.join(BASE, "lab", "naver_listings.jsonl")
 
 # 뷰어가 실제 쓰는 컬럼만. 수도권 전 유형 115k라 파일이 커져(전컬럼 100MB+, GitHub 100MB 한도 초과),
-# 무거운·미사용 컬럼을 뺀다: url(article_no로 재구성), tags/lat/lng/road_address/agent_office/
+# 무거운·미사용 컬럼을 뺀다: url(article_no로 재구성), tags/road_address/agent_office/
 # floor_total/bathrooms/subway_walk/building_type(코드와 중복). → ~70MB 수준.
+# lat/lng는 '역 반경 검색'(선택 역 반경 내 매물, 하버사인)에 필요해 다시 포함(줄당 ~40B, +~5MB).
 COLS = (
     "article_no,building_name,building_type_code,"
     "sido,sigungu,dong,deposit,rent_monthly,maintenance_monthly,"
-    "area_exclusive_m2,floor_current,direction,rooms,"
+    "area_exclusive_m2,floor_current,direction,rooms,lat,lng,"
     "subway_station,subway_distance_m,jibun_address,summary,confirmed_at,agent_phone"
 )
 

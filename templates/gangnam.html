@@ -18,6 +18,10 @@
   .card .val small{font-size:12px;color:#9ca3af;font-weight:500}
   .typechips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
   .chip{font-size:11.5px;padding:3px 9px;border-radius:999px;background:#eef2ff;color:#3730a3;font-weight:700}
+  .selchips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .selchip{display:inline-flex;align-items:center;gap:7px;font-size:12px;padding:4px 6px 4px 11px;border-radius:999px;background:#eef2ff;color:#3730a3;font-weight:700}
+  .selchip .rm{cursor:pointer;color:#818cf8;font-weight:800;font-size:14px;line-height:1;padding:0 3px}
+  .selchip.stn{background:#e0f2fe;color:#075985}.selchip.stn .rm{color:#38bdf8}
   .panel{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:15px;margin-bottom:16px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
   .filters{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
   .fg{display:flex;flex-direction:column;gap:4px}
@@ -96,11 +100,37 @@
       <label>매물 타입 (복수 선택)</label>
       <div class="typebtns" id="f-types"></div>
     </div>
+    <div class="fg" style="margin-bottom:13px">
+      <label>방 개수 (복수 선택)</label>
+      <div class="typebtns" id="f-rooms"></div>
+    </div>
+    <div class="fg" style="margin-bottom:13px">
+      <label>지역 (좁힌 뒤 ➕추가로 여러 곳 선택 가능)</label>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+        <select id="f-sido" onchange="cascadeSido()"><option value="">시/도 전체</option></select>
+        <select id="f-sigun" onchange="cascadeSigun()"><option value="">시/군 전체</option></select>
+        <select id="f-gu" onchange="cascadeGu()"><option value="">구 전체</option></select>
+        <select id="f-dong"><option value="">동 전체</option></select>
+        <button type="button" class="btn" style="background:#e0e7ff;color:#3730a3" onclick="addRegion()">➕ 지역 추가</button>
+      </div>
+      <div id="region-chips" class="selchips"></div>
+    </div>
+    <div class="fg" style="margin-bottom:13px">
+      <label>🚇 역 반경 검색 (역 여러 개 선택 · 선택 역 반경 내 매물 모두)</label>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+        <input id="f-station" list="station-list" placeholder="역 이름 (예: 강남, 홍대입구, 이대)" style="min-width:200px;padding:7px 9px;border:1px solid #d1d5db;border-radius:7px;font-size:13px">
+        <datalist id="station-list"></datalist>
+        <button type="button" class="btn" style="background:#dbeafe;color:#075985" onclick="addStation()">➕ 역 추가</button>
+        <select id="f-radius" style="padding:7px 9px;border:1px solid #d1d5db;border-radius:7px;font-size:13px">
+          <option value="500">반경 500m</option>
+          <option value="1000" selected>반경 1km</option>
+          <option value="2000">반경 2km</option>
+          <option value="3000">반경 3km</option>
+        </select>
+      </div>
+      <div id="station-chips" class="selchips"></div>
+    </div>
     <div class="filters">
-      <div class="fg"><label>시/도</label><select id="f-sido" onchange="cascadeSido()"><option value="">전체</option></select></div>
-      <div class="fg"><label>시/군</label><select id="f-sigun" onchange="cascadeSigun()"><option value="">전체</option></select></div>
-      <div class="fg"><label>구</label><select id="f-gu" onchange="cascadeGu()"><option value="">전체</option></select></div>
-      <div class="fg"><label>동</label><select id="f-dong"><option value="">전체</option></select></div>
       <div class="fg"><label>키워드(건물/요약/주소/역)</label><input id="f-kw" placeholder="예: 래미안, 역세권"></div>
       <div class="fg"><label>보증금(만)</label><div style="display:flex;gap:4px"><input type="number" id="f-depmin" placeholder="최소"><input type="number" id="f-depmax" placeholder="최대"></div></div>
       <div class="fg"><label>월세(만)</label><div style="display:flex;gap:4px"><input type="number" id="f-rentmin" placeholder="최소"><input type="number" id="f-rentmax" placeholder="최대"></div></div>
@@ -136,6 +166,10 @@
 <script>
 const TYPES = {APT:"아파트",OPST:"오피스텔",VL:"빌라",OR:"원룸",DDDGG:"단독/다가구",SG:"상가"};
 let selTypes = new Set();
+let selRooms = new Set();      // "1","2","3","4+"
+let selRegions = [];           // [{enc:"sido|sigun|gu|dong", label}]
+let selStations = [];          // ["강남역", ...]
+let STATIONS = new Set();      // 자동완성용 전체 역명
 let curItems = [];
 
 // 상세 모달 필드 그룹 (있는 값만 표시)
@@ -178,6 +212,16 @@ async function init(){
   const ss=document.getElementById('f-sido');
   sidos.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;ss.appendChild(o);});
   cascadeSido();   // 시군구·동 목록 초기화
+  // 방 개수 칩(타입칩과 동일 패턴)
+  const rb=document.getElementById('f-rooms');
+  [["1","1룸"],["2","2룸"],["3","3룸"],["4+","4룸+"]].forEach(([code,label])=>{
+    const b=document.createElement('button');b.textContent=label;
+    b.onclick=()=>{b.classList.toggle('on'); selRooms.has(code)?selRooms.delete(code):selRooms.add(code);};
+    rb.appendChild(b);
+  });
+  // 역 반경 검색 자동완성 목록(수도권 589역)
+  STATIONS=new Set(f.stations||[]);
+  document.getElementById('station-list').innerHTML=[...STATIONS].map(s=>`<option value="${s}">`).join('');
   if(f.office!=null)document.getElementById('office-n').textContent='('+f.office.toLocaleString()+'건)';
 
   const s = await (await fetch('api/stats')).json();
@@ -206,13 +250,46 @@ function cascadeGu(){
   const sido=v('f-sido'), si=v('f-sigun'), gu=v('f-gu');
   _fill('f-dong',REGIONS.filter(r=>(!sido||r[0]===sido)&&(!si||r[1]===si)&&(!gu||r[2]===gu)).map(r=>r[3]));
 }
+// 지역 다중선택: 현재 셀렉트 선택(어느 depth든)을 칩으로 누적. 여러 시도/구/동 union.
+function addRegion(){
+  const parts=[v('f-sido'),v('f-sigun'),v('f-gu'),v('f-dong')];
+  if(!parts.some(Boolean))return;
+  const enc=parts.join('|'), label=parts.filter(Boolean).join(' ');
+  if(selRegions.some(r=>r.enc===enc))return;
+  selRegions.push({enc,label});renderRegionChips();
+}
+function renderRegionChips(){
+  document.getElementById('region-chips').innerHTML=selRegions.map((r,i)=>
+    `<span class="selchip">📍 ${r.label}<span class="rm" onclick="rmRegion(${i})">×</span></span>`).join('');
+}
+function rmRegion(i){selRegions.splice(i,1);renderRegionChips();}
+// 역 반경 검색: 역명 칩 누적(부분입력이면 목록에서 첫 매칭으로 보정).
+function addStation(){
+  let s=v('f-station'); if(!s)return;
+  if(!STATIONS.has(s)){
+    const hit=[...STATIONS].find(n=>n===s+'역'||n.includes(s));
+    if(!hit){alert('역 목록에 없습니다: '+s);return;}
+    s=hit;
+  }
+  if(!selStations.includes(s)){selStations.push(s);renderStationChips();}
+  document.getElementById('f-station').value='';
+}
+function renderStationChips(){
+  document.getElementById('station-chips').innerHTML=selStations.map((s,i)=>
+    `<span class="selchip stn">🚇 ${s}<span class="rm" onclick="rmStation(${i})">×</span></span>`).join('');
+}
+function rmStation(i){selStations.splice(i,1);renderStationChips();}
 async function search(page){
+  if(v('f-station'))addStation();          // 입력창에 남은 역명 자동 추가
   const p=new URLSearchParams();
   if(selTypes.size)p.set('types',[...selTypes].join(','));
-  if(v('f-sido'))p.set('sido',v('f-sido'));
-  if(v('f-sigun'))p.set('sigun',v('f-sigun'));
-  if(v('f-gu'))p.set('gu',v('f-gu'));
-  if(v('f-dong'))p.set('dongs',v('f-dong'));
+  selRooms.forEach(r=>p.append('rooms',r));
+  // 지역: 추가한 칩 + 현재 셀렉트 선택값(칩 없이도 단일선택 그대로 동작)
+  const casc=[v('f-sido'),v('f-sigun'),v('f-gu'),v('f-dong')].join('|');
+  if(casc!=='|||' && !selRegions.some(r=>r.enc===casc))p.append('region',casc);
+  selRegions.forEach(r=>p.append('region',r.enc));
+  // 역 반경: 선택 역들 + 반경(m)
+  if(selStations.length){selStations.forEach(s=>p.append('station',s));p.set('radius',v('f-radius'));}
   if(v('f-kw'))p.set('keyword',v('f-kw'));
   if(v('f-depmin'))p.set('deposit_min',v('f-depmin'));
   if(v('f-depmax'))p.set('deposit_max',v('f-depmax'));
@@ -315,12 +392,16 @@ function closeM(){document.getElementById('overlay').classList.remove('on');}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeM();});
 function resetF(){
   selTypes.clear();document.querySelectorAll('#f-types button').forEach(b=>b.classList.remove('on'));
+  selRooms.clear();document.querySelectorAll('#f-rooms button').forEach(b=>b.classList.remove('on'));
+  selRegions=[];renderRegionChips();selStations=[];renderStationChips();
   document.querySelectorAll('.panel input').forEach(i=>i.value='');
   document.getElementById('f-sido').value='';cascadeSido();   // 시군구·동 원복
+  document.getElementById('f-radius').value='1000';
   document.getElementById('f-sort').value='recent';
   search(1);
 }
 document.getElementById('f-kw').addEventListener('keydown',e=>{if(e.key==='Enter')search(1);});
+document.getElementById('f-station').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addStation();}});
 init();
 </script>
 </body>
