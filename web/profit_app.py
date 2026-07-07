@@ -13,6 +13,7 @@
 - 동예약률 = 같은 동 매칭매물들의 평균 예약률,  동경쟁매물수 = 같은 동 삼삼 매물수
 """
 import csv
+import json
 import os
 import statistics
 
@@ -37,6 +38,7 @@ PROFIT_MAP = {
     "건물네이버매물수": "bldgCnt", "건물월세최저_만원": "bldgRentMin",
     "건물월세중간_만원": "bldgRentMed", "건물월세최고_만원": "bldgRentMax",
     "네이버건물": "bldg", "네이버링크": "naverUrl", "삼삼링크": "samUrl",
+    "월별예약JSON": "monthOcc",   # 달력월별 예약 {'YYYY-MM':{bk,bl,days}} (앞으로 크롤분부터)
 }
 NUM = {"pyeong", "wk", "maxRev", "realRev", "bk", "bl", "nRent", "nDep", "nEquiv", "nMgmt",
        "nTotal", "matches", "mult", "dongCnt", "samBldg",
@@ -79,6 +81,10 @@ def load_profit():
                 o["expNet"] = round(o["realRev"] - o["nTotal"], 1)
             else:
                 o["expNet"] = None
+            try:                                   # 달력월별 예약 JSON 파싱
+                o["monthOcc"] = json.loads(o["monthOcc"]) if o.get("monthOcc") else {}
+            except (ValueError, TypeError):
+                o["monthOcc"] = {}
             rows.append(o)
     # 동/역 평균 예약률 부착
     _attach_area_occ(rows, "dong", "dongOcc")
@@ -116,15 +122,17 @@ def api_facets():
     for x in P():
         tree.setdefault(x.get("sido", ""), {}).setdefault(x.get("sigungu", ""), set()).add(x.get("dong", ""))
     tree = {s: {g: sorted(d) for g, d in gg.items()} for s, gg in tree.items()}
+    months = sorted({k for x in P() for k in (x.get("monthOcc") or {})})
     return jsonify({
         "sido": uniq("sido"), "tree": tree, "sigungu": uniq("sigungu"),
         "btype": uniq("btype"), "rooms": ["원룸", "투룸", "쓰리룸+"],
+        "months": months,   # 달력월별 예약 데이터 있는 달(재크롤 전엔 빈 배열)
         "total": len(P()),
     })
 
 
 def _filter(a):
-    items = list(P())
+    items = list(_rows_for(a))   # 방 타입(rooms)·달력월(month) 반영된 기준 집합
 
     def eq(key, field):
         v = a.get(key)
@@ -223,10 +231,26 @@ def _agg(groups):
 
 
 def _rows_for(a):
-    """공통 방 타입(rooms) 필터 — 순위·추천을 방 타입별로 볼 수 있게. 같은 동이라도 원룸/투룸/
-    쓰리룸+ 예약률이 다르므로(예: 서초동 투룸 62.6% vs 원룸 53.0%)."""
+    """공통 필터: 방 타입(rooms) + 달력월(month). rooms는 같은 동도 원룸/투룸 예약률이 달라서,
+    month는 '2026-08처럼 특정 달' 예약률/기대순수익을 보기 위해(롤링 1달 대신). month 지정 시
+    그 달 데이터(monthOcc) 있는 매물만, occ/실현매출/기대순수익을 그 달 기준으로 재계산."""
     rm = a.get("rooms")
-    return [x for x in P() if x.get("rooms") == rm] if rm else P()
+    base = [x for x in P() if x.get("rooms") == rm] if rm else P()
+    month = (a.get("month") or "").strip()
+    if not month:
+        return base
+    out = []
+    for x in base:
+        mo = (x.get("monthOcc") or {}).get(month)
+        if not mo:
+            continue   # 그 달 예약 데이터 없는 매물 제외(재크롤 전엔 전부 비어 있음)
+        bk, bl, days = mo.get("bk") or 0, mo.get("bl") or 0, mo.get("days") or 30
+        y = dict(x)
+        y["occ"] = min(100.0, round(bk / max(days - bl, 1) * 100, 1))
+        y["realRev"] = round((y.get("wk") or 0) / 7 * bk, 1)   # 그 달 실현매출 = 일주당/7 × 예약일
+        y["expNet"] = round(y["realRev"] - y["nTotal"], 1) if y.get("nTotal") is not None else None
+        out.append(y)
+    return out
 
 
 def _group(field_or_key, rows=None):
