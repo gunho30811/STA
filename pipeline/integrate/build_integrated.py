@@ -76,7 +76,7 @@ def load_sam():
         "SELECT room_id, url, name, building_type, building_name, floor,"
         " lat, lng, area_m2, area_pyeong, rooms, sido, sigungu, dong,"
         " rent_weekly, maintenance_weekly, rent_total_weekly,"
-        " booked_days_1m, blocked_days_1m, station_500m_names"
+        " booked_days_1m, blocked_days_1m, month_occ, station_500m_names"
         " FROM samsam_listings"
         " WHERE lat IS NOT NULL AND rent_total_weekly > 0"
     ).fetchall()]
@@ -231,6 +231,7 @@ def build_rows(sam, nav, max_deposit=None):
             'sam_month': sam_month,
             'bk': booked,
             'bl': blocked,
+            'month_occ': s.get('month_occ') or '',   # 달력월별 예약 JSON({'YYYY-MM':{bk,bl,days}})
             'realized': realized,
             'rent': rent,
             'dep': dep,
@@ -277,6 +278,7 @@ def write_csv(rows):
             '건물네이버매물수', '건물월세최저_만원', '건물월세중간_만원', '건물월세최고_만원',
             '네이버건물', '네이버링크', '삼삼링크',
             '부동산번호', '중개사무소', '대표월세_만원', '대표보증금_만원', '대표층수',
+            '월별예약JSON',
         ])
         for r in rows:
             w.writerow([
@@ -291,6 +293,7 @@ def write_csv(rows):
                 r['nv_bldg'], r['nv_url'],
                 f"https://web.33m2.co.kr/guest/room/{r['rid']}",
                 r['nv_phone'], r['nv_office'], r['nv_rep_rent'], r['nv_rep_dep'], r['nv_rep_floor'],
+                r['month_occ'],
             ])
 
 

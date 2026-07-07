@@ -79,6 +79,14 @@
 </div>
 
 <div class="wrap">
+  <div style="display:flex;align-items:center;gap:10px;margin:2px 0 12px;flex-wrap:wrap">
+    <label style="font-weight:700;font-size:13px">📅 기준 월</label>
+    <select id="g-month" onchange="onMonthChange()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:13px">
+      <option value="">전체 (오늘기준 1달·롤링)</option>
+    </select>
+    <span class="legend" id="g-month-hint" style="margin:0">달력월별(예: 2026-08 예약률)은 삼삼 재크롤분부터 채워져요. 과거 달은 캘린더에 없어 불가.</span>
+  </div>
+
   <!-- 매물 탭 -->
   <div id="t-list">
     <div class="cards">
@@ -127,11 +135,12 @@
 
   <!-- 순위 탭 -->
   <div id="t-rank" style="display:none">
-    <p class="legend" style="margin:0 0 10px">평균 <b>순수익</b> 높은 순 = 그 동/역에서 단기임대가 장기월세 대비 가장 유리. <b>경쟁</b>=그 지역 삼삼 매물수 · <b>매칭수</b>=부동산 매칭 표본. 동은 <b>시군구</b>로 구분(같은 동명 안 섞임). 헤더 클릭 정렬.</p>
+    <p class="legend" style="margin:0 0 10px"><b>기대 월순수익</b>(예약률 반영 = 실현매출−월총) 높은 순 = 그 동/역에서 실제로 가장 많이 남는 곳. <b>경쟁</b>=그 지역 삼삼 매물수 · <b>매칭수</b>=부동산 매칭 표본 · <b>풀가동순수익</b>=예약률 100% 가정 상한. 동은 <b>시군구</b>로 구분(같은 동명 안 섞임). 헤더 클릭 정렬.</p>
     <div class="panel" style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">
+      <div class="fg"><label>🛏️ 방 타입</label><select id="rk-rooms" onchange="loadRank()"><option value="">전체</option><option>원룸</option><option>투룸</option><option>쓰리룸+</option></select></div>
       <div class="fg"><label>최소 매칭수 ≥</label><input type="number" id="rk-minmatch" value="0" oninput="renderRankAll()"></div>
       <div class="fg"><label>최대 경쟁 ≤</label><input type="number" id="rk-maxcomp" placeholder="비우면 전체" oninput="renderRankAll()"></div>
-      <span class="legend" style="margin:0">경쟁이 적은데 순수익·예약률이 높은 곳이 신규 진입에 유리 — 자세한 추천은 <b>🎯 신규진입 추천</b> 탭.</span>
+      <span class="legend" style="margin:0">방 타입별로 예약률이 달라요(같은 동도 투룸↔원룸 차이). 경쟁 적은데 수익·예약률 높은 곳이 신규 진입에 유리 — <b>🎯 신규진입 추천</b> 탭.</span>
     </div>
     <div class="rankwrap">
       <div class="panel"><h3 style="margin:2px 0 8px;font-size:14px">🏘️ 동별 베스트
@@ -145,12 +154,13 @@
 
   <!-- 신규진입 추천 탭 -->
   <div id="t-reco" style="display:none">
-    <p class="legend" style="margin:0 0 10px">🎯 <b>신규진입 추천(블루오션)</b> — 수요(예약률) 있고 순수익 좋은데 <b>경쟁 삼삼 매물이 적은</b> 동/역/오피스텔.
-      <b>기회점수</b> = 평균순수익 × 예약률/100 ÷ √경쟁수 <span style="color:#9ca3af">(수익·수요 높고 경쟁 적을수록↑)</span>. 순수익 양(+)·예약률 조건 통과만.</p>
+    <p class="legend" style="margin:0 0 10px">🎯 <b>신규진입 추천(블루오션)</b> — 수요(예약률) 있고 <b>기대 월순수익</b>(예약률 반영) 좋은데 <b>경쟁 삼삼 매물이 적은</b> 동/역/오피스텔.
+      <b>기회점수</b> = 기대월순수익 ÷ √경쟁수 <span style="color:#9ca3af">(수익·수요 높고 경쟁 적을수록↑)</span>. 기대월순수익 양(+)·예약률 조건 통과만.</p>
     <div class="panel" style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">
       <div class="fg"><label>최소 예약률 ≥ <span style="color:#2563eb">(수요)</span></label><input type="number" id="rc-occ" value="30"></div>
       <div class="fg"><label>최대 경쟁 ≤ <span style="color:#2563eb">(삼삼 매물수)</span></label><input type="number" id="rc-comp" placeholder="비우면 전체"></div>
       <div class="fg"><label>최소 표본(매칭수) ≥</label><input type="number" id="rc-minn" value="2"></div>
+      <div class="fg"><label>🛏️ 방 타입</label><select id="rc-rooms" onchange="loadReco()"><option value="">전체</option><option>원룸</option><option>투룸</option><option>쓰리룸+</option></select></div>
       <div class="fg"><label>&nbsp;</label><button class="btn btn-go" onclick="loadReco()">추천 보기</button></div>
       <span class="legend" id="rc-count" style="margin:0"></span>
     </div>
@@ -163,15 +173,16 @@
 </div>
 
 <script>
-let TREE={}, ITEMS=[], curSort={col:"net",dir:"desc"}, selId=null;
+let TREE={}, ITEMS=[], curSort={col:"expNet",dir:"desc"}, selId=null;
 const COLS=[
   {k:"name",t:"매물명 / 건물",l:true},
   {k:"dong",t:"동",l:true},
   {k:"station",t:"역",l:true},
   {k:"pyeong",t:"평"},
-  {k:"maxRev",t:"최대수익"},
-  {k:"net",t:"순수익"},
+  {k:"expNet",t:"기대월순수익"},
   {k:"occ",t:"예약률%"},
+  {k:"net",t:"순수익(풀가동)"},
+  {k:"maxRev",t:"최대수익"},
 ];
 function n(x){return x==null?'-':x.toLocaleString();}
 function v(id){return document.getElementById(id).value.trim();}
@@ -181,6 +192,9 @@ async function init(){
   TREE=f.tree;
   const fill=(id,arr)=>{const s=document.getElementById(id);arr.forEach(x=>{const o=document.createElement('option');o.value=x;o.textContent=x;s.appendChild(o);});};
   fill('f-sido',f.sido); fill('f-btype',f.btype);
+  const gm=document.getElementById('g-month');
+  (f.months||[]).forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m.replace('-','년 ')+'월';gm.appendChild(o);});
+  if(!(f.months||[]).length)document.getElementById('g-month-hint').textContent='아직 달력월별 데이터가 없어요 — 삼삼 재크롤 후 8월·9월… 순으로 채워집니다.';
   document.getElementById('f-sido').onchange=fillSigungu;
   document.getElementById('f-sigungu').onchange=fillDong;
   renderThead(); search(1);
@@ -210,6 +224,7 @@ async function search(page){
   set('f-sido','sido');set('f-sigungu','sigungu');set('f-dong','dong');set('f-btype','btype');set('f-rooms','rooms');
   set('f-kw','keyword');set('f-station','station');set('f-matches','matches_min');set('f-net','net_min');set('f-maxrev','maxrev_min');set('f-occ','occ_min');
   set('f-dongocc','dongocc_min');set('f-dep','dep_max');set('f-pmin','pyeong_min');set('f-pmax','pyeong_max');
+  if(v('g-month'))p.set('month',v('g-month'));
   p.set('sort',curSort.col);p.set('dir',curSort.dir);p.set('page',page);p.set('size',40);
   renderThead();
   const r=await (await fetch('api/profit?'+p)).json();
@@ -222,13 +237,15 @@ async function search(page){
 }
 function renderRows(){
   const tb=document.getElementById('tbody');tb.innerHTML='';
-  if(!ITEMS.length){tb.innerHTML='<tr><td colspan="7" class="d-empty">조건에 맞는 매물 없음</td></tr>';return;}
+  if(!ITEMS.length){tb.innerHTML='<tr><td colspan="8" class="d-empty">조건에 맞는 매물 없음</td></tr>';return;}
   ITEMS.forEach(x=>{
     const tr=document.createElement('tr');if(x.id===selId)tr.className='on';
-    const nc=(x.net!=null&&x.net>=0)?'pos':'neg';
+    const ec=(x.expNet!=null&&x.expNet>=0)?'pos':'neg';
+    const oc=(x.occ==null||x.occ===0)?'style="color:#dc2626;font-weight:700"':'class="occ"';
     tr.innerHTML=`<td class="l"><span class="name">${x.name||''}</span><br><span class="sub">${x.bldg||''}</span></td>
       <td class="l">${x.dong||''}</td><td class="l">${x.station||'-'}</td><td>${n(x.pyeong)}</td>
-      <td>${n(x.maxRev)}</td><td class="${nc}">${n(x.net)}</td><td class="occ">${n(x.occ)}%</td>`;
+      <td class="${ec}" style="font-weight:800">${n(x.expNet)}</td><td ${oc}>${n(x.occ)}%</td>
+      <td style="color:#94a3b8">${n(x.net)}</td><td style="color:#94a3b8">${n(x.maxRev)}</td>`;
     tr.onclick=()=>{selId=x.id;renderRows();showDetail(x);};
     tb.appendChild(tr);
   });
@@ -239,10 +256,12 @@ function showDetail(x){
   d.innerHTML=`
     <div class="d-title">${x.name||''}</div>
     <div class="d-sub">${x.btype||''} · ${x.rooms||''} · ${x.sigungu||''} ${x.dong||''} · ${x.pyeong||'-'}평</div>
-    <div class="d-net">순수익 <b>${n(x.net)}</b> 만원 <span style="font-size:11px">(최대수익−부동산월총)</span></div>
+    <div class="d-net">기대 월순수익 <b>${n(x.expNet)}</b> 만원 <span style="font-size:11px">(예약률 ${n(x.occ)}% 반영 = 실현매출−부동산월총)</span><br>
+      <span style="font-size:12px;color:#9ca3af">풀가동 순수익 ${n(x.net)}만 · 최대수익 ${n(x.maxRev)}만 (예약률 100% 가정 상한)</span></div>
     <div class="d-sec"><h4>삼삼 단기임대</h4>
       ${kv('주당 임대료',n(x.wk)+' 만원')}
-      ${kv('최대수익(월환산)',n(x.maxRev)+' 만원')}
+      ${kv('실현매출(월, 예약률 반영)',n(x.realRev)+' 만원')}
+      ${kv('최대수익(월환산, 풀가동)',n(x.maxRev)+' 만원')}
       ${kv('1달 예약일 / 막힘',n(x.bk)+' / '+n(x.bl)+' 일')}
       ${kv('예약률',n(x.occ)+' %')}</div>
     <div class="d-sec"><h4>부동산 장기월세 (매칭 기준)</h4>
@@ -289,21 +308,28 @@ function resetF(){
   ['f-sido','f-sigungu','f-dong','f-btype','f-rooms'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-sigungu').innerHTML='<option value="">전체</option>';
   document.getElementById('f-dong').innerHTML='<option value="">전체</option>';
-  curSort={col:"net",dir:"desc"};selId=null;
+  curSort={col:"expNet",dir:"desc"};selId=null;
   document.getElementById('detail').innerHTML='<div class="d-empty">왼쪽 매물을 클릭하면<br>여기에 상세가 떠요</div>';
   search(1);
 }
 document.getElementById('f-kw').addEventListener('keydown',e=>{if(e.key==='Enter')search(1);});
 
 // ── 순위 탭 ──
-const RANK_COLS=[{k:"rk",t:"#",s:false},{k:"name",t:"이름",l:true},{k:"comp",t:"경쟁"},{k:"n",t:"매칭수"},{k:"net",t:"평균순수익"},{k:"occ",t:"평균예약률%"},{k:"maxRev",t:"평균최대수익"}];
-let RANK=null, rankSort={dong:{col:"net",dir:"desc"},station:{col:"net",dir:"desc"}};
+const RANK_COLS=[{k:"rk",t:"#",s:false},{k:"name",t:"이름",l:true},{k:"comp",t:"경쟁"},{k:"n",t:"매칭수"},{k:"expNet",t:"기대월순수익"},{k:"occ",t:"평균예약률%"},{k:"net",t:"풀가동순수익"}];
+let RANK=null, rankSort={dong:{col:"expNet",dir:"desc"},station:{col:"expNet",dir:"desc"}};
 function medal(i){return i===1?'🥇':i===2?'🥈':i===3?'🥉':i;}
+let curTab='list';
+function onMonthChange(){ if(curTab==='list')search(1); else if(curTab==='rank')loadRank(); else loadReco(); }
 async function tab(name){
+  curTab=name;
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===name));
   ['list','rank','reco'].forEach(t=>document.getElementById('t-'+t).style.display=name===t?'':'none');
-  if(name==='rank'){ if(!RANK)RANK=await (await fetch('api/rank')).json(); renderRankAll(); }
+  if(name==='rank'){ if(!RANK)await loadRank(); else renderRankAll(); }
   if(name==='reco'){ if(!RECO)loadReco(); }
+}
+async function loadRank(){   // 방 타입(rooms)·기준월(month) 반영해 재조회
+  const p=new URLSearchParams(); if(v('rk-rooms'))p.set('rooms',v('rk-rooms')); if(v('g-month'))p.set('month',v('g-month'));
+  RANK=await (await fetch('api/rank?'+p)).json(); renderRankAll();
 }
 function renderRankAll(){ renderRank('dong','dh','db'); renderRank('station','sh','sb'); }
 function renderRank(which,hid,bid){
@@ -326,21 +352,24 @@ function renderRank(which,hid,bid){
   const b=document.getElementById(bid);
   if(!data.length){b.innerHTML='<tr><td colspan="7" class="d-empty">조건에 맞는 항목 없음</td></tr>';return;}
   b.innerHTML=data.map((r,i)=>{
-    const oc=(r.occ==null||r.occ===0)?'style="color:#dc2626;font-weight:700" title="예약률 0% — 수요 미검증(이론 순수익)"':'class="occ"';
+    const oc=(r.occ==null||r.occ===0)?'style="color:#dc2626;font-weight:700" title="예약률 0% — 수요 미검증"':'class="occ"';
+    const ec=(r.expNet==null)?'style="color:#94a3b8"':(r.expNet>=0?'class="pos"':'class="neg"');
     return `<tr><td style="font-weight:800;font-size:${i<3?'15px':'12px'}">${medal(i+1)}</td>
     <td class="l" style="font-weight:600">${r.name}</td><td>${n(r.comp)}</td>
-    <td style="color:#94a3b8">${n(r.n)}</td><td class="pos">${n(r.net)}</td>
-    <td ${oc}>${n(r.occ)}%</td><td>${n(r.maxRev)}</td></tr>`;}).join('');
+    <td style="color:#94a3b8">${n(r.n)}</td><td ${ec} style="font-weight:800">${n(r.expNet)}</td>
+    <td ${oc}>${n(r.occ)}%</td><td style="color:#94a3b8">${n(r.net)}</td></tr>`;}).join('');
 }
 
 // ── 신규진입 추천 탭 ──
 let RECO=null;
-const RECO_COLS=[{k:"rk",t:"#"},{k:"name",t:"이름",l:true},{k:"comp",t:"경쟁"},{k:"n",t:"매칭"},{k:"occ",t:"예약률%"},{k:"net",t:"순수익"},{k:"score",t:"기회점수"}];
+const RECO_COLS=[{k:"rk",t:"#"},{k:"name",t:"이름",l:true},{k:"comp",t:"경쟁"},{k:"n",t:"매칭"},{k:"occ",t:"예약률%"},{k:"expNet",t:"기대월순수익"},{k:"score",t:"기회점수"}];
 async function loadReco(){
   const p=new URLSearchParams();
   if(v('rc-occ'))p.set('min_occ',v('rc-occ'));
   if(v('rc-comp'))p.set('max_comp',v('rc-comp'));
   if(v('rc-minn'))p.set('min_n',v('rc-minn'));
+  if(v('rc-rooms'))p.set('rooms',v('rc-rooms'));
+  if(v('g-month'))p.set('month',v('g-month'));
   RECO=await (await fetch('api/recommend?'+p)).json();
   document.getElementById('rc-count').textContent=`추천 동 ${RECO.dong.length} · 역 ${RECO.station.length} · 오피스텔 ${RECO.office.length}`;
   renderRecoArea(RECO.dong,'rcd-h','rcd-b');
@@ -354,17 +383,17 @@ function renderRecoArea(rows,hid,bid){
   b.innerHTML=rows.map((r,i)=>`<tr><td style="font-weight:800;font-size:${i<3?'15px':'12px'}">${medal(i+1)}</td>
     <td class="l" style="font-weight:600">${r.name}</td><td>${n(r.comp)}</td>
     <td style="color:#94a3b8">${n(r.n)}</td><td class="occ">${n(r.occ)}%</td>
-    <td class="pos">${n(r.net)}</td><td style="font-weight:800;color:#7c3aed">${n(r.score)}</td></tr>`).join('');
+    <td class="pos" style="font-weight:800">${n(r.expNet)}</td><td style="font-weight:800;color:#7c3aed">${n(r.score)}</td></tr>`).join('');
 }
 function renderRecoOffice(){
   const rows=RECO.office||[];
-  const cols=['#','매물명','동','역','평','경쟁','예약률%','순수익','기회점수','링크'];
+  const cols=['#','매물명','동','역','평','경쟁','예약률%','기대월순수익','기회점수','링크'];
   document.getElementById('rco-h').innerHTML=cols.map((t,i)=>`<th${[1,2,3,9].includes(i)?' class="l"':''}>${t}</th>`).join('');
   const b=document.getElementById('rco-b');
   if(!rows.length){b.innerHTML='<tr><td colspan="10" class="d-empty">조건에 맞는 오피스텔 없음</td></tr>';return;}
   b.innerHTML=rows.map((r,i)=>`<tr><td style="font-weight:800">${medal(i+1)}</td>
     <td class="l" style="font-weight:600">${r.name}</td><td class="l">${r.dong}</td><td class="l">${r.station||'-'}</td>
-    <td>${n(r.pyeong)}</td><td>${n(r.comp)}</td><td class="occ">${n(r.occ)}%</td><td class="pos">${n(r.net)}</td>
+    <td>${n(r.pyeong)}</td><td>${n(r.comp)}</td><td class="occ">${n(r.occ)}%</td><td class="pos" style="font-weight:800">${n(r.expNet)}</td>
     <td style="font-weight:800;color:#7c3aed">${n(r.score)}</td>
     <td class="l">${r.naverUrl?`<a class="lnk n" style="padding:3px 8px" href="${r.naverUrl}" target="_blank">부동산</a>`:''}${r.samUrl?`<a class="lnk s" style="padding:3px 8px" href="${r.samUrl}" target="_blank">삼삼</a>`:''}</td></tr>`).join('');
 }

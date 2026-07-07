@@ -177,6 +177,36 @@ def _count_status(schedules, from_d, to_d, statuses):
     return cnt
 
 
+def month_occ(schedules):
+    """달력월별 예약/막힘/가용일 집계 → {'YYYY-MM': {'bk':int, 'bl':int, 'days':int}}.
+
+    롤링(오늘~+30/60/90)과 달리 '2026-08처럼 특정 달' 예약률을 보기 위함. days=그 달의 오늘 이후
+    일수(현재월은 남은 일수, 미래월은 그 달 전체). 예약률=bk/max(days-bl,1). 과거는 캘린더에 없어
+    앞으로 크롤분부터만 채워진다. 오늘~+90일을 덮는 월(fetch_schedules가 조회한 월)만 담는다."""
+    import calendar as _cal
+    months = {(TODAY.year, TODAY.month)}
+    for off in (30, 60, 90):
+        dd = TODAY + timedelta(days=off)
+        months.add((dd.year, dd.month))
+    out = {}
+    for (y, m) in sorted(months):
+        start_day = TODAY.day if (y, m) == (TODAY.year, TODAY.month) else 1
+        out[f"{y:04d}-{m:02d}"] = {"bk": 0, "bl": 0, "days": _cal.monthrange(y, m)[1] - start_day + 1}
+    for dt_str, st in (schedules or {}).items():
+        try:
+            dt = date.fromisoformat(dt_str)
+        except ValueError:
+            continue
+        key = out.get(f"{dt.year:04d}-{dt.month:02d}")
+        if key is None or dt < TODAY:
+            continue
+        if st in BOOKED_STATUSES:
+            key["bk"] += 1
+        elif st in BLOCKED_STATUSES:
+            key["bl"] += 1
+    return out
+
+
 # ── 인증 ───────────────────────────────────────────────────────────────────────
 def _get_credentials():
     email = os.environ.get('SAMSAM_EMAIL') or input('삼삼엠투 이메일: ').strip()
@@ -503,6 +533,7 @@ def map_row(rid, room, detail, schedules):
         'booked_days_2m': bk2,
         'booked_days_3m': bk3,
         'blocked_days_1m': bl1,
+        'month_occ': json.dumps(month_occ(schedules), ensure_ascii=False),
         'station_500m_count': len(sub500),
         'station_500m_names': json.dumps(sub500, ensure_ascii=False),
         'station_1km_count': len(sub1k),
@@ -521,7 +552,7 @@ COLS = [
     'rooms', 'bathrooms', 'kitchens', 'living_rooms', 'elevator', 'parking',
     'basic_options', 'extra_options', 'rent_weekly', 'maintenance_weekly',
     'rent_total_weekly', 'booked_days_1m', 'booked_days_2m', 'booked_days_3m',
-    'blocked_days_1m', 'station_500m_count', 'station_500m_names',
+    'blocked_days_1m', 'month_occ', 'station_500m_count', 'station_500m_names',
     'station_1km_count', 'station_1km_names', 'sido', 'sigungu', 'dong', 'collected_at',
 ]
 
@@ -537,9 +568,9 @@ def upsert_batch(conn, rows):
 
 
 def update_schedules_batch(conn, rows):
-    """기존 매물의 예약 스케줄만 갱신 (rows: [(bk1, bk2, bk3, bl1, collected_at, room_id), ...])."""
+    """기존 매물의 예약 스케줄만 갱신 (rows: [(bk1, bk2, bk3, bl1, month_occ, collected_at, room_id), ...])."""
     sql = ('UPDATE samsam_listings SET booked_days_1m=%s, booked_days_2m=%s, booked_days_3m=%s, '
-           'blocked_days_1m=%s, collected_at=%s WHERE room_id=%s')
+           'blocked_days_1m=%s, month_occ=%s, collected_at=%s WHERE room_id=%s')
     conn.executemany(sql, rows)
     conn.commit()
 
@@ -592,6 +623,10 @@ def main():
     session = _make_session(cookies)
 
     conn = db.connect()
+    # 달력월별 예약(month_occ) 컬럼 자동 마이그레이션(idempotent) — 크롤 전 CI/로컬에서 1회 보장.
+    # init_db는 기존 스키마면 DDL을 스킵하므로 여기서 직접 ADD COLUMN IF NOT EXISTS.
+    conn.execute("ALTER TABLE samsam_listings ADD COLUMN IF NOT EXISTS month_occ TEXT")
+    conn.commit()
 
     # 이미 적재된 room_id + 마지막 갱신 시각(로테이션에 사용) + 현재 예약 상태(공실 우선용)
     done = set()
@@ -765,8 +800,9 @@ def main():
                         bk2 = _count_status(schedules, TODAY, D60, BOOKED_STATUSES)
                         bk3 = _count_status(schedules, TODAY, D90, BOOKED_STATUSES)
                         bl1 = _count_status(schedules, TODAY, D30, BLOCKED_STATUSES)
+                        mo = json.dumps(month_occ(schedules), ensure_ascii=False)
                         buf.append(
-                            (bk1, bk2, bk3, bl1, datetime.now().isoformat(timespec='seconds'), rid))
+                            (bk1, bk2, bk3, bl1, mo, datetime.now().isoformat(timespec='seconds'), rid))
                         if schedules:
                             with_data += 1
                             total_data += 1

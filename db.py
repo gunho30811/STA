@@ -367,6 +367,7 @@ def init_db(force=False):
         booked_days_2m        INTEGER,
         booked_days_3m        INTEGER,
         blocked_days_1m       INTEGER,
+        month_occ             TEXT,
         station_500m_count    INTEGER,
         station_500m_names    TEXT,
         station_1km_count     INTEGER,
@@ -376,6 +377,8 @@ def init_db(force=False):
         dong                  TEXT,
         collected_at          TEXT
     )""")
+    # 달력월별 예약률(JSON: {'YYYY-MM':{bk,bl,days}}) — 롤링(1/2/3달)과 별개로 특정 달 조회용. 앞으로 크롤분부터.
+    conn.execute("ALTER TABLE samsam_listings ADD COLUMN IF NOT EXISTS month_occ TEXT")
     # 주간 예약률 스냅샷(지역×유형 집계). 매주 크롤 후 snapshot.py 가 1행씩 적재 → 인기 트렌드 추적.
     conn.execute("""
     CREATE TABLE IF NOT EXISTS samsam_snapshots (

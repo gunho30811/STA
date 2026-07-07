@@ -13,6 +13,7 @@
 - 동예약률 = 같은 동 매칭매물들의 평균 예약률,  동경쟁매물수 = 같은 동 삼삼 매물수
 """
 import csv
+import json
 import os
 import statistics
 
@@ -24,12 +25,12 @@ app = Flask(__name__, template_folder=os.path.join(ROOT, "templates"))
 from auth import init_auth  # noqa: E402
 init_auth(app)
 
-# CSV 원본 헤더 → 짧은 키 (실현/현실효율/CSV순수익은 안 씀 — 최대수익 기준으로 재계산)
+# CSV 원본 헤더 → 짧은 키. maxRev=풀가동(100%) 상한, realRev=실현(예약률 반영, 주당/7×예약일).
 PROFIT_MAP = {
     "삼삼ID": "id", "매물명": "name", "건물유형": "btype", "방수": "rooms",
     "시도": "sido", "시군구": "sigungu", "동": "dong", "인근역": "station",
     "동삼삼매물수": "dongCnt", "삼삼동일건물매물수": "samBldg", "평수": "pyeong",
-    "삼삼주당_만원": "wk", "삼삼월환산_만원": "maxRev",
+    "삼삼주당_만원": "wk", "삼삼월환산_만원": "maxRev", "1달실현수익_만원": "realRev",
     "1달예약일": "bk", "1달막힘일": "bl",
     "네이버월세_만원": "nRent", "네이버보증금_만원": "nDep", "네이버환산월세_만원": "nEquiv",
     "네이버관리비_만원": "nMgmt", "관리비표기여부": "mgmtFlag", "네이버월총_만원": "nTotal",
@@ -37,8 +38,9 @@ PROFIT_MAP = {
     "건물네이버매물수": "bldgCnt", "건물월세최저_만원": "bldgRentMin",
     "건물월세중간_만원": "bldgRentMed", "건물월세최고_만원": "bldgRentMax",
     "네이버건물": "bldg", "네이버링크": "naverUrl", "삼삼링크": "samUrl",
+    "월별예약JSON": "monthOcc",   # 달력월별 예약 {'YYYY-MM':{bk,bl,days}} (앞으로 크롤분부터)
 }
-NUM = {"pyeong", "wk", "maxRev", "bk", "bl", "nRent", "nDep", "nEquiv", "nMgmt",
+NUM = {"pyeong", "wk", "maxRev", "realRev", "bk", "bl", "nRent", "nDep", "nEquiv", "nMgmt",
        "nTotal", "matches", "mult", "dongCnt", "samBldg",
        "bldgCnt", "bldgRentMin", "bldgRentMed", "bldgRentMax"}
 
@@ -71,9 +73,18 @@ def load_profit():
             avail = max(31 - bl, 1)
             o["occ"] = min(100.0, round(bk / avail * 100, 1))   # 예약률(%)
             if o.get("maxRev") is not None and o.get("nTotal") is not None:
-                o["net"] = round(o["maxRev"] - o["nTotal"], 1)  # 순수익(최대−월총)
+                o["net"] = round(o["maxRev"] - o["nTotal"], 1)  # 순수익(풀가동 상한: 최대−월총)
             else:
                 o["net"] = None
+            # 기대 월순수익 = 실현매출(예약률 반영, 주당/7×예약일) − 네이버월총. 예약률 0%면 −월총(손해).
+            if o.get("realRev") is not None and o.get("nTotal") is not None:
+                o["expNet"] = round(o["realRev"] - o["nTotal"], 1)
+            else:
+                o["expNet"] = None
+            try:                                   # 달력월별 예약 JSON 파싱
+                o["monthOcc"] = json.loads(o["monthOcc"]) if o.get("monthOcc") else {}
+            except (ValueError, TypeError):
+                o["monthOcc"] = {}
             rows.append(o)
     # 동/역 평균 예약률 부착
     _attach_area_occ(rows, "dong", "dongOcc")
@@ -111,15 +122,17 @@ def api_facets():
     for x in P():
         tree.setdefault(x.get("sido", ""), {}).setdefault(x.get("sigungu", ""), set()).add(x.get("dong", ""))
     tree = {s: {g: sorted(d) for g, d in gg.items()} for s, gg in tree.items()}
+    months = sorted({k for x in P() for k in (x.get("monthOcc") or {})})
     return jsonify({
         "sido": uniq("sido"), "tree": tree, "sigungu": uniq("sigungu"),
         "btype": uniq("btype"), "rooms": ["원룸", "투룸", "쓰리룸+"],
+        "months": months,   # 달력월별 예약 데이터 있는 달(재크롤 전엔 빈 배열)
         "total": len(P()),
     })
 
 
 def _filter(a):
-    items = list(P())
+    items = list(_rows_for(a))   # 방 타입(rooms)·달력월(month) 반영된 기준 집합
 
     def eq(key, field):
         v = a.get(key)
@@ -172,7 +185,7 @@ def api_profit():
 
     sort = a.get("sort", "net")
     rev = a.get("dir", "desc") != "asc"
-    valid = set(PROFIT_MAP.values()) | {"occ", "net", "dongOcc", "stOcc"}
+    valid = set(PROFIT_MAP.values()) | {"occ", "net", "expNet", "dongOcc", "stOcc"}
     key = sort if sort in valid else "net"
     pres = [x for x in items if x.get(key) not in (None, "")]
     mis = [x for x in items if x.get(key) in (None, "")]
@@ -200,24 +213,50 @@ def _agg(groups):
     out = []
     for label, xs in groups.items():
         nets = [v["net"] for v in xs if v.get("net") is not None]
+        exps = [v["expNet"] for v in xs if v.get("expNet") is not None]
         occs = [v["occ"] for v in xs if v.get("occ") is not None]
         maxs = [v["maxRev"] for v in xs if v.get("maxRev") is not None]
         comps = [v["dongCnt"] for v in xs if v.get("dongCnt") is not None]
         out.append({
             "name": label, "n": len(xs),
             "comp": max(comps) if comps else len(xs),   # 경쟁(그 지역 삼삼 매물수)
-            "net": round(statistics.mean(nets), 1) if nets else None,
+            "net": round(statistics.mean(nets), 1) if nets else None,        # 풀가동 순수익
+            "expNet": round(statistics.mean(exps), 1) if exps else None,     # 기대 월순수익(예약률 반영)
             "occ": round(statistics.mean(occs), 1) if occs else None,
             "maxRev": round(statistics.mean(maxs), 1) if maxs else None,
         })
-    out.sort(key=lambda r: (r["net"] is None, -(r["net"] or 0)))
+    # 기본 정렬 = 기대 월순수익(예약률 반영). 예약률 0%면 −월총이라 자연히 하위로.
+    out.sort(key=lambda r: (r["expNet"] is None, -(r["expNet"] if r["expNet"] is not None else -1e9)))
     return out
 
 
-def _group(field_or_key):
-    """P()를 동(시군구+동)/역 단위로 묶는다. dong은 구 다르면 분리(같은 동명 병합 방지)."""
+def _rows_for(a):
+    """공통 필터: 방 타입(rooms) + 달력월(month). rooms는 같은 동도 원룸/투룸 예약률이 달라서,
+    month는 '2026-08처럼 특정 달' 예약률/기대순수익을 보기 위해(롤링 1달 대신). month 지정 시
+    그 달 데이터(monthOcc) 있는 매물만, occ/실현매출/기대순수익을 그 달 기준으로 재계산."""
+    rm = a.get("rooms")
+    base = [x for x in P() if x.get("rooms") == rm] if rm else P()
+    month = (a.get("month") or "").strip()
+    if not month:
+        return base
+    out = []
+    for x in base:
+        mo = (x.get("monthOcc") or {}).get(month)
+        if not mo:
+            continue   # 그 달 예약 데이터 없는 매물 제외(재크롤 전엔 전부 비어 있음)
+        bk, bl, days = mo.get("bk") or 0, mo.get("bl") or 0, mo.get("days") or 30
+        y = dict(x)
+        y["occ"] = min(100.0, round(bk / max(days - bl, 1) * 100, 1))
+        y["realRev"] = round((y.get("wk") or 0) / 7 * bk, 1)   # 그 달 실현매출 = 일주당/7 × 예약일
+        y["expNet"] = round(y["realRev"] - y["nTotal"], 1) if y.get("nTotal") is not None else None
+        out.append(y)
+    return out
+
+
+def _group(field_or_key, rows=None):
+    """rows(기본 P())를 동(시군구+동)/역 단위로 묶는다. dong은 구 다르면 분리(같은 동명 병합 방지)."""
     by = {}
-    for x in P():
+    for x in (P() if rows is None else rows):
         if field_or_key == "dong":
             sg, dg = x.get("sigungu") or "", x.get("dong") or ""
             if not dg:
@@ -234,14 +273,15 @@ def _group(field_or_key):
 @app.route("/api/rank")
 def api_rank():
     """동별·역별 순위 — 어디서 운영하는 게 제일 좋은지(평균 순수익/예약률/최대수익 + 경쟁 삼삼 매물수).
-    동은 '시군구 동'으로 묶어 같은 동명(구 다른)이 섞이지 않게 한다."""
-    return jsonify({"dong": _agg(_group("dong")), "station": _agg(_group("station"))})
+    동은 '시군구 동'으로 묶어 같은 동명(구 다른)이 섞이지 않게 한다. rooms로 방 타입별 조회 가능."""
+    rows = _rows_for(request.args)
+    return jsonify({"dong": _agg(_group("dong", rows)), "station": _agg(_group("station", rows))})
 
 
 @app.route("/api/recommend")
 def api_recommend():
-    """신규진입 추천(블루오션): 수요(예약률) 있고 순수익 좋은데 경쟁 삼삼 매물이 적은 동/역/오피스텔.
-    기회점수 = 평균순수익 × 평균예약률/100 ÷ √경쟁수 (수익·수요 높을수록↑, 경쟁 많을수록↓)."""
+    """신규진입 추천(블루오션): 수요(예약률) 있고 기대 월순수익 좋은데 경쟁 삼삼 매물이 적은 동/역/오피스텔.
+    기회점수 = 기대월순수익(예약률 반영) ÷ √경쟁수 (수익·수요 높을수록↑, 경쟁 많을수록↓)."""
     a = request.args
 
     def fnum(key, default=None):
@@ -252,11 +292,12 @@ def api_recommend():
     min_occ = fnum("min_occ", 30)      # 최소 평균예약률(수요 검증)
     min_n = int(fnum("min_n", 2))       # 최소 표본(매칭 매물수) — 노이즈 제외
     max_comp = fnum("max_comp", None)   # 최대 경쟁 삼삼 매물수(비우면 제한 없음)
+    rows = _rows_for(a)                 # 방 타입(원룸/투룸/쓰리룸+)별 조회
 
-    def score(net, occ, comp):
-        if net is None or occ is None or net <= 0:
+    def score(expnet, comp):
+        if expnet is None or expnet <= 0:   # 기대 월순수익이 양(+)일 때만(예약률 반영)
             return None
-        return round(net * (occ / 100) / max(comp, 1) ** 0.5, 1)
+        return round(expnet / max(comp, 1) ** 0.5, 1)
 
     def build(groups):
         out = []
@@ -265,7 +306,7 @@ def api_recommend():
                 continue
             if max_comp is not None and r["comp"] > max_comp:
                 continue
-            sc = score(r["net"], r["occ"], r["comp"])
+            sc = score(r["expNet"], r["comp"])
             if sc is None:
                 continue
             out.append({**r, "score": sc})
@@ -274,10 +315,10 @@ def api_recommend():
 
     # 오피스텔: 개별 매물(오피스텔 유형) 중 수요·수익 좋고 그 동 경쟁 적은 것. 경쟁=동삼삼매물수.
     offices = []
-    for x in P():
+    for x in rows:
         if "오피스텔" not in (x.get("btype") or ""):
             continue
-        if x.get("occ") is None or x["occ"] < min_occ or x.get("net") is None or x["net"] <= 0:
+        if x.get("occ") is None or x["occ"] < min_occ or x.get("expNet") is None or x["expNet"] <= 0:
             continue
         comp = x.get("dongCnt") or 1
         if max_comp is not None and comp > max_comp:
@@ -285,12 +326,12 @@ def api_recommend():
         offices.append({
             "name": x.get("name") or "", "dong": f"{x.get('sigungu','')} {x.get('dong','')}".strip(),
             "station": x.get("station") or "", "pyeong": x.get("pyeong"),
-            "comp": comp, "occ": x["occ"], "net": x["net"], "maxRev": x.get("maxRev"),
-            "score": score(x["net"], x["occ"], comp),
+            "comp": comp, "occ": x["occ"], "net": x["net"], "expNet": x["expNet"], "maxRev": x.get("maxRev"),
+            "score": score(x["expNet"], comp),
             "samUrl": x.get("samUrl") or "", "naverUrl": x.get("naverUrl") or "",
         })
     offices.sort(key=lambda r: -(r["score"] or 0))
-    return jsonify({"dong": build(_group("dong")), "station": build(_group("station")),
+    return jsonify({"dong": build(_group("dong", rows)), "station": build(_group("station", rows)),
                     "office": offices[:200]})
 
 
