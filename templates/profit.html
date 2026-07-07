@@ -104,7 +104,7 @@
         <div class="fg"><label>방수</label><select id="f-rooms"><option value="">전체</option><option>원룸</option><option>투룸</option><option>쓰리룸+</option></select></div>
         <div class="fg"><label>🚇 역 검색</label><input id="f-station" placeholder="예: 강남"></div>
         <div class="fg"><label>키워드</label><input id="f-kw" placeholder="매물/건물"></div>
-        <div class="fg"><label>매칭수 ≥</label><input type="number" id="f-matches" placeholder="개"></div>
+        <div class="fg"><label>부동산 매칭가능 매물수 ≥</label><input type="number" id="f-matches" placeholder="개"></div>
         <div class="fg"><label>순수익 ≥</label><input type="number" id="f-net" placeholder="만원"></div>
         <div class="fg"><label>최대수익 ≥</label><input type="number" id="f-maxrev" placeholder="만원"></div>
         <div class="fg"><label>예약률 ≥ <span style="color:#2563eb">(기본 20%)</span></label><input type="number" id="f-occ" placeholder="%" value="20"></div>
@@ -135,10 +135,10 @@
 
   <!-- 순위 탭 -->
   <div id="t-rank" style="display:none">
-    <p class="legend" style="margin:0 0 10px"><b>기대 월순수익</b>(예약률 반영 = 실현매출−월총) 높은 순 = 그 동/역에서 실제로 가장 많이 남는 곳. <b>경쟁</b>=그 지역 삼삼 매물수 · <b>매칭수</b>=부동산 매칭 표본 · <b>풀가동순수익</b>=예약률 100% 가정 상한. 동은 <b>시군구</b>로 구분(같은 동명 안 섞임). 헤더 클릭 정렬.</p>
+    <p class="legend" style="margin:0 0 10px"><b>기대 월순수익</b>(예약률 반영 = 실현매출−월총) 높은 순 = 그 동/역에서 실제로 가장 많이 남는 곳. <b>경쟁</b>=그 지역 삼삼 매물수 · <b>부동산 매칭가능 매물수</b>=순수익 계산에 쓴 표본(네이버 부동산과 매칭된 삼삼 매물 수) · <b>풀가동순수익</b>=예약률 100% 가정 상한. 동은 <b>시군구</b>로 구분(같은 동명 안 섞임). 헤더 클릭 정렬.</p>
     <div class="panel" style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">
       <div class="fg"><label>🛏️ 방 타입</label><select id="rk-rooms" onchange="loadRank()"><option value="">전체</option><option>원룸</option><option>투룸</option><option>쓰리룸+</option></select></div>
-      <div class="fg"><label>최소 매칭수 ≥</label><input type="number" id="rk-minmatch" value="0" oninput="renderRankAll()"></div>
+      <div class="fg"><label>최소 부동산 매칭가능 매물수 ≥</label><input type="number" id="rk-minmatch" value="0" oninput="renderRankAll()"></div>
       <div class="fg"><label>최대 경쟁 ≤</label><input type="number" id="rk-maxcomp" placeholder="비우면 전체" oninput="renderRankAll()"></div>
       <span class="legend" style="margin:0">방 타입별로 예약률이 달라요(같은 동도 투룸↔원룸 차이). 경쟁 적은데 수익·예약률 높은 곳이 신규 진입에 유리 — <b>🎯 신규진입 추천</b> 탭.</span>
     </div>
@@ -159,7 +159,7 @@
     <div class="panel" style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">
       <div class="fg"><label>최소 예약률 ≥ <span style="color:#2563eb">(수요)</span></label><input type="number" id="rc-occ" value="30"></div>
       <div class="fg"><label>최대 경쟁 ≤ <span style="color:#2563eb">(삼삼 매물수)</span></label><input type="number" id="rc-comp" placeholder="비우면 전체"></div>
-      <div class="fg"><label>최소 표본(매칭수) ≥</label><input type="number" id="rc-minn" value="2"></div>
+      <div class="fg"><label>최소 표본(부동산 매칭가능 매물수) ≥</label><input type="number" id="rc-minn" value="2"></div>
       <div class="fg"><label>🛏️ 방 타입</label><select id="rc-rooms" onchange="loadReco()"><option value="">전체</option><option>원룸</option><option>투룸</option><option>쓰리룸+</option></select></div>
       <div class="fg"><label>&nbsp;</label><button class="btn btn-go" onclick="loadReco()">추천 보기</button></div>
       <span class="legend" id="rc-count" style="margin:0"></span>
@@ -271,7 +271,7 @@ function showDetail(x){
       ${kv('관리비',n(x.nMgmt)+' 만원 ('+(x.mgmtFlag||'')+')')}
       ${kv('월총(환산+관리비)',n(x.nTotal)+' 만원')}
       ${kv('배수(월총÷주당)',n(x.mult))}
-      ${kv('매칭 매물수',n(x.matches))}</div>
+      ${kv('부동산 매칭가능 매물수',n(x.matches))}</div>
     <div class="d-sec"><h4>건물 · 지역</h4>
       ${kv('이 건물 삼삼 매물수',n(x.samBldg))}
       ${kv('동 경쟁(삼삼)',n(x.dongCnt))}
@@ -315,7 +315,7 @@ function resetF(){
 document.getElementById('f-kw').addEventListener('keydown',e=>{if(e.key==='Enter')search(1);});
 
 // ── 순위 탭 ──
-const RANK_COLS=[{k:"rk",t:"#",s:false},{k:"name",t:"이름",l:true},{k:"comp",t:"경쟁"},{k:"n",t:"매칭수"},{k:"expNet",t:"기대월순수익"},{k:"occ",t:"평균예약률%"},{k:"net",t:"풀가동순수익"}];
+const RANK_COLS=[{k:"rk",t:"#",s:false},{k:"name",t:"이름",l:true},{k:"comp",t:"경쟁"},{k:"n",t:"부동산 매칭가능 매물수"},{k:"expNet",t:"기대월순수익"},{k:"occ",t:"평균예약률%"},{k:"net",t:"풀가동순수익"}];
 let RANK=null, rankSort={dong:{col:"expNet",dir:"desc"},station:{col:"expNet",dir:"desc"}};
 function medal(i){return i===1?'🥇':i===2?'🥈':i===3?'🥉':i;}
 let curTab='list';
@@ -362,7 +362,7 @@ function renderRank(which,hid,bid){
 
 // ── 신규진입 추천 탭 ──
 let RECO=null;
-const RECO_COLS=[{k:"rk",t:"#"},{k:"name",t:"이름",l:true},{k:"comp",t:"경쟁"},{k:"n",t:"매칭"},{k:"occ",t:"예약률%"},{k:"expNet",t:"기대월순수익"},{k:"score",t:"기회점수"}];
+const RECO_COLS=[{k:"rk",t:"#"},{k:"name",t:"이름",l:true},{k:"comp",t:"경쟁"},{k:"n",t:"부동산 매칭가능 매물수"},{k:"occ",t:"예약률%"},{k:"expNet",t:"기대월순수익"},{k:"score",t:"기회점수"}];
 async function loadReco(){
   const p=new URLSearchParams();
   if(v('rc-occ'))p.set('min_occ',v('rc-occ'));
