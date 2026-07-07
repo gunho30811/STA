@@ -33,6 +33,24 @@ AREA_PCT = 0.15      # 면적 허용 오차 ±15%
 CONV_RATE = 0.06     # 전월세 전환율(연). 환산월세 = 월세 + 보증금(만원) × CONV_RATE / 12
 
 
+def parse_ro(road_address):
+    """도로명주소에서 '로(대로)' 추출 — 동보다 좁은 단위. '테헤란로88길'·'…168번길'은 큰 로로 묶음.
+    '서울특별시 강남구 테헤란로88길 10' → '테헤란로', '… 종로구 종로 12' → '종로'.
+    시도(첫 토큰)·시군구(시/군/구로 끝) 토큰은 건너뛴다(종로구 같은 시군구를 로로 오인 방지)."""
+    parts = (road_address or '').split()
+    i = 1 if parts else 0                       # 시도 스킵
+    while i < len(parts) and parts[i].endswith(('시', '군', '구')):
+        i += 1                                   # 시군구(성남시 분당구처럼 최대 2개) 스킵
+    if i < len(parts):
+        p = parts[i]
+        if '로' in p:
+            m = re.match(r'(.+?로)\d', p)         # 테헤란로88길 → 테헤란로 (마포대로는 그대로)
+            return m.group(1) if m else p
+        if p.endswith('길'):                     # 로 없는 순수 '~길'
+            return p
+    return ''
+
+
 # ── 공통 유틸 ──────────────────────────────────────────────────────────────────
 def norm(s):
     """건물명 정규화: 괄호 제거 + 특수문자 제거."""
@@ -76,7 +94,7 @@ def load_sam():
         "SELECT room_id, url, name, building_type, building_name, floor,"
         " lat, lng, area_m2, area_pyeong, rooms, sido, sigungu, dong,"
         " rent_weekly, maintenance_weekly, rent_total_weekly,"
-        " booked_days_1m, blocked_days_1m, month_occ, station_500m_names"
+        " booked_days_1m, blocked_days_1m, month_occ, station_500m_names, road_address"
         " FROM samsam_listings"
         " WHERE lat IS NOT NULL AND rent_total_weekly > 0"
     ).fetchall()]
@@ -223,6 +241,7 @@ def build_rows(sam, nav, max_deposit=None):
             'sido': s['sido'],
             'sigungu': s['sigungu'],
             'dong': s['dong'],
+            'ro': parse_ro(s.get('road_address')),   # 로(도로명) — 동보다 좁은 단위
             'station': station,
             'sam_nearby': dong_count[s['dong']] - 1,
             'sam_bldg': sam_bldg_count[bldg_key(s)],   # 같은 오피스텔 삼삼 매물 수(자기 포함)
@@ -268,7 +287,7 @@ def write_csv(rows):
     with open(OUT, 'w', encoding='utf-8-sig', newline='') as f:
         w = csv.writer(f)
         w.writerow([
-            '삼삼ID', '매물명', '건물유형', '방수', '시도', '시군구', '동', '인근역',
+            '삼삼ID', '매물명', '건물유형', '방수', '시도', '시군구', '동', '로', '인근역',
             '동삼삼매물수', '삼삼동일건물매물수', '평수', '삼삼주당_만원', '삼삼월환산_만원',
             '1달예약일', '1달막힘일', '1달실현수익_만원',
             '네이버월세_만원', '네이버보증금_만원', '네이버환산월세_만원', '네이버관리비_만원', '관리비표기여부',
@@ -283,7 +302,7 @@ def write_csv(rows):
         for r in rows:
             w.writerow([
                 r['rid'], r['name'], r['btype'], r['rooms'],
-                r['sido'], r['sigungu'], r['dong'], r['station'],
+                r['sido'], r['sigungu'], r['dong'], r['ro'], r['station'],
                 r['sam_nearby'], r['sam_bldg'], r['pyeong'], r['sam_week'], r['sam_month'],
                 r['bk'], r['bl'], r['realized'], r['rent'], r['dep'], r['equiv'], r['navmgmt'],
                 '표기' if r['mgmt_known'] else '미표기(평당2만)',

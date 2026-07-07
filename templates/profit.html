@@ -103,6 +103,7 @@
         <div class="fg"><label>건물유형</label><select id="f-btype"><option value="">전체</option></select></div>
         <div class="fg"><label>방수</label><select id="f-rooms"><option value="">전체</option><option>원룸</option><option>투룸</option><option>쓰리룸+</option></select></div>
         <div class="fg"><label>🚇 역 검색</label><input id="f-station" placeholder="예: 강남"></div>
+        <div class="fg"><label>🛣️ 로 검색</label><input id="f-ro" placeholder="예: 테헤란로"></div>
         <div class="fg"><label>키워드</label><input id="f-kw" placeholder="매물/건물"></div>
         <div class="fg"><label>부동산 매칭가능 매물수 ≥</label><input type="number" id="f-matches" placeholder="개"></div>
         <div class="fg"><label>순수익 ≥</label><input type="number" id="f-net" placeholder="만원"></div>
@@ -149,6 +150,9 @@
       <div class="panel"><h3 style="margin:2px 0 8px;font-size:14px">🚇 역별 베스트
         <input id="rk-stn-kw" placeholder="역 검색" oninput="renderRank('station','sh','sb')" style="font-size:12px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-weight:400;margin-left:6px"></h3>
         <div style="overflow:auto;max-height:68vh"><table><thead><tr id="sh"></tr></thead><tbody id="sb"></tbody></table></div></div>
+      <div class="panel"><h3 style="margin:2px 0 8px;font-size:14px">🛣️ 로별 베스트
+        <input id="rk-road-kw" placeholder="로 검색 (예: 테헤란로)" oninput="renderRank('road','roh','rob')" style="font-size:12px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-weight:400;margin-left:6px"></h3>
+        <div style="overflow:auto;max-height:68vh"><table><thead><tr id="roh"></tr></thead><tbody id="rob"></tbody></table></div></div>
     </div>
   </div>
 
@@ -167,6 +171,7 @@
     <div class="rankwrap">
       <div class="panel"><h3 style="margin:2px 0 8px;font-size:14px">🏘️ 추천 동</h3><div style="overflow:auto;max-height:64vh"><table><thead><tr id="rcd-h"></tr></thead><tbody id="rcd-b"></tbody></table></div></div>
       <div class="panel"><h3 style="margin:2px 0 8px;font-size:14px">🚇 추천 역</h3><div style="overflow:auto;max-height:64vh"><table><thead><tr id="rcs-h"></tr></thead><tbody id="rcs-b"></tbody></table></div></div>
+      <div class="panel"><h3 style="margin:2px 0 8px;font-size:14px">🛣️ 추천 로</h3><div style="overflow:auto;max-height:64vh"><table><thead><tr id="rcr-h"></tr></thead><tbody id="rcr-b"></tbody></table></div></div>
     </div>
     <div class="panel"><h3 style="margin:2px 0 8px;font-size:14px">🏢 추천 오피스텔 (개별 매물)</h3><div style="overflow:auto;max-height:60vh"><table><thead><tr id="rco-h"></tr></thead><tbody id="rco-b"></tbody></table></div></div>
   </div>
@@ -177,6 +182,7 @@ let TREE={}, ITEMS=[], curSort={col:"expNet",dir:"desc"}, selId=null;
 const COLS=[
   {k:"name",t:"매물명 / 건물",l:true},
   {k:"dong",t:"동",l:true},
+  {k:"ro",t:"로",l:true},
   {k:"station",t:"역",l:true},
   {k:"pyeong",t:"평"},
   {k:"expNet",t:"기대월순수익"},
@@ -222,7 +228,7 @@ async function search(page){
   const p=new URLSearchParams();
   const set=(id,key)=>{if(v(id))p.set(key,v(id));};
   set('f-sido','sido');set('f-sigungu','sigungu');set('f-dong','dong');set('f-btype','btype');set('f-rooms','rooms');
-  set('f-kw','keyword');set('f-station','station');set('f-matches','matches_min');set('f-net','net_min');set('f-maxrev','maxrev_min');set('f-occ','occ_min');
+  set('f-kw','keyword');set('f-station','station');set('f-ro','ro');set('f-matches','matches_min');set('f-net','net_min');set('f-maxrev','maxrev_min');set('f-occ','occ_min');
   set('f-dongocc','dongocc_min');set('f-dep','dep_max');set('f-pmin','pyeong_min');set('f-pmax','pyeong_max');
   if(v('g-month'))p.set('month',v('g-month'));
   p.set('sort',curSort.col);p.set('dir',curSort.dir);p.set('page',page);p.set('size',40);
@@ -237,13 +243,13 @@ async function search(page){
 }
 function renderRows(){
   const tb=document.getElementById('tbody');tb.innerHTML='';
-  if(!ITEMS.length){tb.innerHTML='<tr><td colspan="8" class="d-empty">조건에 맞는 매물 없음</td></tr>';return;}
+  if(!ITEMS.length){tb.innerHTML='<tr><td colspan="9" class="d-empty">조건에 맞는 매물 없음</td></tr>';return;}
   ITEMS.forEach(x=>{
     const tr=document.createElement('tr');if(x.id===selId)tr.className='on';
     const ec=(x.expNet!=null&&x.expNet>=0)?'pos':'neg';
     const oc=(x.occ==null||x.occ===0)?'style="color:#dc2626;font-weight:700"':'class="occ"';
     tr.innerHTML=`<td class="l"><span class="name">${x.name||''}</span><br><span class="sub">${x.bldg||''}</span></td>
-      <td class="l">${x.dong||''}</td><td class="l">${x.station||'-'}</td><td>${n(x.pyeong)}</td>
+      <td class="l">${x.dong||''}</td><td class="l">${x.ro||'-'}</td><td class="l">${x.station||'-'}</td><td>${n(x.pyeong)}</td>
       <td class="${ec}" style="font-weight:800">${n(x.expNet)}</td><td ${oc}>${n(x.occ)}%</td>
       <td style="color:#94a3b8">${n(x.net)}</td><td style="color:#94a3b8">${n(x.maxRev)}</td>`;
     tr.onclick=()=>{selId=x.id;renderRows();showDetail(x);};
@@ -316,7 +322,7 @@ document.getElementById('f-kw').addEventListener('keydown',e=>{if(e.key==='Enter
 
 // ── 순위 탭 ──
 const RANK_COLS=[{k:"rk",t:"#",s:false},{k:"name",t:"이름",l:true},{k:"comp",t:"경쟁"},{k:"n",t:"부동산 매칭가능 매물수"},{k:"expNet",t:"기대월순수익"},{k:"occ",t:"평균예약률%"},{k:"net",t:"풀가동순수익"}];
-let RANK=null, rankSort={dong:{col:"expNet",dir:"desc"},station:{col:"expNet",dir:"desc"}};
+let RANK=null, rankSort={dong:{col:"expNet",dir:"desc"},station:{col:"expNet",dir:"desc"},road:{col:"expNet",dir:"desc"}};
 function medal(i){return i===1?'🥇':i===2?'🥈':i===3?'🥉':i;}
 let curTab='list';
 function onMonthChange(){ if(curTab==='list')search(1); else if(curTab==='rank')loadRank(); else loadReco(); }
@@ -331,11 +337,12 @@ async function loadRank(){   // 방 타입(rooms)·기준월(month) 반영해 �
   const p=new URLSearchParams(); if(v('rk-rooms'))p.set('rooms',v('rk-rooms')); if(v('g-month'))p.set('month',v('g-month'));
   RANK=await (await fetch('api/rank?'+p)).json(); renderRankAll();
 }
-function renderRankAll(){ renderRank('dong','dh','db'); renderRank('station','sh','sb'); }
+function renderRankAll(){ renderRank('dong','dh','db'); renderRank('station','sh','sb'); renderRank('road','roh','rob'); }
 function renderRank(which,hid,bid){
   if(!RANK)return;
   const st=rankSort[which];
-  const kw=(document.getElementById(which==='dong'?'rk-dong-kw':'rk-stn-kw').value||'').trim();
+  const kwId={dong:'rk-dong-kw',station:'rk-stn-kw',road:'rk-road-kw'}[which];
+  const kw=(document.getElementById(kwId).value||'').trim();
   const minMatch=parseInt(document.getElementById('rk-minmatch').value)||0;
   const mc=document.getElementById('rk-maxcomp').value.trim(); const maxComp=mc===''?null:parseFloat(mc);
   let rows=RANK[which].filter(r=>(r.n||0)>=minMatch && (maxComp==null||(r.comp||0)<=maxComp) && (!kw||(r.name||'').includes(kw)));
@@ -371,9 +378,10 @@ async function loadReco(){
   if(v('rc-rooms'))p.set('rooms',v('rc-rooms'));
   if(v('g-month'))p.set('month',v('g-month'));
   RECO=await (await fetch('api/recommend?'+p)).json();
-  document.getElementById('rc-count').textContent=`추천 동 ${RECO.dong.length} · 역 ${RECO.station.length} · 오피스텔 ${RECO.office.length}`;
+  document.getElementById('rc-count').textContent=`추천 동 ${RECO.dong.length} · 역 ${RECO.station.length} · 로 ${(RECO.road||[]).length} · 오피스텔 ${RECO.office.length}`;
   renderRecoArea(RECO.dong,'rcd-h','rcd-b');
   renderRecoArea(RECO.station,'rcs-h','rcs-b');
+  renderRecoArea(RECO.road||[],'rcr-h','rcr-b');
   renderRecoOffice();
 }
 function renderRecoArea(rows,hid,bid){

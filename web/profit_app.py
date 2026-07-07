@@ -28,7 +28,7 @@ init_auth(app)
 # CSV 원본 헤더 → 짧은 키. maxRev=풀가동(100%) 상한, realRev=실현(예약률 반영, 주당/7×예약일).
 PROFIT_MAP = {
     "삼삼ID": "id", "매물명": "name", "건물유형": "btype", "방수": "rooms",
-    "시도": "sido", "시군구": "sigungu", "동": "dong", "인근역": "station",
+    "시도": "sido", "시군구": "sigungu", "동": "dong", "로": "ro", "인근역": "station",
     "동삼삼매물수": "dongCnt", "삼삼동일건물매물수": "samBldg", "평수": "pyeong",
     "삼삼주당_만원": "wk", "삼삼월환산_만원": "maxRev", "1달실현수익_만원": "realRev",
     "1달예약일": "bk", "1달막힘일": "bl",
@@ -152,6 +152,9 @@ def _filter(a):
     dq = a.get("dong_kw", "").strip()   # 동 검색(부분일치 — 드롭다운 대신 타이핑)
     if dq:
         items = [x for x in items if dq in (x.get("dong") or "")]
+    roq = a.get("ro", "").strip()       # 로 검색(부분일치) — 동보다 좁은 도로명 단위
+    if roq:
+        items = [x for x in items if roq in (x.get("ro") or "")]
 
     def fnum(key):
         v = a.get(key)
@@ -254,14 +257,16 @@ def _rows_for(a):
 
 
 def _group(field_or_key, rows=None):
-    """rows(기본 P())를 동(시군구+동)/역 단위로 묶는다. dong은 구 다르면 분리(같은 동명 병합 방지)."""
+    """rows(기본 P())를 동(시군구+동)/로(시군구+로)/역 단위로 묶는다. 동·로는 시군구를 붙여
+    같은 이름(구 다른)이 병합되지 않게 한다."""
     by = {}
     for x in (P() if rows is None else rows):
-        if field_or_key == "dong":
-            sg, dg = x.get("sigungu") or "", x.get("dong") or ""
-            if not dg:
+        if field_or_key in ("dong", "road"):
+            sg = x.get("sigungu") or ""
+            v = x.get("dong" if field_or_key == "dong" else "ro") or ""
+            if not v:
                 continue
-            by.setdefault(f"{sg} {dg}".strip(), []).append(x)
+            by.setdefault(f"{sg} {v}".strip(), []).append(x)
         else:
             k = x.get(field_or_key) or ""
             if not k:
@@ -273,9 +278,11 @@ def _group(field_or_key, rows=None):
 @app.route("/api/rank")
 def api_rank():
     """동별·역별 순위 — 어디서 운영하는 게 제일 좋은지(평균 순수익/예약률/최대수익 + 경쟁 삼삼 매물수).
-    동은 '시군구 동'으로 묶어 같은 동명(구 다른)이 섞이지 않게 한다. rooms로 방 타입별 조회 가능."""
+    동·로는 '시군구 동/로'로 묶어 같은 이름(구 다른)이 섞이지 않게 한다. rooms로 방 타입별 조회 가능."""
     rows = _rows_for(request.args)
-    return jsonify({"dong": _agg(_group("dong", rows)), "station": _agg(_group("station", rows))})
+    return jsonify({"dong": _agg(_group("dong", rows)),
+                    "road": _agg(_group("road", rows)),
+                    "station": _agg(_group("station", rows))})
 
 
 @app.route("/api/recommend")
@@ -331,8 +338,8 @@ def api_recommend():
             "samUrl": x.get("samUrl") or "", "naverUrl": x.get("naverUrl") or "",
         })
     offices.sort(key=lambda r: -(r["score"] or 0))
-    return jsonify({"dong": build(_group("dong", rows)), "station": build(_group("station", rows)),
-                    "office": offices[:200]})
+    return jsonify({"dong": build(_group("dong", rows)), "road": build(_group("road", rows)),
+                    "station": build(_group("station", rows)), "office": offices[:200]})
 
 
 def _median(xs):
