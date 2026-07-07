@@ -24,12 +24,12 @@ app = Flask(__name__, template_folder=os.path.join(ROOT, "templates"))
 from auth import init_auth  # noqa: E402
 init_auth(app)
 
-# CSV 원본 헤더 → 짧은 키 (실현/현실효율/CSV순수익은 안 씀 — 최대수익 기준으로 재계산)
+# CSV 원본 헤더 → 짧은 키. maxRev=풀가동(100%) 상한, realRev=실현(예약률 반영, 주당/7×예약일).
 PROFIT_MAP = {
     "삼삼ID": "id", "매물명": "name", "건물유형": "btype", "방수": "rooms",
     "시도": "sido", "시군구": "sigungu", "동": "dong", "인근역": "station",
     "동삼삼매물수": "dongCnt", "삼삼동일건물매물수": "samBldg", "평수": "pyeong",
-    "삼삼주당_만원": "wk", "삼삼월환산_만원": "maxRev",
+    "삼삼주당_만원": "wk", "삼삼월환산_만원": "maxRev", "1달실현수익_만원": "realRev",
     "1달예약일": "bk", "1달막힘일": "bl",
     "네이버월세_만원": "nRent", "네이버보증금_만원": "nDep", "네이버환산월세_만원": "nEquiv",
     "네이버관리비_만원": "nMgmt", "관리비표기여부": "mgmtFlag", "네이버월총_만원": "nTotal",
@@ -38,7 +38,7 @@ PROFIT_MAP = {
     "건물월세중간_만원": "bldgRentMed", "건물월세최고_만원": "bldgRentMax",
     "네이버건물": "bldg", "네이버링크": "naverUrl", "삼삼링크": "samUrl",
 }
-NUM = {"pyeong", "wk", "maxRev", "bk", "bl", "nRent", "nDep", "nEquiv", "nMgmt",
+NUM = {"pyeong", "wk", "maxRev", "realRev", "bk", "bl", "nRent", "nDep", "nEquiv", "nMgmt",
        "nTotal", "matches", "mult", "dongCnt", "samBldg",
        "bldgCnt", "bldgRentMin", "bldgRentMed", "bldgRentMax"}
 
@@ -71,9 +71,14 @@ def load_profit():
             avail = max(31 - bl, 1)
             o["occ"] = min(100.0, round(bk / avail * 100, 1))   # 예약률(%)
             if o.get("maxRev") is not None and o.get("nTotal") is not None:
-                o["net"] = round(o["maxRev"] - o["nTotal"], 1)  # 순수익(최대−월총)
+                o["net"] = round(o["maxRev"] - o["nTotal"], 1)  # 순수익(풀가동 상한: 최대−월총)
             else:
                 o["net"] = None
+            # 기대 월순수익 = 실현매출(예약률 반영, 주당/7×예약일) − 네이버월총. 예약률 0%면 −월총(손해).
+            if o.get("realRev") is not None and o.get("nTotal") is not None:
+                o["expNet"] = round(o["realRev"] - o["nTotal"], 1)
+            else:
+                o["expNet"] = None
             rows.append(o)
     # 동/역 평균 예약률 부착
     _attach_area_occ(rows, "dong", "dongOcc")
@@ -172,7 +177,7 @@ def api_profit():
 
     sort = a.get("sort", "net")
     rev = a.get("dir", "desc") != "asc"
-    valid = set(PROFIT_MAP.values()) | {"occ", "net", "dongOcc", "stOcc"}
+    valid = set(PROFIT_MAP.values()) | {"occ", "net", "expNet", "dongOcc", "stOcc"}
     key = sort if sort in valid else "net"
     pres = [x for x in items if x.get(key) not in (None, "")]
     mis = [x for x in items if x.get(key) in (None, "")]
@@ -200,17 +205,20 @@ def _agg(groups):
     out = []
     for label, xs in groups.items():
         nets = [v["net"] for v in xs if v.get("net") is not None]
+        exps = [v["expNet"] for v in xs if v.get("expNet") is not None]
         occs = [v["occ"] for v in xs if v.get("occ") is not None]
         maxs = [v["maxRev"] for v in xs if v.get("maxRev") is not None]
         comps = [v["dongCnt"] for v in xs if v.get("dongCnt") is not None]
         out.append({
             "name": label, "n": len(xs),
             "comp": max(comps) if comps else len(xs),   # 경쟁(그 지역 삼삼 매물수)
-            "net": round(statistics.mean(nets), 1) if nets else None,
+            "net": round(statistics.mean(nets), 1) if nets else None,        # 풀가동 순수익
+            "expNet": round(statistics.mean(exps), 1) if exps else None,     # 기대 월순수익(예약률 반영)
             "occ": round(statistics.mean(occs), 1) if occs else None,
             "maxRev": round(statistics.mean(maxs), 1) if maxs else None,
         })
-    out.sort(key=lambda r: (r["net"] is None, -(r["net"] or 0)))
+    # 기본 정렬 = 기대 월순수익(예약률 반영). 예약률 0%면 −월총이라 자연히 하위로.
+    out.sort(key=lambda r: (r["expNet"] is None, -(r["expNet"] if r["expNet"] is not None else -1e9)))
     return out
 
 
@@ -248,8 +256,8 @@ def api_rank():
 
 @app.route("/api/recommend")
 def api_recommend():
-    """신규진입 추천(블루오션): 수요(예약률) 있고 순수익 좋은데 경쟁 삼삼 매물이 적은 동/역/오피스텔.
-    기회점수 = 평균순수익 × 평균예약률/100 ÷ √경쟁수 (수익·수요 높을수록↑, 경쟁 많을수록↓)."""
+    """신규진입 추천(블루오션): 수요(예약률) 있고 기대 월순수익 좋은데 경쟁 삼삼 매물이 적은 동/역/오피스텔.
+    기회점수 = 기대월순수익(예약률 반영) ÷ √경쟁수 (수익·수요 높을수록↑, 경쟁 많을수록↓)."""
     a = request.args
 
     def fnum(key, default=None):
@@ -262,10 +270,10 @@ def api_recommend():
     max_comp = fnum("max_comp", None)   # 최대 경쟁 삼삼 매물수(비우면 제한 없음)
     rows = _rows_for(a)                 # 방 타입(원룸/투룸/쓰리룸+)별 조회
 
-    def score(net, occ, comp):
-        if net is None or occ is None or net <= 0:
+    def score(expnet, comp):
+        if expnet is None or expnet <= 0:   # 기대 월순수익이 양(+)일 때만(예약률 반영)
             return None
-        return round(net * (occ / 100) / max(comp, 1) ** 0.5, 1)
+        return round(expnet / max(comp, 1) ** 0.5, 1)
 
     def build(groups):
         out = []
@@ -274,7 +282,7 @@ def api_recommend():
                 continue
             if max_comp is not None and r["comp"] > max_comp:
                 continue
-            sc = score(r["net"], r["occ"], r["comp"])
+            sc = score(r["expNet"], r["comp"])
             if sc is None:
                 continue
             out.append({**r, "score": sc})
@@ -286,7 +294,7 @@ def api_recommend():
     for x in rows:
         if "오피스텔" not in (x.get("btype") or ""):
             continue
-        if x.get("occ") is None or x["occ"] < min_occ or x.get("net") is None or x["net"] <= 0:
+        if x.get("occ") is None or x["occ"] < min_occ or x.get("expNet") is None or x["expNet"] <= 0:
             continue
         comp = x.get("dongCnt") or 1
         if max_comp is not None and comp > max_comp:
@@ -294,8 +302,8 @@ def api_recommend():
         offices.append({
             "name": x.get("name") or "", "dong": f"{x.get('sigungu','')} {x.get('dong','')}".strip(),
             "station": x.get("station") or "", "pyeong": x.get("pyeong"),
-            "comp": comp, "occ": x["occ"], "net": x["net"], "maxRev": x.get("maxRev"),
-            "score": score(x["net"], x["occ"], comp),
+            "comp": comp, "occ": x["occ"], "net": x["net"], "expNet": x["expNet"], "maxRev": x.get("maxRev"),
+            "score": score(x["expNet"], comp),
             "samUrl": x.get("samUrl") or "", "naverUrl": x.get("naverUrl") or "",
         })
     offices.sort(key=lambda r: -(r["score"] or 0))
