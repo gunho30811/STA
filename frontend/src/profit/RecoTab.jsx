@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { fetchRecommend, fmt as n } from '../shared/api.js'
+import { fetchRecommend, fmt as n, fmtComp } from '../shared/api.js'
 
 const RECO_COLS = ['#', '이름', '경쟁', '매칭', '예약률%', '기대월순수익', '기회점수']
 const medal = (i) => (i === 1 ? '🥇' : i === 2 ? '🥈' : i === 3 ? '🥉' : i)
@@ -58,7 +58,7 @@ export default function RecoTab({ month }) {
                   <td className="l">{r.dong}</td>
                   <td className="l">{r.station || '-'}</td>
                   <td>{n(r.pyeong)}</td>
-                  <td>{n(r.comp)}</td>
+                  <td title={r.comp >= 400 ? '삼삼 조회 상한(400) 도달' : ''}>{fmtComp(r.comp)}</td>
                   <td style={{ color: r.matches != null && r.matches <= 2 ? '#dc2626' : '#94a3b8', fontWeight: r.matches != null && r.matches <= 2 ? 700 : 400 }} title={r.matches != null && r.matches <= 2 ? '표본 부족 — 신뢰도 낮음' : ''}>{n(r.matches)}</td>
                   <td className="occ">{n(r.occ)}%</td>
                   <td className="pos" style={{ fontWeight: 800 }}>{n(r.expNet)}</td>
@@ -90,9 +90,11 @@ function RecoArea({ title, rows }) {
             ) : rows.map((r, i) => (
               <tr key={r.name}>
                 <td style={{ fontWeight: 800, fontSize: i < 3 ? 15 : 12 }}>{medal(i + 1)}</td>
-                <td className="l" style={{ fontWeight: 600 }}>{r.name}</td>
-                <td>{n(r.comp)}</td>
-                <td style={{ color: '#94a3b8' }}>{n(r.n)}</td>
+                <td className="l" style={{ fontWeight: 600 }}>{r.name}
+                  {r.n != null && r.n <= 2 && <span title="매칭 표본 1~2건 — 신뢰도 낮음" style={{ marginLeft: 5, fontSize: 10, fontWeight: 700, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 5px' }}>표본부족</span>}
+                </td>
+                <td title={r.comp >= 400 ? '삼삼 조회 상한(400) 도달' : ''}>{fmtComp(r.comp)}</td>
+                <td style={r.n != null && r.n <= 2 ? { color: '#dc2626', fontWeight: 700 } : { color: '#94a3b8' }}>{n(r.n)}</td>
                 <td className="occ">{n(r.occ)}%</td>
                 <td className="pos" style={{ fontWeight: 800 }}>{n(r.expNet)}</td>
                 <td style={{ fontWeight: 800, color: '#7c3aed' }}>{n(r.score)}</td>

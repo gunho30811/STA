@@ -1,4 +1,4 @@
-import { fmt as n } from '../shared/api.js'
+import { fmt as n, fmtComp } from '../shared/api.js'
 
 // 오른쪽 상세 패널. 기존 showDetail() 이식. React라 innerHTML 없이 JSX로 렌더 → XSS 자동 차단.
 function KV({ k, v }) {
@@ -51,7 +51,7 @@ export default function Detail({ item }) {
       <div className="d-sec">
         <h4>건물 · 지역</h4>
         <KV k="이 건물 삼삼 매물수" v={n(x.samBldg)} />
-        <KV k="동 경쟁(삼삼)" v={n(x.dongCnt)} />
+        <KV k="동 경쟁(삼삼)" v={fmtComp(x.dongCnt)} />
         <KV k="동 예약률" v={`${n(x.dongOcc)} %`} />
         <KV k="인근역" v={`${x.station || '-'} (역예약률 ${n(x.stOcc)}%)`} />
         <KV k="건물 부동산 매물수" v={n(x.bldgCnt)} />
