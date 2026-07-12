@@ -17,7 +17,7 @@ from flask import Flask, jsonify, request, send_from_directory
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST = os.path.join(ROOT, "frontend", "dist", "gangnam")   # React(Vite) 빌드 산출물
 sys.path.insert(0, ROOT)   # db 모듈 import용(상세 모달이 DB에서 전체 컬럼을 가져옴)
-sys.path.insert(0, os.path.join(ROOT, "pipeline", "naver"))   # subway(역 좌표·하버사인)
+sys.path.insert(0, os.path.join(ROOT, "common"))   # 공용 유틸(subway 등, sta-common 예정)
 import subway  # noqa: E402  # 역 반경 검색: 매물 lat/lng ↔ 역 좌표 거리 계산
 import db  # noqa: E402  # naver_listings 를 DB에서 직접 쿼리(70MB 파일 통짜 로드 대신)
 # 역명(N역) → (lat, lng). data/subway_stations.csv(수도권 589역). '역 반경 검색' 자동완성·거리계산에 씀.
