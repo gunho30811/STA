@@ -21,7 +21,7 @@ from flask import Flask, jsonify, render_template, request, send_from_directory
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "data")
-DIST = os.path.join(ROOT, "frontend", "dist")   # React(Vite) 빌드 산출물
+DIST = os.path.join(ROOT, "frontend", "dist", "profit")   # React(Vite) 빌드 산출물(뷰어별)
 app = Flask(__name__, template_folder=os.path.join(ROOT, "templates"))
 from auth import init_auth  # noqa: E402
 init_auth(app)

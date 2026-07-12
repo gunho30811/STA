@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { fetchRank, fmt as n } from '../api.js'
+import { fetchRank, fmt as n } from '../shared/api.js'
 
 const RANK_COLS = [
   { k: 'rk', t: '#', s: false },

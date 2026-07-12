@@ -12,9 +12,10 @@ import json
 import os
 import sys
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_from_directory
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DIST = os.path.join(ROOT, "frontend", "dist", "gangnam")   # React(Vite) 빌드 산출물
 sys.path.insert(0, ROOT)   # db 모듈 import용(상세 모달이 DB에서 전체 컬럼을 가져옴)
 sys.path.insert(0, os.path.join(ROOT, "pipeline", "naver"))   # subway(역 좌표·하버사인)
 import subway  # noqa: E402  # 역 반경 검색: 매물 lat/lng ↔ 역 좌표 거리 계산
@@ -148,7 +149,17 @@ def L():
 
 @app.route("/")
 def index():
-    return render_template("gangnam.html")
+    # React(Vite) 빌드를 서빙. 빌드 전이면 안내.
+    idx = os.path.join(DIST, "index.html")
+    if os.path.exists(idx):
+        return send_from_directory(DIST, "index.html")
+    return ("<h3>프론트엔드 빌드가 없습니다.</h3>"
+            "<p><code>cd frontend &amp;&amp; npm run build:gangnam</code> 후 새로고침하세요.</p>"), 200
+
+
+@app.route("/assets/<path:filename>")
+def assets(filename):
+    return send_from_directory(os.path.join(DIST, "assets"), filename)
 
 
 @app.route("/api/facets")

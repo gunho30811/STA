@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { fetchFacets } from './api.js'
-import ProfitList from './components/ProfitList.jsx'
-import RankTab from './components/RankTab.jsx'
-import RecoTab from './components/RecoTab.jsx'
+import { fetchFacets } from '../shared/api.js'
+import './styles.css'
+import ProfitList from './ProfitList.jsx'
+import RankTab from './RankTab.jsx'
+import RecoTab from './RecoTab.jsx'
 
 const TABS = [
   { id: 'list', label: '매물 수익성' },

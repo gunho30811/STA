@@ -3,10 +3,14 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "삼삼 x 부동산 수익성 뷰어 React 프론트엔드 (Vite). Flask JSON API 소비.",
+  "description": "삼삼 x 부동산 뷰어 React 프론트엔드 (Vite). 뷰어별 멀티 빌드. Flask JSON API 소비.",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "cross-env VIEWER=profit vite",
+    "dev:profit": "cross-env VIEWER=profit vite",
+    "dev:gangnam": "cross-env VIEWER=gangnam vite",
+    "build:profit": "cross-env VIEWER=profit vite build",
+    "build:gangnam": "cross-env VIEWER=gangnam vite build",
+    "build": "npm run build:profit && npm run build:gangnam",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -15,6 +19,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
+    "cross-env": "^7.0.3",
     "vite": "^5.4.2"
   }
 }

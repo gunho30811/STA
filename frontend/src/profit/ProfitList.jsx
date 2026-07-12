@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { fetchProfit, fmt as n } from '../api.js'
+import { fetchProfit, fmt as n } from '../shared/api.js'
 import Detail from './Detail.jsx'
 import Pager from './Pager.jsx'
 

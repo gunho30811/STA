@@ -1,4 +1,4 @@
-import { fmt as n } from '../api.js'
+import { fmt as n } from '../shared/api.js'
 
 // 오른쪽 상세 패널. 기존 showDetail() 이식. React라 innerHTML 없이 JSX로 렌더 → XSS 자동 차단.
 function KV({ k, v }) {

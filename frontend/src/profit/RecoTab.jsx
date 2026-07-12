@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { fetchRecommend, fmt as n } from '../api.js'
+import { fetchRecommend, fmt as n } from '../shared/api.js'
 
 const RECO_COLS = ['#', '이름', '경쟁', '매칭', '예약률%', '기대월순수익', '기회점수']
 const medal = (i) => (i === 1 ? '🥇' : i === 2 ? '🥈' : i === 3 ? '🥉' : i)
