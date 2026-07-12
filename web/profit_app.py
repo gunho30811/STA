@@ -17,11 +17,12 @@ import json
 import os
 import statistics
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, request, send_from_directory
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "data")
-app = Flask(__name__, template_folder=os.path.join(ROOT, "templates"))
+DIST = os.path.join(ROOT, "frontend", "dist", "profit")   # React(Vite) 빌드 산출물(뷰어별)
+app = Flask(__name__)
 from auth import init_auth  # noqa: E402
 init_auth(app)
 
@@ -111,7 +112,21 @@ def P():
 
 @app.route("/")
 def index():
-    return render_template("profit.html")
+    # React(Vite) 빌드를 서빙. index.html은 '문자열'로 반환해야 auth.py after_request의
+    # 공통 네비게이션 주입(HTML 본문 수정)이 동작한다(send_file은 direct_passthrough라 주입 안 됨).
+    idx = os.path.join(DIST, "index.html")
+    if os.path.exists(idx):
+        with open(idx, encoding="utf-8") as f:
+            return f.read()
+    return ("<h3>프론트엔드 빌드가 없습니다.</h3>"
+            "<p><code>cd frontend &amp;&amp; npm run build</code> 후 새로고침하세요. "
+            "(개발 중이면 <code>npm run dev</code> → http://localhost:5173/profit/)</p>"), 200
+
+
+@app.route("/assets/<path:filename>")
+def assets(filename):
+    # Vite 빌드 에셋(js/css). base='/profit/'라 브라우저는 /profit/assets/* 로 요청 → 여기로 들어옴.
+    return send_from_directory(os.path.join(DIST, "assets"), filename)
 
 
 @app.route("/api/facets")

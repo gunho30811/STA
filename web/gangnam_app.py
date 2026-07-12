@@ -2,29 +2,30 @@
 """
 수도권 네이버부동산 매물 뷰어 (Flask).
 
-lab/naver_listings.jsonl (naver_listings 스키마, 서울·경기·인천 전 유형)을
-그대로 읽어 카드 그리드 + 상세 모달로 보여준다. DB 불필요(로컬 jsonl만 읽음).
-export: python pipeline/naver/export_jsonl.py
+naver_listings(Supabase) 를 SQL로 조회(필터·페이지네이션)해 카드 그리드 + 상세 모달로 보여준다.
+근처 삼삼(수요)은 lab/samsam_listings.jsonl 인메모리 인덱스로 부착.
 
     python web/gangnam_app.py        # http://127.0.0.1:5002
 """
 import json
+import math
 import os
 import sys
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, request, send_from_directory
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DIST = os.path.join(ROOT, "frontend", "dist", "gangnam")   # React(Vite) 빌드 산출물
 sys.path.insert(0, ROOT)   # db 모듈 import용(상세 모달이 DB에서 전체 컬럼을 가져옴)
 sys.path.insert(0, os.path.join(ROOT, "pipeline", "naver"))   # subway(역 좌표·하버사인)
 import subway  # noqa: E402  # 역 반경 검색: 매물 lat/lng ↔ 역 좌표 거리 계산
+import db  # noqa: E402  # naver_listings 를 DB에서 직접 쿼리(70MB 파일 통짜 로드 대신)
 # 역명(N역) → (lat, lng). data/subway_stations.csv(수도권 589역). '역 반경 검색' 자동완성·거리계산에 씀.
 STATION_COORDS = {f"{n}역": (y, x) for n, y, x in subway._load()}
-DATA = os.path.join(ROOT, "lab", "naver_listings.jsonl")
 SAMSAM = os.path.join(ROOT, "lab", "samsam_listings.jsonl")   # 근처 삼삼(단기임대) 수요 붙이기용
 M2_PER_PYEONG = 3.305785
 
-app = Flask(__name__, template_folder=os.path.join(ROOT, "templates"))
+app = Flask(__name__)
 from auth import init_auth  # noqa: E402
 init_auth(app)
 
@@ -36,21 +37,6 @@ TYPE_NAMES = {
 # 업무용 오피스텔 판별: 부동산이 상세 summary에 '업무용' 또는 '전입(신고) 불가'라고 써놓은 것.
 # 주의: '전입신고'만 매칭하면 '전입신고 가능'(주거용)까지 잡히므로, 반드시 '불가'가 붙은 문구만.
 OFFICE_KW = ("업무용", "전입불가", "전입 불가", "전입신고 불가", "전입신고불가")
-
-
-def _is_office(x):
-    return x.get("building_type_code") == "OPST" and \
-        any(k in (x.get("summary") or "") for k in OFFICE_KW)
-
-
-def _split_sgg(sigungu):
-    """'수원시 영통구'→('수원시','영통구') · '강남구'→('','강남구') · '화성시'→('화성시','') ·
-    '가평군'→('가평군','')  (시/군 과 구 분리)."""
-    parts = (sigungu or "").split()
-    if len(parts) >= 2:
-        return parts[0], parts[1]
-    p = parts[0] if parts else ""
-    return ("", p) if p.endswith("구") else (p, "")
 
 
 PYEONG_TOL = 3   # '평수도 같은' 허용 오차(평)
@@ -118,216 +104,296 @@ def _area_of(x):
     return res
 
 
-def _load():
-    rows = []
-    if not os.path.exists(DATA):
-        return rows
-    with open(DATA, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                r = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            area = r.get("area_exclusive_m2")
-            r["pyeong"] = round(area / M2_PER_PYEONG, 1) if isinstance(area, (int, float)) else None
-            r["url"] = f"https://new.land.naver.com/offices?articleNo={r.get('article_no')}"
-            rows.append(r)
-    return rows
+# ── DB(naver_listings) 조회 ──────────────────────────────────────────────────
+# 예전엔 lab/naver_listings.jsonl(70MB)을 통짜로 메모리에 올려 파이썬으로 걸렀지만,
+# 이제 필터·페이지네이션을 SQL(WHERE/LIMIT)로 밀어 DB에서 필요한 만큼만 가져온다.
+
+# 목록/상세에 실제로 쓰는 컬럼만 SELECT(전 66컬럼 로드 안 함).
+LIST_COLS = (
+    "article_no", "building_name", "building_type_code", "sido", "sigungu", "dong",
+    "deposit", "rent_monthly", "maintenance_monthly", "area_exclusive_m2",
+    "floor_current", "rooms", "direction", "subway_station", "subway_distance_m",
+    "summary", "lat", "lng", "jibun_address", "road_address", "confirmed_at",
+)
+
+# 시군구 문자열 → (시/군, 구) 를 SQL에서 계산.
+#   "수원시 영통구" → ("수원시","영통구") · "강남구" → ("","강남구") · "화성시" → ("화성시","")
+# LIKE '%구' 의 %가 파라미터 바인딩과 충돌하므로 right(..,1) 로 대체.
+_SI_SQL = ("CASE WHEN position(' ' in sigungu) > 0 THEN split_part(sigungu, ' ', 1) "
+           "WHEN right(sigungu, 1) = '구' THEN '' ELSE sigungu END")
+_GU_SQL = ("CASE WHEN position(' ' in sigungu) > 0 THEN split_part(sigungu, ' ', 2) "
+           "WHEN right(sigungu, 1) = '구' THEN sigungu ELSE '' END")
+
+# 정렬 → SQL ORDER BY (월순수익 net_desc 는 삼삼 계산이 필요해 파이썬에서 처리).
+_ORDER_SQL = {
+    "recent": "confirmed_at DESC NULLS LAST",
+    "rent_asc": "rent_monthly ASC NULLS LAST",
+    "rent_desc": "rent_monthly DESC NULLS LAST",
+    "deposit_asc": "deposit ASC NULLS LAST",
+    "deposit_desc": "deposit DESC NULLS LAST",
+    "area_asc": "area_exclusive_m2 ASC NULLS LAST",
+    "area_desc": "area_exclusive_m2 DESC NULLS LAST",
+}
 
 
-_CACHE=None
-def L():
-    global _CACHE
-    if _CACHE is None:
-        _CACHE=_load()
-    return _CACHE
+def _enrich_row(d):
+    """DB 행(dict) → 뷰에 필요한 파생(pyeong·url) 부착. (파일 버전 _load 와 동일)"""
+    area = d.get("area_exclusive_m2")
+    d["pyeong"] = round(area / M2_PER_PYEONG, 1) if isinstance(area, (int, float)) else None
+    d["url"] = f"https://new.land.naver.com/offices?articleNo={d.get('article_no')}"
+    return d
 
 
 @app.route("/")
 def index():
-    return render_template("gangnam.html")
+    # index.html은 '문자열'로 반환(auth.py after_request 네비 주입이 동작하려면 direct_passthrough 회피).
+    idx = os.path.join(DIST, "index.html")
+    if os.path.exists(idx):
+        with open(idx, encoding="utf-8") as f:
+            return f.read()
+    return ("<h3>프론트엔드 빌드가 없습니다.</h3>"
+            "<p><code>cd frontend &amp;&amp; npm run build:gangnam</code> 후 새로고침하세요.</p>"), 200
+
+
+@app.route("/assets/<path:filename>")
+def assets(filename):
+    return send_from_directory(os.path.join(DIST, "assets"), filename)
 
 
 @app.route("/api/facets")
 def api_facets():
-    dongs = sorted({x.get("dong") for x in L() if x.get("dong")})
-    # 도→시/군→구→동 트리(시·도·구 분리해 좁혀 선택). 경기 '수원시 영통구'를 시/구로 나눔.
-    regions = sorted({(x.get("sido") or "", *_split_sgg(x.get("sigungu")), x.get("dong") or "")
-                      for x in L() if x.get("dong")})
+    conn = db.connect()
+    try:
+        dongs = [r[0] for r in conn.execute(
+            "SELECT DISTINCT dong FROM naver_listings "
+            "WHERE dong IS NOT NULL AND dong <> '' ORDER BY dong").fetchall()]
+        # 지역 트리: (sido, 시/군, 구, dong) distinct — 시·구는 SQL에서 분리
+        regions = [list(r) for r in conn.execute(
+            f"SELECT DISTINCT COALESCE(sido, ''), {_SI_SQL}, {_GU_SQL}, dong "
+            "FROM naver_listings WHERE dong IS NOT NULL AND dong <> '' "
+            "ORDER BY 1, 2, 3, 4").fetchall()]
+        present = {r[0] for r in conn.execute(
+            "SELECT DISTINCT building_type_code FROM naver_listings").fetchall()}
+        total = conn.execute("SELECT COUNT(*) FROM naver_listings").fetchone()[0]
+        office_kw = " OR ".join(["summary ILIKE %s"] * len(OFFICE_KW))
+        office_n = conn.execute(
+            f"SELECT COUNT(*) FROM naver_listings "
+            f"WHERE building_type_code = 'OPST' AND ({office_kw})",
+            [f"%{k}%" for k in OFFICE_KW]).fetchone()[0]
+    finally:
+        conn.close()
     types = [{"code": c, "name": TYPE_NAMES.get(c, c)}
-             for c in ["APT", "OPST", "VL", "OR", "DDDGG", "SG"]
-             if any(x.get("building_type_code") == c for x in L())]
-    office_n = sum(1 for x in L() if _is_office(x))
+             for c in ["APT", "OPST", "VL", "OR", "DDDGG", "SG"] if c in present]
     return jsonify({"dongs": dongs, "regions": regions, "types": types,
                     "stations": sorted(STATION_COORDS.keys()),
-                    "total": len(L()), "office": office_n})
+                    "total": total, "office": office_n})
 
 
 @app.route("/api/stats")
 def api_stats():
-    by_type, by_dong, rents = {}, {}, []
-    for x in L():
-        t = x.get("building_type_code")
-        by_type[t] = by_type.get(t, 0) + 1
-        d = x.get("dong")
-        by_dong[d] = by_dong.get(d, 0) + 1
-        rm = x.get("rent_monthly")
-        if isinstance(rm, (int, float)) and rm > 0:
-            rents.append(rm)
-    rents.sort()
-    med = rents[len(rents) // 2] if rents else None
+    conn = db.connect()
+    try:
+        total = conn.execute("SELECT COUNT(*) FROM naver_listings").fetchone()[0]
+        dong_count = conn.execute(
+            "SELECT COUNT(DISTINCT dong) FROM naver_listings "
+            "WHERE dong IS NOT NULL AND dong <> ''").fetchone()[0]
+        med = conn.execute(
+            "SELECT percentile_disc(0.5) WITHIN GROUP (ORDER BY rent_monthly) "
+            "FROM naver_listings WHERE rent_monthly > 0").fetchone()[0]
+        by_type = [(r[0], r[1]) for r in conn.execute(
+            "SELECT building_type_code, COUNT(*) c FROM naver_listings "
+            "GROUP BY building_type_code ORDER BY c DESC").fetchall()]
+    finally:
+        conn.close()
     return jsonify({
-        "total": len(L()),
-        "dong_count": len(by_dong),
+        "total": total,
+        "dong_count": dong_count,
         "rent_median": med,
-        "by_type": [{"code": k, "name": TYPE_NAMES.get(k, k), "count": v}
-                    for k, v in sorted(by_type.items(), key=lambda kv: -kv[1])],
+        "by_type": [{"code": k, "name": TYPE_NAMES.get(k, k), "count": c}
+                    for k, c in by_type],
     })
+
+
+def _build_where(a):
+    """요청 필터 → (SQL where 절 리스트, 파라미터). 역반경·월순수익은 여기서 안 다룸(파이썬 후처리)."""
+    clauses, params = [], []
+
+    types = [t for t in a.get("types", "").split(",") if t]
+    if types:
+        clauses.append("building_type_code = ANY(%s)")
+        params.append(types)
+
+    if a.get("sido", "").strip():
+        clauses.append("sido = %s")
+        params.append(a["sido"].strip())
+
+    if a.get("sigun", "").strip():          # 시/군 (예: 수원시)
+        clauses.append(f"{_SI_SQL} = %s")
+        params.append(a["sigun"].strip())
+    if a.get("gu", "").strip():             # 구 (예: 영통구 / 강남구)
+        clauses.append(f"{_GU_SQL} = %s")
+        params.append(a["gu"].strip())
+
+    dongs = [d for d in a.get("dongs", "").split(",") if d]
+    if dongs:
+        clauses.append("dong = ANY(%s)")
+        params.append(dongs)
+
+    # 지역 다중선택: region=sido|sigun|gu|dong (빈 칸=와일드카드), 여러 개를 OR
+    regs = [(r.split("|") + ["", "", "", ""])[:4] for r in a.getlist("region") if r]
+    if regs:
+        ors = []
+        for sido_r, sigun_r, gu_r, dong_r in regs:
+            sub = []
+            if sido_r:
+                sub.append("sido = %s"); params.append(sido_r)
+            if sigun_r:
+                sub.append(f"{_SI_SQL} = %s"); params.append(sigun_r)
+            if gu_r:
+                sub.append(f"{_GU_SQL} = %s"); params.append(gu_r)
+            if dong_r:
+                sub.append("dong = %s"); params.append(dong_r)
+            ors.append("(" + (" AND ".join(sub) if sub else "TRUE") + ")")
+        clauses.append("(" + " OR ".join(ors) + ")")
+
+    # 방 개수: 1/2/3 정수(exact) 또는 '4+'(4개 이상)
+    rooms_sel = a.getlist("rooms")
+    if rooms_sel:
+        exact = [int(r) for r in rooms_sel if r.isdigit()]
+        parts = []
+        if exact:
+            parts.append("rooms = ANY(%s)"); params.append(exact)
+        if "4+" in rooms_sel:
+            parts.append("rooms >= 4")
+        if parts:
+            clauses.append("(" + " OR ".join(parts) + ")")
+
+    # 범위(보증금·월세·평수). 평수는 area_exclusive_m2 로 환산해 필터.
+    def rng(field, lo, hi, scale=1.0):
+        if a.get(lo):
+            clauses.append(f"{field} >= %s"); params.append(float(a[lo]) * scale)
+        if a.get(hi):
+            clauses.append(f"{field} <= %s"); params.append(float(a[hi]) * scale)
+    rng("deposit", "deposit_min", "deposit_max")
+    rng("rent_monthly", "rent_min", "rent_max")
+    rng("area_exclusive_m2", "pyeong_min", "pyeong_max", scale=M2_PER_PYEONG)
+
+    # 키워드(여러 필드 ILIKE)
+    kw = a.get("keyword", "").strip()
+    if kw:
+        fields = ("building_name", "summary", "jibun_address", "road_address",
+                  "subway_station", "summary_tags")
+        clauses.append("(" + " OR ".join(f"{f} ILIKE %s" for f in fields) + ")")
+        params.extend([f"%{kw}%"] * len(fields))
+
+    # 업무용 오피스텔: 상세 summary에 '업무용'·'전입 불가' 명시한 OPST
+    if a.get("office") == "1":
+        clauses.append("building_type_code = 'OPST'")
+        clauses.append("(" + " OR ".join(["summary ILIKE %s"] * len(OFFICE_KW)) + ")")
+        params.extend([f"%{k}%" for k in OFFICE_KW])
+
+    return clauses, params
+
+
+def _sort_python(items, sort):
+    """파이썬 경로(역반경/월순수익 관여 시)의 정렬 — 파일 버전 keyf 와 동일."""
+    if sort == "net_desc":
+        def netkey(x):
+            n = (x.get("sam_area") or {}).get("net")
+            return -(n if n is not None else -1e9)
+        return sorted(items, key=netkey)
+    if sort == "rent_asc":
+        return sorted(items, key=lambda x: (_n(x.get("rent_monthly")) is None, _n(x.get("rent_monthly")) or 0))
+    if sort == "rent_desc":
+        return sorted(items, key=lambda x: -(_n(x.get("rent_monthly")) or 0))
+    if sort == "deposit_asc":
+        return sorted(items, key=lambda x: (_n(x.get("deposit")) is None, _n(x.get("deposit")) or 0))
+    if sort == "deposit_desc":
+        return sorted(items, key=lambda x: -(_n(x.get("deposit")) or 0))
+    if sort == "area_desc":
+        return sorted(items, key=lambda x: -(x.get("pyeong") or 0))
+    if sort == "area_asc":
+        return sorted(items, key=lambda x: (x.get("pyeong") is None, x.get("pyeong") or 0))
+    return sorted(items, key=lambda x: x.get("confirmed_at") or "", reverse=True)
 
 
 @app.route("/api/listings")
 def api_listings():
     a = request.args
-    items = L()
+    clauses, params = _build_where(a)
 
-    types = [t for t in a.get("types", "").split(",") if t]
-    if types:
-        items = [x for x in items if x.get("building_type_code") in types]
-
-    sido = a.get("sido", "").strip()
-    if sido:
-        items = [x for x in items if x.get("sido") == sido]
-    sigun = a.get("sigun", "").strip()   # 시/군 (예: 수원시)
-    gu = a.get("gu", "").strip()          # 구 (예: 영통구 / 강남구)
-    if sigun or gu:
-        def _match(x):
-            si, g = _split_sgg(x.get("sigungu"))
-            return (not sigun or si == sigun) and (not gu or g == gu)
-        items = [x for x in items if _match(x)]
-
-    dongs = [d for d in a.get("dongs", "").split(",") if d]
-    if dongs:
-        items = [x for x in items if x.get("dong") in dongs]
-
-    # 지역 다중선택: region 파라미터 반복(각 "sido|sigun|gu|dong", 빈 칸은 와일드카드).
-    # 여러 시도/구/동을 섞어 union(OR). 예: region=서울시||강남구|역삼동 & region=경기||| 처럼.
-    regs = [r.split("|") for r in a.getlist("region") if r]
-    if regs:
-        regs = [(r + ["", "", "", ""])[:4] for r in regs]   # 4칸 패딩
-
-        def _rmatch(x):
-            si, g = _split_sgg(x.get("sigungu"))
-            for sido, sigun, gu, dong in regs:
-                if sido and x.get("sido") != sido:
-                    continue
-                if sigun and si != sigun:
-                    continue
-                if gu and g != gu:
-                    continue
-                if dong and x.get("dong") != dong:
-                    continue
-                return True
-            return False
-        items = [x for x in items if _rmatch(x)]
-
-    # 방 개수 다중선택: rooms 파라미터 반복(1/2/3 정수 또는 '4+'=4개 이상).
-    rooms_sel = a.getlist("rooms")
-    if rooms_sel:
-        exact = {int(r) for r in rooms_sel if r.isdigit()}
-        fourplus = "4+" in rooms_sel
-
-        def _rmroom(x):
-            rc = x.get("rooms")
-            return rc is not None and (rc in exact or (fourplus and rc >= 4))
-        items = [x for x in items if _rmroom(x)]
-
-    # 역 반경 검색: station 파라미터 반복(역명) + radius(m, 기본 1000). 선택 역들 반경 내 매물 union.
+    # 역 반경: bbox 로 SQL 선필터 → 파이썬에서 haversine 정밀 판정.
     stns = [s for s in a.getlist("station") if s in STATION_COORDS]
+    radius = 1000.0
     if stns:
         try:
             radius = float(a.get("radius") or 1000)
         except ValueError:
             radius = 1000.0
-        coords = [STATION_COORDS[s] for s in stns]
-
-        def _near(x):
-            la, ln = x.get("lat"), x.get("lng")
-            if la is None or ln is None:
-                return False
-            return any(subway.haversine_m(la, ln, sy, sx) <= radius for sy, sx in coords)
-        items = [x for x in items if _near(x)]
-
-    def rng(field, lo, hi):
-        nonlocal items
-        if a.get(lo):
-            v = float(a[lo]); items = [x for x in items if _n(x.get(field)) is not None and _n(x.get(field)) >= v]
-        if a.get(hi):
-            v = float(a[hi]); items = [x for x in items if _n(x.get(field)) is not None and _n(x.get(field)) <= v]
-
-    rng("deposit", "deposit_min", "deposit_max")
-    rng("rent_monthly", "rent_min", "rent_max")
-    rng("pyeong", "pyeong_min", "pyeong_max")
-
-    kw = a.get("keyword", "").strip()
-    if kw:
-        def hit(x):
-            for f in ("building_name", "summary", "jibun_address", "road_address",
-                      "subway_station", "tags"):
-                v = x.get(f)
-                if v and kw in str(v):
-                    return True
-            return False
-        items = [x for x in items if hit(x)]
-
-    # 업무용 오피스텔: 부동산이 상세에 '업무용'·'전입신고 불가'라고 명시한 오피스텔만.
-    if a.get("office") == "1":
-        items = [x for x in items if _is_office(x)]
+        boxes = []
+        for s in stns:
+            la, ln = STATION_COORDS[s]
+            dlat = radius / 111000.0
+            dlng = radius / (111000.0 * max(math.cos(math.radians(la)), 0.01))
+            boxes.append("(lat BETWEEN %s AND %s AND lng BETWEEN %s AND %s)")
+            params.extend([la - dlat, la + dlat, ln - dlng, ln + dlng])
+        clauses.append("(" + " OR ".join(boxes) + ")")
 
     sort = a.get("sort", "recent")
     try:
         net_min = float(a["net_min"]) if a.get("net_min") not in (None, "") else None
     except ValueError:
         net_min = None
-    # 월순수익 필터/정렬은 매물별 순수익이 필요 → 그때만 전체 대상으로 계산(캐시).
-    if net_min is not None or sort == "net_desc":
-        for x in items:
-            if "sam_area" not in x:
-                x["sam_area"] = _area_of(x)
-        if net_min is not None:
-            items = [x for x in items if (x.get("sam_area") or {}).get("net") is not None
-                     and x["sam_area"]["net"] >= net_min]
 
-    def _netkey(x):
-        n = (x.get("sam_area") or {}).get("net")
-        return -(n if n is not None else -1e9)
-    keyf = {
-        "rent_asc": lambda x: (_n(x.get("rent_monthly")) is None, _n(x.get("rent_monthly")) or 0),
-        "rent_desc": lambda x: -(_n(x.get("rent_monthly")) or 0),
-        "deposit_asc": lambda x: (_n(x.get("deposit")) is None, _n(x.get("deposit")) or 0),
-        "deposit_desc": lambda x: -(_n(x.get("deposit")) or 0),
-        "area_desc": lambda x: -(_n(x.get("pyeong")) or 0),
-        "area_asc": lambda x: (_n(x.get("pyeong")) is None, _n(x.get("pyeong")) or 0),
-        "net_desc": _netkey,
-        "recent": lambda x: x.get("confirmed_at") or "",
-    }.get(sort, lambda x: x.get("confirmed_at") or "")
-    rev = sort in ("recent",)
-    items = sorted(items, key=keyf, reverse=rev)
-
-    total = len(items)
+    where_sql = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    cols = ", ".join(LIST_COLS)
     page = max(1, int(a.get("page", 1)))
     size = min(120, max(1, int(a.get("size", 24))))
-    start = (page - 1) * size
-    page_items = items[start:start + size]
-    for it in page_items:      # 이 매물 근처(같은 동) 삼삼 수요·순수익 부착(이미 있으면 재사용)
+
+    # 역반경·월순수익이 걸리면 파이썬 후처리 필요 → SQL로 좁힌 전체를 가져와 처리.
+    #   아니면 WHERE+ORDER BY+LIMIT 로 DB가 페이지만 돌려줌(빠름, 70MB 로드 없음).
+    needs_python = bool(stns) or sort == "net_desc" or net_min is not None
+
+    conn = db.connect()
+    try:
+        if not needs_python:
+            total = conn.execute(
+                f"SELECT COUNT(*) FROM naver_listings{where_sql}", params).fetchone()[0]
+            order = _ORDER_SQL.get(sort, "confirmed_at DESC NULLS LAST")
+            rows = conn.execute(
+                f"SELECT {cols} FROM naver_listings{where_sql} "
+                f"ORDER BY {order} LIMIT %s OFFSET %s",
+                params + [size, (page - 1) * size]).fetchall()
+            items = [_enrich_row(dict(r)) for r in rows]
+        else:
+            items_all = [_enrich_row(dict(r)) for r in conn.execute(
+                f"SELECT {cols} FROM naver_listings{where_sql}", params).fetchall()]
+            if stns:   # bbox 로 좁힌 뒤 haversine 정밀 판정
+                coords = [STATION_COORDS[s] for s in stns]
+                items_all = [x for x in items_all
+                             if x.get("lat") is not None and x.get("lng") is not None
+                             and any(subway.haversine_m(x["lat"], x["lng"], sy, sx) <= radius
+                                     for sy, sx in coords)]
+            if net_min is not None or sort == "net_desc":
+                for x in items_all:
+                    x["sam_area"] = _area_of(x)
+                if net_min is not None:
+                    items_all = [x for x in items_all
+                                 if (x.get("sam_area") or {}).get("net") is not None
+                                 and x["sam_area"]["net"] >= net_min]
+            items_all = _sort_python(items_all, sort)
+            total = len(items_all)
+            items = items_all[(page - 1) * size: (page - 1) * size + size]
+    finally:
+        conn.close()
+
+    for it in items:   # 페이지 항목에 근처(같은 동) 삼삼 수요·순수익 부착(이미 있으면 재사용)
         if "sam_area" not in it:
             it["sam_area"] = _area_of(it)
     return jsonify({
         "total": total, "page": page, "size": size,
         "pages": (total + size - 1) // size,
-        "items": page_items,
+        "items": items,
     })
 
 

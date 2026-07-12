@@ -3,28 +3,35 @@
 수도권/전국 오피스텔 월세 매물을 네이버부동산에서 수집하고, 삼삼엠투(단기임대) 데이터와
 같은 건물·평수로 매칭해 **임대인 관점의 수익성**을 분석·검색하는 로컬 도구.
 
-웹앱 두 개로 구성됩니다.
+**통합 포털**(`web/portal.py`, 포트 8000) 하나에 로그인 게이트 + 뷰어들을 마운트한다.
+프론트엔드는 **React(Vite)** 로 작성되고(`frontend/`), 각 Flask 앱은 JSON API + 빌드된 React를 서빙한다.
 
-| 앱 | 포트 | 내용 |
-|----|------|------|
-| `web/app.py` | 5000 | 네이버 오피스텔 **월세 매물 검색** (서울/경기/인천, 시·군·구·동 필터) |
-| `web/profit_app.py` | 5001 | 삼삼엠투 × 네이버 **단기임대 수익성** 검색 (전국, 건물유형/방수/지역/순수익 필터) |
+| 경로 | 앱 | 내용 |
+|------|-----|------|
+| `/profit/` | `web/profit_app.py` | 삼삼 × 네이버 **단기임대 수익성** (순위·신규진입 추천) |
+| `/samsam/` | `web/samsam_app.py` | 삼삼 **옵션/건물인기/랭킹/지역트렌드** 분석 |
+| `/gangnam/` | `web/gangnam_app.py` | 수도권 **부동산 매물** 카드/상세 뷰어 |
+| `/samsam/chat/` | `web/samsam_app.py` | 연결 계정 **통합 채팅** |
+| `/auth/` | `web/auth.py` | 로그인·회원관리 |
 
 ---
 
-## 1. 빠른 시작 (뷰어만 보기)
+## 1. 빠른 시작 (뷰어 보기)
 
-데이터(`data/`)는 이미 들어 있으므로, 보기만 할 거면 Flask만 있으면 됩니다.
+데이터(`data/`·`lab/`)는 이미 들어 있다. React 프론트를 1회 빌드한 뒤 포털을 띄운다.
 
 ```bash
 # Python 3.10+ 권장
-pip install flask
+pip install -r requirements.txt
 
-python web/app.py          # → http://127.0.0.1:5000  (네이버 매물 검색)
-python web/profit_app.py   # → http://127.0.0.1:5001  (수익성 분석)
+# 프론트엔드 빌드 (뷰어별 정적 산출물 → frontend/dist/<viewer>)
+cd frontend && npm install && npm run build && cd ..
+
+python web/portal.py       # → http://127.0.0.1:8000  (로그인 후 4개 뷰어)
 ```
 
-브라우저에서 위 주소로 접속. (두 앱은 포트가 달라 동시에 띄워도 됨)
+**프론트 개발(핫리로드):** `cd frontend && npm run dev:profit` (또는 `dev:gangnam`/`dev:samsam`/`dev:chat`)
+→ `http://localhost:5173/<viewer>/`. API·로그인은 8000으로 프록시되니 포털도 같이 띄워둔다.
 
 ---
 
@@ -51,9 +58,15 @@ python -m playwright install chromium     # 크롤용 크롬 1회 다운로드
 ├─ db.py                     ← Supabase(PostgreSQL) 연결 헬퍼 (web + pipeline 공유)
 ├─ SCHEMA.md                 ← 수집 데이터 스키마 계약 (네이버/삼삼 컬럼 정의)
 │
-├─ web/                      웹앱 (둘 다 db.py·templates·data 를 공유)
-│   ├─ app.py                 시스템 A: 네이버 매물 뷰어
-│   └─ profit_app.py          시스템 B: 수익성 뷰어
+├─ web/                      Flask 앱 (JSON API + React 빌드 서빙, db.py·data 공유)
+│   ├─ portal.py              통합 포털 — 로그인 게이트 + 뷰어 마운트(:8000)
+│   ├─ auth.py                로그인·회원관리 + 공통 네비 주입
+│   ├─ profit_app.py          수익성(/profit) · samsam_app.py 삼삼분석(+채팅) · gangnam_app.py 부동산매물
+│   └─ (각 앱 index 라우트가 frontend/dist/<viewer> 를 서빙)
+│
+├─ frontend/                 React(Vite) 프론트엔드 — 뷰어별 멀티 빌드
+│   ├─ src/shared/            공용(api.js 등)
+│   └─ src/{profit,gangnam,samsam,chat}/   뷰어별 컴포넌트
 │
 ├─ pipeline/                 데이터 수집/가공 스크립트 (수집원별로 분리)
 │   ├─ naver/                 ▣ 네이버부동산 (담당: gunho)
@@ -70,10 +83,6 @@ python -m playwright install chromium     # 크롤용 크롬 1회 다운로드
 │       ├─ build_integrated.py    ⑤ 매칭 → 최종 CSV 생성
 │       ├─ build_integrated_sqlite.py   (레거시: SQLite 버전)
 │       └─ migrate_to_supabase.py       (1회성: SQLite→Supabase 이전)
-│
-├─ templates/
-│   ├─ index.html            (네이버 뷰어 UI)
-│   └─ profit.html           (수익성 뷰어 UI)
 │
 └─ data/                     모든 데이터 (*.db, *.jsonl 은 git 미추적 — 로컬 크롤 후 생성)
     ├─ net_profit_integrated.csv ★ 최종 수익성 결과 (profit_app 이 읽음)

@@ -21,10 +21,11 @@ import sys
 from datetime import datetime
 
 import requests
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, request, send_from_directory
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+DIST = os.path.join(ROOT, "frontend", "dist", "samsam")   # React(Vite) 빌드 산출물(메인 뷰어)
 
 # 윈도우 콘솔(cp949)에서 로그의 em-dash 등 유니코드가 못 찍혀 500 나는 것 방지(리눅스는 무영향).
 try:
@@ -36,7 +37,7 @@ SAMPLE = os.path.join(ROOT, "lab", "samsam_sample.jsonl")
 EXPORT = os.path.join(ROOT, "lab", "samsam_listings.jsonl")
 SNAP_EXPORT = os.path.join(ROOT, "lab", "samsam_snapshots.jsonl")
 
-app = Flask(__name__, template_folder=os.path.join(ROOT, "templates"))
+app = Flask(__name__)
 from auth import current_user, init_auth  # noqa: E402
 init_auth(app)
 
@@ -342,7 +343,18 @@ def _adj_diff(rows, opt):
 
 @app.route("/")
 def index():
-    return render_template("samsam.html")
+    # React(Vite) 빌드 서빙. index.html은 '문자열'로 반환(auth.py 네비 주입이 동작하려면 direct_passthrough 회피).
+    idx = os.path.join(DIST, "index.html")
+    if os.path.exists(idx):
+        with open(idx, encoding="utf-8") as f:
+            return f.read()
+    return ("<h3>프론트엔드 빌드가 없습니다.</h3>"
+            "<p><code>cd frontend &amp;&amp; npm run build:samsam</code> 후 새로고침하세요.</p>"), 200
+
+
+@app.route("/assets/<path:filename>")
+def assets(filename):
+    return send_from_directory(os.path.join(DIST, "assets"), filename)
 
 
 @app.route("/api/facets")
@@ -653,9 +665,23 @@ def _trigger_chat_poll_workflow():
         pass
 
 
+CHAT_DIST = os.path.join(ROOT, "frontend", "dist", "chat")   # 통합채팅 React 빌드(base /samsam/chat/)
+
+
 @app.route("/chat/")
 def chat_page():
-    return render_template("samsam_chat.html")
+    # 통합채팅 React 빌드 서빙. index.html은 문자열 반환(네비 주입 동작).
+    idx = os.path.join(CHAT_DIST, "index.html")
+    if os.path.exists(idx):
+        with open(idx, encoding="utf-8") as f:
+            return f.read()
+    return ("<h3>채팅 프론트엔드 빌드가 없습니다.</h3>"
+            "<p><code>cd frontend &amp;&amp; npm run build:chat</code> 후 새로고침하세요.</p>"), 200
+
+
+@app.route("/chat/assets/<path:filename>")
+def chat_assets(filename):
+    return send_from_directory(os.path.join(CHAT_DIST, "assets"), filename)
 
 
 @app.route("/chat/api/accounts")
