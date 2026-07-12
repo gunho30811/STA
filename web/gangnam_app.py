@@ -3,11 +3,10 @@
 수도권 네이버부동산 매물 뷰어 (Flask).
 
 naver_listings(Supabase) 를 SQL로 조회(필터·페이지네이션)해 카드 그리드 + 상세 모달로 보여준다.
-근처 삼삼(수요)은 lab/samsam_listings.jsonl 인메모리 인덱스로 부착.
+근처 삼삼(수요)은 samsam_listings(Supabase, 오피스텔) 인메모리 인덱스로 부착.
 
     python web/gangnam_app.py        # http://127.0.0.1:5002
 """
-import json
 import math
 import os
 import sys
@@ -22,7 +21,6 @@ import subway  # noqa: E402  # 역 반경 검색: 매물 lat/lng ↔ 역 좌표 
 import db  # noqa: E402  # naver_listings 를 DB에서 직접 쿼리(70MB 파일 통짜 로드 대신)
 # 역명(N역) → (lat, lng). data/subway_stations.csv(수도권 589역). '역 반경 검색' 자동완성·거리계산에 씀.
 STATION_COORDS = {f"{n}역": (y, x) for n, y, x in subway._load()}
-SAMSAM = os.path.join(ROOT, "lab", "samsam_listings.jsonl")   # 근처 삼삼(단기임대) 수요 붙이기용
 M2_PER_PYEONG = 3.305785
 
 app = Flask(__name__)
@@ -46,32 +44,31 @@ def _sam_offices():
     """동 → [삼삼 오피스텔 {occ%, pyeong, week(주당 만원), name, url}]. (시군구,동)+동 키 둘 다.
 
     네이버 매물에 '근처(같은 동)·같은 평수 삼삼 오피스텔'의 주당 평균·잘나가는/안나가는 걸
-    붙여, 삼삼엔 없어도 근처라 괜찮을지 가늠하게 한다. lab/samsam_listings.jsonl(오피스텔)로 색인."""
+    붙여, 삼삼엔 없어도 근처라 괜찮을지 가늠하게 한다. 계약=DB: samsam_listings(오피스텔)로 색인."""
     global _SAMOFF
     if _SAMOFF is not None:
         return _SAMOFF
     idx = {}
-    if os.path.exists(SAMSAM):
-        with open(SAMSAM, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    r = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if r.get("building_type") != "오피스텔":
-                    continue
-                bk, bl = r.get("booked_days_1m") or 0, r.get("blocked_days_1m") or 0
-                o = {"occ": round(min(1.0, bk / max(31 - bl, 1)) * 100, 1),
-                     "pyeong": r.get("area_pyeong"),
-                     "week": round((r.get("rent_total_weekly") or 0) / 10000, 1),
-                     "name": r.get("name") or r.get("building_name") or "",
-                     "url": r.get("url") or ""}
-                sg, dong = r.get("sigungu") or "", r.get("dong") or ""
-                for key in {(sg, dong), ("", dong)}:
-                    idx.setdefault(key, []).append(o)
+    try:
+        conn = db.connect()
+        rows = conn.execute(
+            "SELECT name, building_name, url, sigungu, dong, area_pyeong, "
+            "rent_total_weekly, booked_days_1m, blocked_days_1m "
+            "FROM samsam_listings WHERE building_type = '오피스텔'").fetchall()
+        conn.close()
+    except Exception as e:
+        print(f"[gangnam_app] 근처삼삼 DB 조회 실패({type(e).__name__}) → 빈 색인", flush=True)
+        rows = []
+    for r in rows:
+        bk, bl = r["booked_days_1m"] or 0, r["blocked_days_1m"] or 0
+        o = {"occ": round(min(1.0, bk / max(31 - bl, 1)) * 100, 1),
+             "pyeong": r["area_pyeong"],
+             "week": round((r["rent_total_weekly"] or 0) / 10000, 1),
+             "name": r["name"] or r["building_name"] or "",
+             "url": r["url"] or ""}
+        sg, dong = r["sigungu"] or "", r["dong"] or ""
+        for key in {(sg, dong), ("", dong)}:
+            idx.setdefault(key, []).append(o)
     _SAMOFF = idx
     return idx
 
