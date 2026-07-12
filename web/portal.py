@@ -65,9 +65,75 @@ box-shadow:0 10px 30px rgba(0,0,0,.25);transition:.15s}
 </div></body></html>"""
 
 
+PUBLIC_LANDING = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>삼삼수익 · 단기임대 수익성 분석</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
+background:radial-gradient(1200px 600px at 50% -10%,#1e293b,#0f172a);min-height:100vh;color:#e2e8f0}
+.nav{display:flex;justify-content:space-between;align-items:center;padding:18px 28px;max-width:1080px;margin:0 auto}
+.brand{font-size:20px;font-weight:900;color:#fff;letter-spacing:-.02em}.brand .dot{color:#60a5fa}
+.nav .cta{display:flex;gap:8px}
+.nav a{text-decoration:none;font-weight:700;font-size:14px;padding:9px 16px;border-radius:9px}
+.nav .login{color:#cbd5e1}.nav .signup{background:#2563eb;color:#fff}
+.hero{max-width:1080px;margin:0 auto;padding:60px 28px 40px;text-align:center}
+.hero .tag{display:inline-block;font-size:13px;font-weight:700;color:#93c5fd;background:rgba(37,99,235,.15);
+border:1px solid rgba(96,165,250,.3);padding:6px 14px;border-radius:999px;margin-bottom:24px}
+.hero h1{font-size:44px;line-height:1.2;font-weight:900;margin:0 0 18px;color:#fff;letter-spacing:-.03em}
+.hero h1 .hl{color:#60a5fa}
+.hero p{font-size:17px;line-height:1.7;color:#94a3b8;margin:0 auto 32px;max-width:640px}
+.hero .btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn{text-decoration:none;font-weight:800;font-size:15px;padding:14px 28px;border-radius:11px}
+.btn-primary{background:#2563eb;color:#fff;box-shadow:0 8px 24px rgba(37,99,235,.4)}
+.btn-ghost{background:rgba(255,255,255,.06);color:#e2e8f0;border:1px solid rgba(255,255,255,.14)}
+.cards{max-width:1080px;margin:20px auto 0;padding:20px 28px 70px;display:grid;
+grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+.card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:26px;text-align:left}
+.card .ic{font-size:32px}.card h3{font-size:18px;font-weight:800;color:#fff;margin:12px 0 8px}
+.card p{font-size:13.5px;color:#94a3b8;line-height:1.65;margin:0}
+.steps{max-width:1080px;margin:0 auto;padding:0 28px 40px;color:#94a3b8;font-size:14px;text-align:center}
+.steps b{color:#cbd5e1}
+.foot{text-align:center;color:#64748b;font-size:12.5px;padding:30px 20px 50px}
+@media(max-width:640px){.hero h1{font-size:32px}.hero{padding:40px 20px 30px}.nav{padding:14px 18px}}
+</style></head><body>
+<div class=nav>
+  <div class=brand>삼삼<span class=dot>수익</span></div>
+  <div class=cta>
+    <a class=login href="/auth/login">로그인</a>
+    <a class=signup href="/auth/signup">회원가입</a>
+  </div>
+</div>
+<div class=hero>
+  <span class=tag>🏠 부동산 × 삼삼엠투 단기임대</span>
+  <h1>부동산 월세 매물,<br><span class=hl>단기임대로 돌리면 얼마 벌까?</span></h1>
+  <p>네이버부동산 매물을 삼삼엠투 단기임대 데이터와 매칭해, <b>월세로 줄 때 대비 얼마나 더 버는지</b>
+     예약률·순수익까지 한눈에. 임대인·투자자를 위한 수익성 분석 도구입니다.</p>
+  <div class=btns>
+    <a class="btn btn-primary" href="/auth/signup">무료로 시작하기 →</a>
+    <a class="btn btn-ghost" href="/auth/login">로그인</a>
+  </div>
+</div>
+<div class=cards>
+  <div class=card><div class=ic>💰</div><h3>수익성 분석</h3>
+    <p>단기임대 풀가동 시 부동산 월세 대비 최대수익·기대 월순수익. 동·역별 순위로 어디가 잘 나가는지 바로.</p></div>
+  <div class=card><div class=ic>🛋️</div><h3>삼삼 데이터</h3>
+    <p>옵션별 예약률 영향, 건물 인기 랭킹, 지역 예약률 트렌드까지 — 실제 단기임대 수요를 데이터로.</p></div>
+  <div class=card><div class=ic>🏙️</div><h3>부동산 매물</h3>
+    <p>수도권(서울·경기·인천) 월세 매물을 근처 단기임대 수요와 함께. 이 집으로 운영 시 예상 순수익까지.</p></div>
+</div>
+<div class=steps>
+  처음이신가요? &nbsp;<b>회원가입</b> → <b>수익성 탭</b>에서 순수익 높은 순으로 보기 → 관심 지역을 <b>순위</b>에서 확인하면 됩니다.
+</div>
+<div class=foot>회원 전용 서비스 · 가입 후 관리자 승인 시 이용 가능</div>
+</body></html>"""
+
+
 @portal.route("/")
 def home():
-    u = current_user() or {}
+    u = current_user()
+    if not u:
+        # 미로그인: 로그인 창 대신 서비스 소개 랜딩(무슨 서비스인지 보이게 → 이탈 방지).
+        return render_template_string(PUBLIC_LANDING)
     return render_template_string(LANDING, user=u)
 
 
