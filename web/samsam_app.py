@@ -33,9 +33,9 @@ try:
 except Exception:
     pass
 SAMPLE = os.path.join(ROOT, "lab", "samsam_sample.jsonl")
-# 배포(미국 함수)에서 DB(서울) 왕복을 피하려고, export된 파일이 있으면 그걸 우선 읽는다.
-EXPORT = os.path.join(ROOT, "lab", "samsam_listings.jsonl")
-SNAP_EXPORT = os.path.join(ROOT, "lab", "samsam_snapshots.jsonl")
+# 계약=DB. 예전엔 lab/samsam_listings.jsonl(크롤 export)를 파일 우선으로 읽었지만,
+# 크롤/웹 분리로 파일 계약을 없애고 samsam_listings/samsam_snapshots 를 DB에서 직접 읽는다.
+# (DB 불가 시 합성 샘플로만 폴백.)
 
 app = Flask(__name__)
 from auth import current_user, init_auth  # noqa: E402
@@ -135,26 +135,13 @@ def _load_sample():
     return rows
 
 
-def _load_jsonl(path):
-    rows = []
-    with open(path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                rows.append(json.loads(line))
-    return rows
-
-
 def load_listings():
-    # 1순위: export 파일(빠름, DB 왕복 없음) → 2순위: DB → 3순위: 합성 샘플
-    if os.path.exists(EXPORT):
-        rows, src = _load_jsonl(EXPORT), "파일"
-    else:
-        rows = _load_db()
-        src = "DB"
-        if not rows:
-            rows = _load_sample()
-            src = "샘플(합성 프리뷰)"
+    # 계약=DB. samsam_listings 를 DB에서 직접 읽는다. DB 불가 시에만 합성 샘플로 폴백.
+    rows = _load_db()
+    src = "DB"
+    if not rows:
+        rows = _load_sample()
+        src = "샘플(합성 프리뷰)"
     rows = [_enrich(r) for r in rows]
     print(f"[samsam_app] {len(rows)}건 로드 — 출처: {src}", flush=True)
     return rows, src
@@ -568,26 +555,19 @@ def api_trend():
     sido_f = set(_multi(a, "sido"))            # 복수 시/도
     sigungu_f = set(_multi(a, "sigungu"))
     try:
-        if os.path.exists(SNAP_EXPORT):   # 파일 우선(DB 왕복 없음)
-            for r in _load_jsonl(SNAP_EXPORT):
-                if sido_f and r.get("sido") not in sido_f:
-                    continue
-                if sigungu_f and _city(r.get("sigungu")) not in sigungu_f:
-                    continue
-                rows.append(r)
-        else:
-            import db
-            conn = db.connect()
-            where, params = [], []
-            if sido_f:
-                where.append("sido = ANY(%s)"); params.append(list(sido_f))
-            if sigungu_f:
-                where.append("sigungu = ANY(%s)"); params.append(list(sigungu_f))
-            w = (" WHERE " + " AND ".join(where)) if where else ""
-            rows = [dict(r) for r in conn.execute(
-                "SELECT snapshot_date, sido, sigungu, dong, n, avg_occ_1m, avg_occ_2m, avg_occ_3m"
-                f" FROM samsam_snapshots{w}", params).fetchall()]
-            conn.close()
+        # 계약=DB: samsam_snapshots 를 직접 조회. sido는 SQL에서, 시군구는 _city 정규화가
+        # 필요해(예: '부천시 원미구'→'부천시') 파이썬에서 거른다(기존 파일 경로와 동일 의미).
+        conn = db.connect()
+        where, params = [], []
+        if sido_f:
+            where.append("sido = ANY(%s)"); params.append(list(sido_f))
+        w = (" WHERE " + " AND ".join(where)) if where else ""
+        rows = [dict(r) for r in conn.execute(
+            "SELECT snapshot_date, sido, sigungu, dong, n, avg_occ_1m, avg_occ_2m, avg_occ_3m"
+            f" FROM samsam_snapshots{w}", params).fetchall()]
+        conn.close()
+        if sigungu_f:
+            rows = [r for r in rows if _city(r.get("sigungu")) in sigungu_f]
     except Exception as e:
         return jsonify({"dates": [], "items": [], "error": str(e)[:80]})
 
