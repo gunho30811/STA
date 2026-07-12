@@ -23,7 +23,18 @@ export default function App() {
 
   useEffect(() => { getJSON('api/facets').then(setFacets).catch(() => {}) }, [])
 
-  if (!facets) return <div style={{ padding: 40, color: '#94a3b8' }}>불러오는 중…</div>
+  // 데이터를 기다리는 동안에도 헤더(뼈대)는 바로 그려 nav와 함께 뜨게 하고, 안쪽만 로딩 표시.
+  if (!facets) {
+    return (
+      <>
+        <header>
+          <h1>🛋️ 삼삼 옵션별 공실/예약률 분석</h1>
+          <p>임대인 관점 — "이 옵션 없어도 잘 나갈까?" · 옵션 <b>있는 집</b> vs <b>없는 집</b>의 평균 예약률 비교 · 최근 1달 기준</p>
+        </header>
+        <div className="wrap"><div className="panel" style={{ color: '#94a3b8' }}>데이터 불러오는 중…</div></div>
+      </>
+    )
+  }
 
   const isDb = facets.source && facets.source.startsWith('DB')
 

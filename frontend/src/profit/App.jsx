@@ -18,9 +18,8 @@ export default function App() {
 
   useEffect(() => { fetchFacets().then(setFacets).catch(() => {}) }, [])
 
-  if (!facets) return <div style={{ padding: 40, color: '#94a3b8' }}>불러오는 중…</div>
-
-  const months = facets.months || []
+  // facets를 기다리며 화면 전체를 막지 않는다 — 헤더·탭은 바로 그리고 데이터만 안쪽에서 로딩.
+  const months = facets?.months || []
 
   return (
     <>
@@ -50,9 +49,15 @@ export default function App() {
           </span>
         </div>
 
-        {tab === 'list' && <ProfitList facets={facets} month={month} />}
-        {tab === 'rank' && <RankTab month={month} />}
-        {tab === 'reco' && <RecoTab month={month} />}
+        {!facets ? (
+          <div className="panel" style={{ color: '#94a3b8' }}>데이터 불러오는 중…</div>
+        ) : (
+          <>
+            {tab === 'list' && <ProfitList facets={facets} month={month} />}
+            {tab === 'rank' && <RankTab month={month} />}
+            {tab === 'reco' && <RecoTab month={month} />}
+          </>
+        )}
       </div>
     </>
   )
