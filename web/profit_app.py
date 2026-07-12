@@ -319,6 +319,29 @@ def api_rank():
     return jsonify({"dong": _agg(_group("dong", rows)), "station": _agg(_group("station", rows))})
 
 
+@app.route("/api/rank_detail")
+def api_rank_detail():
+    """순위(동/역) 한 행의 '근거 매물' 목록 — 그 동/역을 이루는 삼삼 매물과 각자의 부동산 매칭(QA #8).
+    사용자가 순위 수치가 어떤 매물들로 산출됐는지 직접 확인하게 한다. rooms/month는 순위와 동일하게 반영."""
+    a = request.args
+    field = "dong" if a.get("field") == "dong" else "station"
+    label = a.get("label", "")
+    rows = _rows_for(a)
+    items = _group(field, rows).get(label, [])
+    out = [{
+        "name": x.get("name") or "",
+        "area": f"{x.get('sigungu','')} {x.get('dong','')}".strip(),
+        "station": x.get("station") or "", "pyeong": x.get("pyeong"),
+        "wk": x.get("wk"), "occ": x.get("occ"),
+        "expNet": x.get("expNet"), "net": x.get("net"), "maxRev": x.get("maxRev"),
+        "matches": x.get("matches"),
+        "nRent": x.get("nRent"), "nDep": x.get("nDep"), "nTotal": x.get("nTotal"),
+        "samUrl": x.get("samUrl") or "", "naverUrl": x.get("naverUrl") or "",
+    } for x in items]
+    out.sort(key=lambda r: -(r["expNet"] if r["expNet"] is not None else -1e9))
+    return jsonify({"label": label, "field": field, "total": len(out), "items": out})
+
+
 @app.route("/api/recommend")
 def api_recommend():
     """신규진입 추천(블루오션): 수요(예약률) 있고 기대 월순수익 좋은데 경쟁 삼삼 매물이 적은 동/역/오피스텔.

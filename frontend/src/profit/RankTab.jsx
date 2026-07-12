@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { fetchRank, fmt as n, fmtComp } from '../shared/api.js'
+import RankDetailModal from './RankDetailModal.jsx'
 
 const RANK_COLS = [
   { k: 'rk', t: '#', s: false },
@@ -17,6 +18,7 @@ export default function RankTab({ month }) {
   const [minMatch, setMinMatch] = useState('0')
   const [maxComp, setMaxComp] = useState('')
   const [data, setData] = useState(null)
+  const [detail, setDetail] = useState(null)   // { field, label } — 클릭한 순위 행(근거 매물 모달)
 
   const load = useCallback(async () => {
     setData(await fetchRank({ rooms, month }))
@@ -28,7 +30,7 @@ export default function RankTab({ month }) {
     <div>
       <p className="legend" style={{ margin: '0 0 10px' }}>
         <b>기대 월순수익</b>(예약률 반영) 높은 순 = 실제로 가장 많이 남는 곳. <b>경쟁</b>=그 지역 삼삼 매물수 ·
-        <b>매칭수</b>=부동산 매칭 표본 · 동은 <b>시군구</b>로 구분. 헤더 클릭 정렬.
+        <b>매칭수</b>=부동산 매칭 표본 · 동은 <b>시군구</b>로 구분. 헤더 클릭 정렬 · <b>행 클릭 시 그 동/역의 근거 매물</b> 확인.
       </p>
       <div className="panel" style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 10 }}>
         <div className="fg"><label>🛏️ 방 타입</label>
@@ -40,14 +42,20 @@ export default function RankTab({ month }) {
         <div className="fg"><label>최대 경쟁 ≤</label><input type="number" value={maxComp} placeholder="비우면 전체" style={{ minWidth: 130 }} onChange={(e) => setMaxComp(e.target.value)} /></div>
       </div>
       <div className="rankwrap">
-        <RankPanel title="🏘️ 동별 베스트" rows={data?.dong} minMatch={minMatch} maxComp={maxComp} />
-        <RankPanel title="🚇 역별 베스트" rows={data?.station} minMatch={minMatch} maxComp={maxComp} />
+        <RankPanel title="🏘️ 동별 베스트" rows={data?.dong} minMatch={minMatch} maxComp={maxComp}
+          onOpenDetail={(label) => setDetail({ field: 'dong', label })} />
+        <RankPanel title="🚇 역별 베스트" rows={data?.station} minMatch={minMatch} maxComp={maxComp}
+          onOpenDetail={(label) => setDetail({ field: 'station', label })} />
       </div>
+      {detail && (
+        <RankDetailModal field={detail.field} label={detail.label} month={month} rooms={rooms}
+          onClose={() => setDetail(null)} />
+      )}
     </div>
   )
 }
 
-function RankPanel({ title, rows, minMatch, maxComp }) {
+function RankPanel({ title, rows, minMatch, maxComp, onOpenDetail }) {
   const [kw, setKw] = useState('')
   const [sort, setSort] = useState({ col: 'expNet', dir: 'desc' })
   const list = rows || []
@@ -96,7 +104,7 @@ function RankPanel({ title, rows, minMatch, maxComp }) {
               const zeroOcc = r.occ == null || r.occ === 0
               const ec = r.expNet == null ? '' : r.expNet >= 0 ? 'pos' : 'neg'
               return (
-                <tr key={r.name}>
+                <tr key={r.name} onClick={() => onOpenDetail && onOpenDetail(r.name)} title="클릭 — 이 순위의 근거 매물 보기">
                   <td style={{ fontWeight: 800, fontSize: i < 3 ? 15 : 12 }}>{medal(i + 1)}</td>
                   <td className="l" style={{ fontWeight: 600 }}>{r.name}
                     {r.n != null && r.n <= 2 && <span title="매칭 표본 1~2건 — 순위·순수익 신뢰도 낮음" style={{ marginLeft: 5, fontSize: 10, fontWeight: 700, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 5px' }}>표본부족</span>}
