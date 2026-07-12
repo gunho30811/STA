@@ -9,7 +9,8 @@ data/*.jsonl
 # gangnam이 DB 조회로 전환돼 더는 안 씀(export_jsonl.py가 재생성해도 커밋 안 함)
 lab/naver_listings.jsonl
 
-# 런타임 로그 · 프론트 빌드 산출물/의존성
+# 런타임 로그 · 프론트 의존성
 *.log
 frontend/node_modules/
-frontend/dist/
+# frontend/dist 는 커밋한다 — Vercel(Python 서버리스)이 이 정적 산출물을 그대로 서빙하므로.
+# (프론트 수정 시 `npm run build` 후 dist 변경분도 함께 커밋)

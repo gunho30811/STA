@@ -1,4 +1,4 @@
 node_modules/
-dist/
 *.local
 .vite/
+# dist/ 는 커밋한다(Vercel Python 서버리스가 이 정적 산출물을 서빙).
