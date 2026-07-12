@@ -176,6 +176,7 @@
 let TREE={}, ITEMS=[], curSort={col:"expNet",dir:"desc"}, selId=null;
 const COLS=[
   {k:"name",t:"매물명 / 건물",l:true},
+  {k:"sido",t:"시/도",l:true},
   {k:"dong",t:"동",l:true},
   {k:"station",t:"역",l:true},
   {k:"pyeong",t:"평"},
@@ -237,13 +238,13 @@ async function search(page){
 }
 function renderRows(){
   const tb=document.getElementById('tbody');tb.innerHTML='';
-  if(!ITEMS.length){tb.innerHTML='<tr><td colspan="8" class="d-empty">조건에 맞는 매물 없음</td></tr>';return;}
+  if(!ITEMS.length){tb.innerHTML='<tr><td colspan="9" class="d-empty">조건에 맞는 매물 없음</td></tr>';return;}
   ITEMS.forEach(x=>{
     const tr=document.createElement('tr');if(x.id===selId)tr.className='on';
     const ec=(x.expNet!=null&&x.expNet>=0)?'pos':'neg';
     const oc=(x.occ==null||x.occ===0)?'style="color:#dc2626;font-weight:700"':'class="occ"';
     tr.innerHTML=`<td class="l"><span class="name">${x.name||''}</span><br><span class="sub">${x.bldg||''}</span></td>
-      <td class="l">${x.dong||''}</td><td class="l">${x.station||'-'}</td><td>${n(x.pyeong)}</td>
+      <td class="l">${x.sido||''}</td><td class="l">${x.dong||''}</td><td class="l">${x.station||'-'}</td><td>${n(x.pyeong)}</td>
       <td class="${ec}" style="font-weight:800">${n(x.expNet)}</td><td ${oc}>${n(x.occ)}%</td>
       <td style="color:#94a3b8">${n(x.net)}</td><td style="color:#94a3b8">${n(x.maxRev)}</td>`;
     tr.onclick=()=>{selId=x.id;renderRows();showDetail(x);};

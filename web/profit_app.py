@@ -17,10 +17,11 @@ import json
 import os
 import statistics
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_from_directory
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "data")
+DIST = os.path.join(ROOT, "frontend", "dist")   # React(Vite) 빌드 산출물
 app = Flask(__name__, template_folder=os.path.join(ROOT, "templates"))
 from auth import init_auth  # noqa: E402
 init_auth(app)
@@ -111,7 +112,19 @@ def P():
 
 @app.route("/")
 def index():
-    return render_template("profit.html")
+    # React(Vite) 빌드를 서빙. 빌드 전이면(개발 중 dist 없음) 안내.
+    idx = os.path.join(DIST, "index.html")
+    if os.path.exists(idx):
+        return send_from_directory(DIST, "index.html")
+    return ("<h3>프론트엔드 빌드가 없습니다.</h3>"
+            "<p><code>cd frontend &amp;&amp; npm run build</code> 후 새로고침하세요. "
+            "(개발 중이면 <code>npm run dev</code> → http://localhost:5173/profit/)</p>"), 200
+
+
+@app.route("/assets/<path:filename>")
+def assets(filename):
+    # Vite 빌드 에셋(js/css). base='/profit/'라 브라우저는 /profit/assets/* 로 요청 → 여기로 들어옴.
+    return send_from_directory(os.path.join(DIST, "assets"), filename)
 
 
 @app.route("/api/facets")
