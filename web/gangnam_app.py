@@ -162,31 +162,53 @@ def assets(filename):
 
 @app.route("/api/facets")
 def api_facets():
+    # 첫 화면을 막지 않게 '가벼운 것만' 준다. 지역 트리는 /api/regions 로 lazy,
+    # 업무용 매물수(느린 ILIKE 스캔)는 /api/office_count 로 async 로 뺐다.
     conn = db.connect()
     try:
-        dongs = [r[0] for r in conn.execute(
-            "SELECT DISTINCT dong FROM naver_listings "
-            "WHERE dong IS NOT NULL AND dong <> '' ORDER BY dong").fetchall()]
-        # 지역 트리: (sido, 시/군, 구, dong) distinct — 시·구는 SQL에서 분리
-        regions = [list(r) for r in conn.execute(
-            f"SELECT DISTINCT COALESCE(sido, ''), {_SI_SQL}, {_GU_SQL}, dong "
-            "FROM naver_listings WHERE dong IS NOT NULL AND dong <> '' "
-            "ORDER BY 1, 2, 3, 4").fetchall()]
+        sidos = [r[0] for r in conn.execute(
+            "SELECT DISTINCT sido FROM naver_listings "
+            "WHERE sido IS NOT NULL AND sido <> '' ORDER BY sido").fetchall()]
         present = {r[0] for r in conn.execute(
             "SELECT DISTINCT building_type_code FROM naver_listings").fetchall()}
-        total = conn.execute("SELECT COUNT(*) FROM naver_listings").fetchone()[0]
+    finally:
+        conn.close()
+    types = [{"code": c, "name": TYPE_NAMES.get(c, c)}
+             for c in ["APT", "OPST", "VL", "OR", "DDDGG", "SG"] if c in present]
+    return jsonify({"sido": sidos, "types": types,
+                    "stations": sorted(STATION_COORDS.keys())})
+
+
+@app.route("/api/regions")
+def api_regions():
+    """특정 시/도의 (시군구→동) 트리만 lazy 로드 — 지역 드롭다운을 처음부터 다 보내지 않으려고."""
+    sido = request.args.get("sido", "").strip()
+    if not sido:
+        return jsonify([])
+    conn = db.connect()
+    try:
+        rows = [list(r) for r in conn.execute(
+            f"SELECT DISTINCT {_SI_SQL}, {_GU_SQL}, dong FROM naver_listings "
+            "WHERE sido = %s AND dong IS NOT NULL AND dong <> '' ORDER BY 1, 2, 3",
+            [sido]).fetchall()]
+    finally:
+        conn.close()
+    return jsonify(rows)   # [[시/군, 구, 동], ...]
+
+
+@app.route("/api/office_count")
+def api_office_count():
+    """업무용 오피스텔 수 — summary ILIKE 전체 스캔이라 느려서 facets에서 빼 async로 분리."""
+    conn = db.connect()
+    try:
         office_kw = " OR ".join(["summary ILIKE %s"] * len(OFFICE_KW))
-        office_n = conn.execute(
+        n = conn.execute(
             f"SELECT COUNT(*) FROM naver_listings "
             f"WHERE building_type_code = 'OPST' AND ({office_kw})",
             [f"%{k}%" for k in OFFICE_KW]).fetchone()[0]
     finally:
         conn.close()
-    types = [{"code": c, "name": TYPE_NAMES.get(c, c)}
-             for c in ["APT", "OPST", "VL", "OR", "DDDGG", "SG"] if c in present]
-    return jsonify({"dongs": dongs, "regions": regions, "types": types,
-                    "stations": sorted(STATION_COORDS.keys()),
-                    "total": total, "office": office_n})
+    return jsonify({"office": n})
 
 
 @app.route("/api/stats")
