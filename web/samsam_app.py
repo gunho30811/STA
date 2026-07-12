@@ -21,7 +21,7 @@ import sys
 from datetime import datetime
 
 import requests
-from flask import Flask, jsonify, render_template, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -37,7 +37,7 @@ SAMPLE = os.path.join(ROOT, "lab", "samsam_sample.jsonl")
 EXPORT = os.path.join(ROOT, "lab", "samsam_listings.jsonl")
 SNAP_EXPORT = os.path.join(ROOT, "lab", "samsam_snapshots.jsonl")
 
-app = Flask(__name__, template_folder=os.path.join(ROOT, "templates"))
+app = Flask(__name__)
 from auth import current_user, init_auth  # noqa: E402
 init_auth(app)
 

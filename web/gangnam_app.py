@@ -12,7 +12,7 @@ import json
 import os
 import sys
 
-from flask import Flask, jsonify, render_template, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST = os.path.join(ROOT, "frontend", "dist", "gangnam")   # React(Vite) 빌드 산출물
@@ -25,7 +25,7 @@ DATA = os.path.join(ROOT, "lab", "naver_listings.jsonl")
 SAMSAM = os.path.join(ROOT, "lab", "samsam_listings.jsonl")   # 근처 삼삼(단기임대) 수요 붙이기용
 M2_PER_PYEONG = 3.305785
 
-app = Flask(__name__, template_folder=os.path.join(ROOT, "templates"))
+app = Flask(__name__)
 from auth import init_auth  # noqa: E402
 init_auth(app)
 

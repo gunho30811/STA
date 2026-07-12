@@ -5,3 +5,8 @@ data/config.json
 .claude/
 data/*.db
 data/*.jsonl
+
+# 런타임 로그 · 프론트 빌드 산출물/의존성
+*.log
+frontend/node_modules/
+frontend/dist/
