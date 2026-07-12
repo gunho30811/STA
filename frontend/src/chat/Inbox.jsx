@@ -18,7 +18,7 @@ export default function Inbox({ rooms, onReloadRooms }) {
   // 방 열기: 메시지 로드 → 서버가 읽음 처리하므로 방 목록도 갱신
   const openRoom = useCallback(async (id) => {
     setCurRoom(id)
-    const res = await getJSON(`api/rooms/${id}/messages`)
+    const res = await getJSON(`api/rooms/${id}/messages`, { ttl: 0 })
     if (res.error) {
       setThread(null)
       return

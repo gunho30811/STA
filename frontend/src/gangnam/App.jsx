@@ -22,20 +22,33 @@ export default function App() {
 
   const [res, setRes] = useState({ items: [], total: 0, page: 1, pages: 1 })
   const [modal, setModal] = useState(null)
+  const [regionTree, setRegionTree] = useState({})   // 시/도 → [[시군, 구, 동]] lazy 캐시
+  const [officeCount, setOfficeCount] = useState(null)
 
-  const regions = facets?.regions || []
   const stationSet = useMemo(() => new Set(facets?.stations || []), [facets])
 
   useEffect(() => {
     getJSON('api/facets').then(setFacets).catch(() => {})
     getJSON('api/stats').then(setStats).catch(() => {})
+    // 업무용 매물수(느린 ILIKE)는 첫 화면 막지 않게 따로 비동기로.
+    getJSON('api/office_count').then((d) => setOfficeCount(d.office)).catch(() => {})
   }, [])
 
-  // 종속 드롭다운 옵션
-  const sidos = uniq(regions.map((r) => r[0]))
-  const siguns = uniq(regions.filter((r) => !casc.sido || r[0] === casc.sido).map((r) => r[1]))
-  const gus = uniq(regions.filter((r) => (!casc.sido || r[0] === casc.sido) && (!casc.sigun || r[1] === casc.sigun)).map((r) => r[2]))
-  const dongs = uniq(regions.filter((r) => (!casc.sido || r[0] === casc.sido) && (!casc.sigun || r[1] === casc.sigun) && (!casc.gu || r[2] === casc.gu)).map((r) => r[3]))
+  // 지역 트리는 처음부터 다 안 받고, 시/도를 고르면 그 시/도의 (시군구→동)만 lazy 로드해 캐시.
+  useEffect(() => {
+    const sido = casc.sido
+    if (!sido || regionTree[sido]) return
+    getJSON('api/regions?sido=' + encodeURIComponent(sido))
+      .then((rows) => setRegionTree((t) => ({ ...t, [sido]: rows })))
+      .catch(() => {})
+  }, [casc.sido, regionTree])
+
+  // 종속 드롭다운 옵션 — 현재 시/도의 서브트리(로딩 전이면 빈 배열)
+  const sidos = facets?.sido || []
+  const subtree = regionTree[casc.sido] || []          // [[시군, 구, 동], ...]
+  const siguns = uniq(subtree.map((r) => r[0]))
+  const gus = uniq(subtree.filter((r) => !casc.sigun || r[0] === casc.sigun).map((r) => r[1]))
+  const dongs = uniq(subtree.filter((r) => (!casc.sigun || r[0] === casc.sigun) && (!casc.gu || r[1] === casc.gu)).map((r) => r[2]))
 
   const doSearch = useCallback(async (page) => {
     const p = new URLSearchParams()
@@ -238,7 +251,7 @@ export default function App() {
             <div className="fg"><label>🏢 업무용</label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, cursor: 'pointer', padding: '7px 0' }}>
                 <input type="checkbox" checked={f.office} onChange={(e) => { const office = e.target.checked; setF({ ...f, office }); }} /> 업무용 오피스텔만
-                <span style={{ fontWeight: 400 }}>{facets.office != null ? `(${facets.office.toLocaleString()}건)` : ''}</span>
+                <span style={{ fontWeight: 400 }}>{officeCount != null ? `(${officeCount.toLocaleString()}건)` : ''}</span>
               </label></div>
             <div className="fg"><label>&nbsp;</label><button className="btn btn-go" onClick={() => doSearch(1)}>검색</button></div>
             <div className="fg"><label>&nbsp;</label><button className="btn btn-reset" onClick={reset}>초기화</button></div>

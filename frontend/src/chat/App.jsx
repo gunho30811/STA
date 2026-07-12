@@ -9,12 +9,13 @@ export default function App() {
   const [rooms, setRooms] = useState([])
   const [refreshing, setRefreshing] = useState(false)
 
+  // 채팅은 항상 신선해야 하므로 캐시 끔(ttl:0)
   const loadAccounts = useCallback(async () => {
-    setAccounts(await getJSON('api/accounts'))
+    setAccounts(await getJSON('api/accounts', { ttl: 0 }))
   }, [])
 
   const loadRooms = useCallback(async () => {
-    setRooms(await getJSON('api/rooms'))
+    setRooms(await getJSON('api/rooms', { ttl: 0 }))
   }, [])
 
   // 계정/방이 바뀌면 둘 다 다시 로드
