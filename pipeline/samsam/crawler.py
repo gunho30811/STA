@@ -30,6 +30,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 sys.path.insert(0, BASE_DIR)
 sys.path.insert(0, os.path.join(BASE_DIR, 'pipeline', 'naver'))
 sys.path.insert(0, os.path.join(BASE_DIR, 'pipeline', 'samsam'))   # deploy_lab의 export_jsonl import용
+sys.path.insert(0, os.path.join(BASE_DIR, 'common'))   # subway 등 공용 유틸(sta-common 예정)
 
 import db
 from subway import stations_within

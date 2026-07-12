@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-좌표 → 최근접 지하철역 계산.
+좌표 → 최근접 지하철역 계산. (웹앱·크롤 공용 — 순수 지오 유틸)
 
 네이버 상세 API는 지하철 '도보 N분'만 주고 역명/거리(m)는 안 준다(역명/미터는
 신플랫폼 fin.land 의 로그인 전용 front-api 에만 있음). 그래서 매물 좌표(lat/lng)와
@@ -8,15 +8,17 @@
 
 사용:
   from subway import nearest_station, stations_within
-  nearest_station(37.50834, 127.038279)   # -> {'station':'언주', 'distance_m':406}
+  nearest_station(37.50834, 127.038279)   # -> {'station':'언주역', 'distance_m':406}
   stations_within(lat, lng, 500)          # 반경 내 역명 리스트
 """
 import csv
 import os
 from math import radians, sin, cos, asin, sqrt
 
-_DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__)))), "data", "subway_stations.csv")
+# 이 파일은 common/ 아래 → 레포 루트는 한 단계 위. data/subway_stations.csv 참조.
+_DATA = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "data", "subway_stations.csv")
 _STATIONS = None
 
 
