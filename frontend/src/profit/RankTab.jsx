@@ -37,7 +37,7 @@ export default function RankTab({ month }) {
           </select>
         </div>
         <div className="fg"><label>최소 매칭수 ≥</label><input type="number" value={minMatch} onChange={(e) => setMinMatch(e.target.value)} /></div>
-        <div className="fg"><label>최대 경쟁 ≤</label><input type="number" value={maxComp} placeholder="비우면 전체" onChange={(e) => setMaxComp(e.target.value)} /></div>
+        <div className="fg"><label>최대 경쟁 ≤</label><input type="number" value={maxComp} placeholder="비우면 전체" style={{ minWidth: 130 }} onChange={(e) => setMaxComp(e.target.value)} /></div>
       </div>
       <div className="rankwrap">
         <RankPanel title="🏘️ 동별 베스트" rows={data?.dong} minMatch={minMatch} maxComp={maxComp} />

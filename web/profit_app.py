@@ -73,11 +73,16 @@ def load_profit():
             # 수집 윈도우가 오늘~+30일 = 31일(양끝 포함)이라 분모도 31. 예약일+막힘일 ≤ 31 이라 ≤100%.
             avail = max(31 - bl, 1)
             o["occ"] = min(100.0, round(bk / avail * 100, 1))   # 예약률(%)
+            # 실현매출 = 최대수익(풀가동 월매출) × 예약률. 이렇게 정의해야 예약률 100%일 때
+            # 실현매출=최대수익, 기대월순수익=풀가동순수익으로 일치한다(세 지표의 일수 기준 불일치 해소).
+            # (CSV의 1달실현수익_만원은 30/7 기준이라 100%에서도 최대수익과 어긋나 파생값으로 덮어씀.)
+            if o.get("maxRev") is not None:
+                o["realRev"] = round(o["maxRev"] * o["occ"] / 100, 1)
             if o.get("maxRev") is not None and o.get("nTotal") is not None:
                 o["net"] = round(o["maxRev"] - o["nTotal"], 1)  # 순수익(풀가동 상한: 최대−월총)
             else:
                 o["net"] = None
-            # 기대 월순수익 = 실현매출(예약률 반영, 주당/7×예약일) − 네이버월총. 예약률 0%면 −월총(손해).
+            # 기대 월순수익 = 실현매출(예약률 반영) − 네이버월총. 예약률 0%면 −월총(손해).
             if o.get("realRev") is not None and o.get("nTotal") is not None:
                 o["expNet"] = round(o["realRev"] - o["nTotal"], 1)
             else:
@@ -262,21 +267,28 @@ def _rows_for(a):
         bk, bl, days = mo.get("bk") or 0, mo.get("bl") or 0, mo.get("days") or 30
         y = dict(x)
         y["occ"] = min(100.0, round(bk / max(days - bl, 1) * 100, 1))
-        y["realRev"] = round((y.get("wk") or 0) / 7 * bk, 1)   # 그 달 실현매출 = 일주당/7 × 예약일
+        # 그 달 실현매출 = 최대수익 × 그 달 예약률 (전체 경로와 동일 정의 — 100%면 실현=최대).
+        y["realRev"] = round((y.get("maxRev") or 0) * y["occ"] / 100, 1)
         y["expNet"] = round(y["realRev"] - y["nTotal"], 1) if y.get("nTotal") is not None else None
         out.append(y)
     return out
 
 
+# 순위 라벨에서 서울/인천은 시군구가 '강남구'처럼 구만이라 어느 시인지 안 보임(QA #4).
+# → 시/도를 축약해 앞에 붙인다. 경기는 시군구에 이미 시(수원시)가 들어 있어 '경기 수원시 …'가 됨.
+_SIDO_SHORT = {"서울특별시": "서울", "경기도": "경기", "인천광역시": "인천"}
+
+
 def _group(field_or_key, rows=None):
-    """rows(기본 P())를 동(시군구+동)/역 단위로 묶는다. dong은 구 다르면 분리(같은 동명 병합 방지)."""
+    """rows(기본 P())를 동(시도+시군구+동)/역 단위로 묶는다. dong은 구 다르면 분리(같은 동명 병합 방지)."""
     by = {}
     for x in (P() if rows is None else rows):
         if field_or_key == "dong":
             sg, dg = x.get("sigungu") or "", x.get("dong") or ""
             if not dg:
                 continue
-            by.setdefault(f"{sg} {dg}".strip(), []).append(x)
+            sido = _SIDO_SHORT.get(x.get("sido") or "", x.get("sido") or "")
+            by.setdefault(f"{sido} {sg} {dg}".strip(), []).append(x)
         else:
             k = x.get(field_or_key) or ""
             if not k:
@@ -342,6 +354,7 @@ def api_recommend():
             "name": x.get("name") or "", "dong": f"{x.get('sigungu','')} {x.get('dong','')}".strip(),
             "station": x.get("station") or "", "pyeong": x.get("pyeong"),
             "comp": comp, "occ": x["occ"], "net": x["net"], "expNet": x["expNet"], "maxRev": x.get("maxRev"),
+            "matches": x.get("matches"),   # 부동산 매칭 표본수(신뢰도) — QA #11
             "score": score(x["expNet"], comp),
             "samUrl": x.get("samUrl") or "", "naverUrl": x.get("naverUrl") or "",
         })

@@ -205,7 +205,9 @@ def build_rows(sam, nav, max_deposit=None):
         blocked = s['blocked_days_1m'] or 0
         avail = max(31 - blocked, 1)   # 수집 윈도우 오늘~+30일=31일(양끝 포함) → 예약률 ≤100%
         occ = min(1.0, booked / avail)
-        realized = round(sam_week * occ * 30 / 7, 1)
+        # 실현매출 = 월환산매출(최대수익) × 예약률. 예약률 100%면 실현=최대(풀가동 상한과 일치).
+        # (예전 sam_week×occ×30/7 은 30일 기준이라 4.345주 기준 최대수익과 어긋났음.)
+        realized = round(sam_month * occ, 1)
 
         bldg_rents = [nv['rent_monthly'] for nv in bldg_all if nv['rent_monthly']]
         bldg_cnt = len(bldg_all)
