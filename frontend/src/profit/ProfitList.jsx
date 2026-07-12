@@ -22,7 +22,7 @@ const DEFAULTS = {
   occ_min: '20', dongocc_min: '', dep_max: '', pyeong_min: '', pyeong_max: '',
 }
 
-export default function ProfitList({ facets, month }) {
+export default function ProfitList({ facets, month, demo = false, onSignup }) {
   const [f, setF] = useState(DEFAULTS)
   const [sort, setSort] = useState({ col: 'expNet', dir: 'desc' })
   const [res, setRes] = useState({ items: [], summary: {}, total: 0, page: 1, pages: 1 })
@@ -78,6 +78,12 @@ export default function ProfitList({ facets, month }) {
         <Card lbl="예약률 중앙값" val={<>{n(s.occ_med)}<small> %</small></>} cls="occ" />
       </div>
 
+      {demo ? (
+        <div className="panel" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', background: '#f8fafc' }}>
+          <span style={{ fontSize: 13.5, color: '#475569' }}>🔒 지역·건물유형·순수익·평수 등 <b>상세 필터는 회원 전용</b>이에요.</span>
+          <button className="btn btn-go" onClick={onSignup}>회원가입하고 필터 쓰기 →</button>
+        </div>
+      ) : (
       <div className="panel">
         <div className="filters">
           <Sel label="시/도" value={f.sido} onChange={(v) => setF((st) => ({ ...st, sido: v, sigungu: '', dong: '' }))} opts={facets.sido || []} />
@@ -113,6 +119,7 @@ export default function ProfitList({ facets, month }) {
           기본값으로 <b>예약률 20% 이상</b>만 보여줍니다. 전체를 보려면 <b>예약률 ≥</b> 칸을 비우고 검색하세요.
         </div>
       </div>
+      )}
 
       <div className="md">
         <div className="listcol">
@@ -133,7 +140,8 @@ export default function ProfitList({ facets, month }) {
                 const ec = x.expNet != null && x.expNet >= 0 ? 'pos' : 'neg'
                 const zeroOcc = x.occ == null || x.occ === 0
                 return (
-                  <tr key={x.id} className={x.id === sel?.id ? 'on' : ''} onClick={() => setSel(x)}>
+                  <tr key={x.id} className={x.id === sel?.id ? 'on' : ''} onClick={() => (demo ? onSignup() : setSel(x))}
+                    title={demo ? '상세는 회원 전용 — 클릭 시 회원가입' : ''}>
                     <td className="l"><span className="name">{x.name || ''}</span><br /><span className="sub">{x.bldg || ''}</span></td>
                     <td className="l">{x.sido || ''}</td>
                     <td className="l">{x.dong || ''}</td>
@@ -149,9 +157,17 @@ export default function ProfitList({ facets, month }) {
             </tbody>
           </table>
         </div>
-        <Detail item={sel} />
+        {!demo && <Detail item={sel} />}
       </div>
-      <Pager page={res.page} pages={res.pages} onGo={(p) => doSearch(p)} />
+      {demo ? (
+        <div className="panel" style={{ textAlign: 'center', padding: '24px 16px', background: 'linear-gradient(180deg,#fff,#f1f5f9)' }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: '#1e293b' }}>🔒 {n(res.locked)}개 매물이 더 있어요</div>
+          <div style={{ fontSize: 13, color: '#64748b', margin: '6px 0 14px' }}>회원가입하면 전체 매물 · 지역/순수익 필터 · 상세 · 순위 · 신규진입 추천까지 전부 무료로.</div>
+          <button className="btn btn-go" style={{ padding: '12px 26px', fontSize: 15 }} onClick={onSignup}>무료 회원가입하고 전체 보기 →</button>
+        </div>
+      ) : (
+        <Pager page={res.page} pages={res.pages} onGo={(p) => doSearch(p)} />
+      )}
     </div>
   )
 }

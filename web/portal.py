@@ -110,7 +110,7 @@ grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
      예약률·순수익까지 한눈에. 임대인·투자자를 위한 수익성 분석 도구입니다.</p>
   <div class=btns>
     <a class="btn btn-primary" href="/auth/signup">무료로 시작하기 →</a>
-    <a class="btn btn-ghost" href="/auth/login">로그인</a>
+    <a class="btn btn-ghost" href="/profit/">🔍 데모 둘러보기</a>
   </div>
 </div>
 <div class=cards>

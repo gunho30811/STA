@@ -20,6 +20,14 @@ export default function App() {
 
   // facets를 기다리며 화면 전체를 막지 않는다 — 헤더·탭은 바로 그리고 데이터만 안쪽에서 로딩.
   const months = facets?.months || []
+  const demo = facets?.demo === true   // 미로그인 데모 모드(일부만 공개 → 회원가입 유도)
+  const goSignup = () => { window.location.href = '/auth/signup' }
+
+  // 데모에서는 매물 탭만 열람 가능, 순위/추천은 회원 전용.
+  const onTab = (id) => {
+    if (demo && id !== 'list') { goSignup(); return }
+    setTab(id)
+  }
 
   return (
     <>
@@ -28,9 +36,19 @@ export default function App() {
         <p>삼삼 단기임대 풀가동 시 부동산 장기월세 대비 최대수익·순수익 + 동/역 수요(예약률) · 단위 만원 · 행 클릭 시 오른쪽 상세</p>
       </header>
 
+      {demo && (
+        <div style={{ background: '#1e293b', color: '#e2e8f0', padding: '10px 22px', fontSize: 13.5, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <span>🔒 <b>데모</b> — 지금은 기대 월순수익 상위 일부만 보여요. 회원가입하면 <b>전체 매물 · 필터 · 순위 · 신규진입 추천</b>까지 전부.</span>
+          <a href="/auth/signup" style={{ background: '#2563eb', color: '#fff', textDecoration: 'none', fontWeight: 800, padding: '7px 16px', borderRadius: 8 }}>무료 회원가입 →</a>
+        </div>
+      )}
+
       <div className="tabs">
         {TABS.map((t) => (
-          <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>{t.label}</button>
+          <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => onTab(t.id)}
+            title={demo && t.id !== 'list' ? '회원 전용 — 클릭 시 회원가입' : ''}>
+            {t.label}{demo && t.id !== 'list' ? ' 🔒' : ''}
+          </button>
         ))}
       </div>
 
@@ -53,7 +71,7 @@ export default function App() {
           <div className="panel" style={{ color: '#94a3b8' }}>데이터 불러오는 중…</div>
         ) : (
           <>
-            {tab === 'list' && <ProfitList facets={facets} month={month} />}
+            {tab === 'list' && <ProfitList facets={facets} month={month} demo={demo} onSignup={goSignup} />}
             {tab === 'rank' && <RankTab month={month} />}
             {tab === 'reco' && <RecoTab month={month} />}
           </>
