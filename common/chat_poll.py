@@ -13,9 +13,10 @@ import datetime
 import os
 import sys
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, BASE_DIR)
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# 이 파일은 common/ 아래 → 레포 루트는 한 단계 위(db 등은 루트에 있음).
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, BASE_DIR)                                    # db(루트)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # chat_auth·crypto_util(common)
 
 from dotenv import load_dotenv
 

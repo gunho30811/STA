@@ -42,7 +42,8 @@ from auth import current_user, init_auth  # noqa: E402
 init_auth(app)
 
 # 삼삼 통합 채팅: 계정 연결(Playwright 1회 로그인) + 폴링 결과 조회.
-sys.path.insert(0, os.path.join(ROOT, "pipeline", "samsam"))
+# chat_* / crypto_util 은 채팅(실시간 웹 서비스) 코드라 common/ 에 둔다(순수 크롤은 pipeline).
+sys.path.insert(0, os.path.join(ROOT, "common"))
 import chat_auth  # noqa: E402
 import chat_poll  # noqa: E402
 import crypto_util  # noqa: E402
