@@ -395,6 +395,23 @@ def init_db(force=False):
         PRIMARY KEY (snapshot_date, sido, sigungu, dong, building_type)
     )""")
     conn.execute("ALTER TABLE samsam_snapshots ADD COLUMN IF NOT EXISTS avg_occ_2m REAL")
+    # 삼삼×네이버 통합 수익성 매칭 결과. 예전엔 data/net_profit_integrated.csv 파일로 주고받았으나
+    # 크롤/웹 분리(계약=DB)로 이 테이블에 적재한다. 컬럼명은 웹(profit_app) 내부 짧은키와 동일.
+    # 크롤 파이프라인(build_integrated → export_net_profit)이 upsert, 웹은 SELECT.
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS net_profit (
+        id          BIGINT PRIMARY KEY,      -- 삼삼ID(room_id)
+        name        TEXT,   btype   TEXT,   rooms   TEXT,
+        sido        TEXT,   sigungu TEXT,   dong    TEXT,   station TEXT,
+        dongCnt     REAL,   samBldg REAL,   pyeong  REAL,
+        wk          REAL,   maxRev  REAL,   realRev REAL,
+        bk          REAL,   bl      REAL,
+        nRent       REAL,   nDep    REAL,   nEquiv  REAL,   nMgmt   REAL,
+        mgmtFlag    TEXT,   nTotal  REAL,   matches REAL,   mult    REAL,
+        bldgCnt     REAL,   bldgRentMin REAL, bldgRentMed REAL, bldgRentMax REAL,
+        bldg        TEXT,   naverUrl TEXT,  samUrl  TEXT,   monthOcc TEXT,
+        phone       TEXT,   office  TEXT,   repRent REAL,   repDep  REAL,   repFloor TEXT
+    )""")
     # 회원/로그인. 관리자는 username, 일반회원은 email로 로그인. 비번은 해시 저장.
     # (이름이 Supabase 예약 auth.users 와 헷갈려 public.members 로 명명)
     conn.execute("""
