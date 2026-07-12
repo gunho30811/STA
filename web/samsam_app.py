@@ -665,9 +665,23 @@ def _trigger_chat_poll_workflow():
         pass
 
 
+CHAT_DIST = os.path.join(ROOT, "frontend", "dist", "chat")   # 통합채팅 React 빌드(base /samsam/chat/)
+
+
 @app.route("/chat/")
 def chat_page():
-    return render_template("samsam_chat.html")
+    # 통합채팅 React 빌드 서빙. index.html은 문자열 반환(네비 주입 동작).
+    idx = os.path.join(CHAT_DIST, "index.html")
+    if os.path.exists(idx):
+        with open(idx, encoding="utf-8") as f:
+            return f.read()
+    return ("<h3>채팅 프론트엔드 빌드가 없습니다.</h3>"
+            "<p><code>cd frontend &amp;&amp; npm run build:chat</code> 후 새로고침하세요.</p>"), 200
+
+
+@app.route("/chat/assets/<path:filename>")
+def chat_assets(filename):
+    return send_from_directory(os.path.join(CHAT_DIST, "assets"), filename)
 
 
 @app.route("/chat/api/accounts")

@@ -5,9 +5,12 @@ import react from '@vitejs/plugin-react'
 //   VIEWER=gangnam npm run build  →  base '/gangnam/', dist/gangnam
 // default 는 profit.
 const viewer = process.env.VIEWER || 'profit'
+// 대부분 /{viewer}/ 지만, 채팅은 삼삼 앱 하위(/samsam/chat/)에 마운트된다.
+const BASES = { chat: '/samsam/chat/' }
+const base = BASES[viewer] || `/${viewer}/`
 
 export default defineConfig({
-  base: `/${viewer}/`,
+  base,
   define: { 'import.meta.env.VITE_VIEWER': JSON.stringify(viewer) },
   plugins: [react()],
   server: {
@@ -16,6 +19,7 @@ export default defineConfig({
     proxy: {
       '/profit/api': 'http://localhost:8000',
       '/gangnam/api': 'http://localhost:8000',
+      '/samsam/chat/api': 'http://localhost:8000',
       '/samsam/api': 'http://localhost:8000',
       '/auth': 'http://localhost:8000',
     },

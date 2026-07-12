@@ -13,6 +13,19 @@ export async function getJSON(path) {
   return res.json()
 }
 
+// 변경 요청(POST/DELETE 등). body 있으면 JSON. {ok,status,data} 반환.
+export async function sendJSON(path, method = 'POST', body) {
+  const res = await fetch(path, {
+    method,
+    credentials: 'same-origin',
+    headers: body != null ? { 'Content-Type': 'application/json' } : undefined,
+    body: body != null ? JSON.stringify(body) : undefined,
+  })
+  const ct = res.headers.get('content-type') || ''
+  const data = ct.includes('application/json') ? await res.json() : null
+  return { ok: res.ok, status: res.status, data }
+}
+
 // URLSearchParams 빌더: 빈 값 제외. multi에 담긴 키는 append(다중선택).
 export function qs(params, multi = {}) {
   const p = new URLSearchParams()
