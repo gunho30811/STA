@@ -111,7 +111,18 @@ export default function App() {
     } catch { /* noop */ }
   }
 
-  if (!facets || !stats) return <div style={{ padding: 40, color: '#94a3b8' }}>불러오는 중…</div>
+  // 데이터를 기다리는 동안에도 헤더(뼈대)는 바로 그려 nav와 함께 뜨게 하고, 안쪽만 로딩 표시.
+  if (!facets || !stats) {
+    return (
+      <>
+        <header>
+          <h1>🏙️ 수도권 부동산 매물 뷰어</h1>
+          <p>서울·경기·인천 부동산 · 아파트/오피스텔/빌라/원룸/단독·다가구 · 카드 클릭 시 상세 전체 보기 · 단위 만원</p>
+        </header>
+        <div className="wrap"><div className="panel" style={{ color: '#94a3b8' }}>데이터 불러오는 중…</div></div>
+      </>
+    )
+  }
 
   return (
     <>
