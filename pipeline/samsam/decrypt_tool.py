@@ -15,6 +15,7 @@ import sys
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, BASE_DIR)
+sys.path.insert(0, os.path.join(BASE_DIR, 'common'))   # crypto_util(common으로 이동됨)
 
 from dotenv import load_dotenv
 

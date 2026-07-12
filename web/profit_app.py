@@ -4,7 +4,7 @@
 
 핵심: "삼삼 단기임대로 풀가동하면 네이버 장기월세 대비 얼마나 더 버나(최대수익·순수익)와
        그 지역(동/역) 수요(예약률)는 어떤가".
-데이터: data/net_profit_integrated.csv (build_integrated.py 산출, 만원 단위)
+데이터: net_profit 테이블(Supabase) — build_integrated.py→export_net_profit.py 가 적재. 만원 단위.
 
 용어(전부 '높을수록 좋음' 방향으로 통일):
 - 최대수익 = 삼삼 월환산(주당×4.345, 풀가동 시 월 매출)
@@ -12,7 +12,6 @@
 - 예약률   = 1달 예약일 / (30 − 막힘일)   ← 공실률의 반대(직관적)
 - 동예약률 = 같은 동 매칭매물들의 평균 예약률,  동경쟁매물수 = 같은 동 삼삼 매물수
 """
-import csv
 import json
 import os
 import statistics
@@ -20,13 +19,13 @@ import statistics
 from flask import Flask, jsonify, request, send_from_directory
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA = os.path.join(ROOT, "data")
 DIST = os.path.join(ROOT, "frontend", "dist", "profit")   # React(Vite) 빌드 산출물(뷰어별)
 app = Flask(__name__)
 from auth import init_auth  # noqa: E402
 init_auth(app)
 
-# CSV 원본 헤더 → 짧은 키. maxRev=풀가동(100%) 상한, realRev=실현(예약률 반영, 주당/7×예약일).
+# net_profit 테이블 컬럼(=웹 내부 짧은키). maxRev=풀가동(100%) 상한, realRev=실현(예약률 반영).
+# (키는 export_net_profit.py 의 COL_MAP 값과 일치.)
 PROFIT_MAP = {
     "삼삼ID": "id", "매물명": "name", "건물유형": "btype", "방수": "rooms",
     "시도": "sido", "시군구": "sigungu", "동": "dong", "인근역": "station",
@@ -59,39 +58,54 @@ def _num(v):
         return None
 
 
+# net_profit 테이블 컬럼(웹 내부 짧은키와 동일). 계약=DB로 CSV 대신 이 테이블을 읽는다.
+NP_COLS = list(PROFIT_MAP.values())
+
+
 def load_profit():
-    path = os.path.join(DATA, "net_profit_integrated.csv")
+    import db
+    # Postgres는 따옴표 없는 식별자를 소문자로 낮추므로(dongCnt→dongcnt), 결과 키를 원래
+    # 카멜케이스로 되돌리려 AS "카멜" 별칭을 준다.
+    sel = ", ".join(f'{c.lower()} AS "{c}"' for c in NP_COLS)
+    conn = db.connect()
+    try:
+        db_rows = conn.execute(f"SELECT {sel} FROM net_profit").fetchall()
+    finally:
+        conn.close()
     rows = []
-    with open(path, encoding="utf-8-sig") as f:
-        for r in csv.DictReader(f):
-            o = {key: (None if key in NUM else "") for key in PROFIT_MAP.values()}
-            for kr, key in PROFIT_MAP.items():
-                if kr in r:
-                    o[key] = _num(r[kr]) if key in NUM else (r[kr] or "")
-            # 파생: 예약률 / 순수익(최대 기준)
-            bk, bl = o.get("bk") or 0, o.get("bl") or 0
-            # 수집 윈도우가 오늘~+30일 = 31일(양끝 포함)이라 분모도 31. 예약일+막힘일 ≤ 31 이라 ≤100%.
-            avail = max(31 - bl, 1)
-            o["occ"] = min(100.0, round(bk / avail * 100, 1))   # 예약률(%)
-            # 실현매출 = 최대수익(풀가동 월매출) × 예약률. 이렇게 정의해야 예약률 100%일 때
-            # 실현매출=최대수익, 기대월순수익=풀가동순수익으로 일치한다(세 지표의 일수 기준 불일치 해소).
-            # (CSV의 1달실현수익_만원은 30/7 기준이라 100%에서도 최대수익과 어긋나 파생값으로 덮어씀.)
-            if o.get("maxRev") is not None:
-                o["realRev"] = round(o["maxRev"] * o["occ"] / 100, 1)
-            if o.get("maxRev") is not None and o.get("nTotal") is not None:
-                o["net"] = round(o["maxRev"] - o["nTotal"], 1)  # 순수익(풀가동 상한: 최대−월총)
+    for r in db_rows:
+        # DB 행 → 내부 dict. 숫자 컬럼은 정수/소수 정규화(_num), 문자 컬럼은 None→"".
+        o = {}
+        for key in NP_COLS:
+            v = r[key]
+            if key in NUM:
+                o[key] = _num(v) if v is not None else None
             else:
-                o["net"] = None
-            # 기대 월순수익 = 실현매출(예약률 반영) − 네이버월총. 예약률 0%면 −월총(손해).
-            if o.get("realRev") is not None and o.get("nTotal") is not None:
-                o["expNet"] = round(o["realRev"] - o["nTotal"], 1)
-            else:
-                o["expNet"] = None
-            try:                                   # 달력월별 예약 JSON 파싱
-                o["monthOcc"] = json.loads(o["monthOcc"]) if o.get("monthOcc") else {}
-            except (ValueError, TypeError):
-                o["monthOcc"] = {}
-            rows.append(o)
+                o[key] = v if v is not None else ""
+
+        # 파생: 예약률 / 순수익(최대 기준)
+        bk, bl = o.get("bk") or 0, o.get("bl") or 0
+        # 수집 윈도우가 오늘~+30일 = 31일(양끝 포함)이라 분모도 31. 예약일+막힘일 ≤ 31 이라 ≤100%.
+        avail = max(31 - bl, 1)
+        o["occ"] = min(100.0, round(bk / avail * 100, 1))   # 예약률(%)
+        # 실현매출 = 최대수익(풀가동 월매출) × 예약률. 이렇게 정의해야 예약률 100%일 때
+        # 실현매출=최대수익, 기대월순수익=풀가동순수익으로 일치한다(세 지표의 일수 기준 불일치 해소).
+        if o.get("maxRev") is not None:
+            o["realRev"] = round(o["maxRev"] * o["occ"] / 100, 1)
+        if o.get("maxRev") is not None and o.get("nTotal") is not None:
+            o["net"] = round(o["maxRev"] - o["nTotal"], 1)  # 순수익(풀가동 상한: 최대−월총)
+        else:
+            o["net"] = None
+        # 기대 월순수익 = 실현매출(예약률 반영) − 네이버월총. 예약률 0%면 −월총(손해).
+        if o.get("realRev") is not None and o.get("nTotal") is not None:
+            o["expNet"] = round(o["realRev"] - o["nTotal"], 1)
+        else:
+            o["expNet"] = None
+        try:                                   # 달력월별 예약 JSON 파싱
+            o["monthOcc"] = json.loads(o["monthOcc"]) if o.get("monthOcc") else {}
+        except (ValueError, TypeError):
+            o["monthOcc"] = {}
+        rows.append(o)
     # 동/역 평균 예약률 부착
     _attach_area_occ(rows, "dong", "dongOcc")
     _attach_area_occ(rows, "station", "stOcc")

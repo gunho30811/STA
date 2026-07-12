@@ -42,7 +42,8 @@ from auth import current_user, init_auth  # noqa: E402
 init_auth(app)
 
 # 삼삼 통합 채팅: 계정 연결(Playwright 1회 로그인) + 폴링 결과 조회.
-sys.path.insert(0, os.path.join(ROOT, "pipeline", "samsam"))
+# chat_* / crypto_util 은 채팅(실시간 웹 서비스) 코드라 common/ 에 둔다(순수 크롤은 pipeline).
+sys.path.insert(0, os.path.join(ROOT, "common"))
 import chat_auth  # noqa: E402
 import chat_poll  # noqa: E402
 import crypto_util  # noqa: E402
@@ -179,43 +180,38 @@ def _indexes():
     return _IDX
 
 
-# ── 네이버 매칭 결과(net_profit_integrated.csv) → room_id별 수익 정보 ──
-MATCH_CSV = os.path.join(ROOT, "data", "net_profit_integrated.csv")
+# ── 네이버 매칭 결과(net_profit 테이블) → room_id별 수익 정보 ──
+# 계약=DB: 예전엔 data/net_profit_integrated.csv 를 읽었으나 크롤/웹 분리로 net_profit 테이블에서 읽는다.
 CONV_PER_MONTH = 0.06 / 12   # 전월세 전환율(월). 보증금 D → 월세환산 = 환산월세 − D×CONV
 
 
 def _load_matches():
-    import csv
     out = {}
-    if not os.path.exists(MATCH_CSV):
+    try:
+        # Postgres 소문자 컬럼 → AS "카멜" 별칭으로 원래 키 복원.
+        conn = db.connect()
+        rows = conn.execute(
+            'SELECT id, maxrev AS "maxRev", nrent AS "nRent", nmgmt AS "nMgmt", '
+            'ndep AS "nDep", nequiv AS "nEquiv", naverurl AS "naverUrl", '
+            'phone, office, reprent AS "repRent", repdep AS "repDep", '
+            'repfloor AS "repFloor" FROM net_profit').fetchall()
+        conn.close()
+    except Exception as e:
+        print(f"[samsam_app] net_profit DB 조회 실패({type(e).__name__}) → 빈 매칭", flush=True)
         return out
-
-    def num(v):
-        v = (v or "").replace(",", "")
-        try:
-            return float(v)
-        except ValueError:
-            return None
-    with open(MATCH_CSV, encoding="utf-8-sig") as f:
-        for r in csv.DictReader(f):
-            try:
-                rid = int(r["삼삼ID"])
-            except (KeyError, ValueError):
-                continue
-            out[rid] = {
-                "maxRev": num(r.get("삼삼월환산_만원")),
-                "nRent": num(r.get("네이버월세_만원")),
-                "nMgmt": num(r.get("네이버관리비_만원")),
-                "nDep": num(r.get("네이버보증금_만원")),
-                "nEquiv": num(r.get("네이버환산월세_만원")),
-                "nUrl": (r.get("네이버링크") or "").strip(),
-                # 대표 네이버 매물 연락처·조건(전화 문의용). 구 CSV엔 없을 수 있어 .get으로 방어.
-                "phone": (r.get("부동산번호") or "").strip(),
-                "office": (r.get("중개사무소") or "").strip(),
-                "repRent": num(r.get("대표월세_만원")),
-                "repDep": num(r.get("대표보증금_만원")),
-                "repFloor": (r.get("대표층수") or "").strip(),
-            }
+    for r in rows:
+        rid = r["id"]
+        if rid is None:
+            continue
+        out[int(rid)] = {
+            "maxRev": r["maxRev"], "nRent": r["nRent"], "nMgmt": r["nMgmt"],
+            "nDep": r["nDep"], "nEquiv": r["nEquiv"],
+            "nUrl": (r["naverUrl"] or "").strip(),
+            "phone": (r["phone"] or "").strip(),
+            "office": (r["office"] or "").strip(),
+            "repRent": r["repRent"], "repDep": r["repDep"],
+            "repFloor": (r["repFloor"] or "").strip(),
+        }
     return out
 
 

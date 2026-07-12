@@ -36,4 +36,4 @@ jobs:
         run: python -m playwright install chromium --with-deps
 
       - name: 연결된 계정 채팅 폴링
-        run: python pipeline/samsam/chat_poll.py
+        run: python common/chat_poll.py
