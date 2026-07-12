@@ -127,7 +127,7 @@ export default function ProfitList({ facets, month, demo = false, onSignup }) {
             <thead>
               <tr>
                 {COLS.map((c) => (
-                  <th key={c.k} className={c.l ? 'l' : ''} onClick={() => onSort(c.k)}>
+                  <th key={c.k} className={`col-${c.k}${c.l ? ' l' : ''}`} onClick={() => onSort(c.k)}>
                     {c.t}{c.k === sort.col ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                   </th>
                 ))}
@@ -142,15 +142,15 @@ export default function ProfitList({ facets, month, demo = false, onSignup }) {
                 return (
                   <tr key={x.id} className={x.id === sel?.id ? 'on' : ''} onClick={() => (demo ? onSignup() : setSel(x))}
                     title={demo ? '상세는 회원 전용 — 클릭 시 회원가입' : ''}>
-                    <td className="l"><span className="name">{x.name || ''}</span><br /><span className="sub">{x.bldg || ''}</span></td>
-                    <td className="l">{x.sido || ''}</td>
-                    <td className="l">{x.dong || ''}</td>
-                    <td className="l">{x.station || '-'}</td>
-                    <td>{n(x.pyeong)}</td>
-                    <td className={ec} style={{ fontWeight: 800 }}>{n(x.expNet)}</td>
-                    <td className={zeroOcc ? '' : 'occ'} style={zeroOcc ? { color: '#dc2626', fontWeight: 700 } : undefined}>{n(x.occ)}%</td>
-                    <td style={{ color: '#94a3b8' }}>{n(x.net)}</td>
-                    <td style={{ color: '#94a3b8' }}>{n(x.maxRev)}</td>
+                    <td className="l col-name"><span className="name">{x.name || ''}</span><br /><span className="sub">{x.bldg || ''}</span></td>
+                    <td className="l col-sido">{x.sido || ''}</td>
+                    <td className="l col-dong">{x.dong || ''}</td>
+                    <td className="l col-station">{x.station || '-'}</td>
+                    <td className="col-pyeong">{n(x.pyeong)}</td>
+                    <td className={`col-expNet ${ec}`} style={{ fontWeight: 800 }}>{n(x.expNet)}</td>
+                    <td className={`col-occ ${zeroOcc ? '' : 'occ'}`} style={zeroOcc ? { color: '#dc2626', fontWeight: 700 } : undefined}>{n(x.occ)}%</td>
+                    <td className="col-net" style={{ color: '#94a3b8' }}>{n(x.net)}</td>
+                    <td className="col-maxRev" style={{ color: '#94a3b8' }}>{n(x.maxRev)}</td>
                   </tr>
                 )
               })}

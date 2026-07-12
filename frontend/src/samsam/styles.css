@@ -56,8 +56,21 @@ tbody tr.on { background: #dbeafe; }
 .occ { font-weight: 700; color: #0369a1; }
 @media (max-width: 640px) {
   header { padding: 14px 14px; }
-  header h1 { font-size: 17px; }
-  .wrap { padding: 14px 14px; }
-  .tabs2 button { padding: 8px 12px; flex: 1; }
+  header h1 { font-size: 16px; }
+  header p { font-size: 11px; line-height: 1.5; }
+  .wrap { padding: 14px 12px; }
+  /* 탭 많아 가로 스크롤(글자 안 깨지게) */
+  .tabs2 { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tabs2 button { padding: 8px 12px; flex: 0 0 auto; white-space: nowrap; font-size: 12.5px; }
   input, select { font-size: 16px; }
+  /* 통계 카드 2열로 촘촘히 */
+  .cards { gap: 8px; }
+  .card { min-width: 0; flex: 1 1 44%; padding: 10px 12px; }
+  .card .val { font-size: 19px; }
+  /* 표는 컬럼이 많아 가로 스크롤 유지하되 폰트·패딩 축소로 한 화면에 더 많이 */
+  table { font-size: 11px; }
+  th, td { padding: 6px 6px; }
+  .hint { font-size: 11px; }
+  /* 안내문 속 인라인 입력들이 넘치지 않게 줄바꿈 허용 */
+  .hint input, .hint select { margin: 2px 0; }
 }
