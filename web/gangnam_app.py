@@ -2,9 +2,8 @@
 """
 수도권 네이버부동산 매물 뷰어 (Flask).
 
-lab/naver_listings.jsonl (naver_listings 스키마, 서울·경기·인천 전 유형)을
-그대로 읽어 카드 그리드 + 상세 모달로 보여준다. DB 불필요(로컬 jsonl만 읽음).
-export: python pipeline/naver/export_jsonl.py
+naver_listings(Supabase) 를 SQL로 조회(필터·페이지네이션)해 카드 그리드 + 상세 모달로 보여준다.
+근처 삼삼(수요)은 lab/samsam_listings.jsonl 인메모리 인덱스로 부착.
 
     python web/gangnam_app.py        # http://127.0.0.1:5002
 """
@@ -38,21 +37,6 @@ TYPE_NAMES = {
 # 업무용 오피스텔 판별: 부동산이 상세 summary에 '업무용' 또는 '전입(신고) 불가'라고 써놓은 것.
 # 주의: '전입신고'만 매칭하면 '전입신고 가능'(주거용)까지 잡히므로, 반드시 '불가'가 붙은 문구만.
 OFFICE_KW = ("업무용", "전입불가", "전입 불가", "전입신고 불가", "전입신고불가")
-
-
-def _is_office(x):
-    return x.get("building_type_code") == "OPST" and \
-        any(k in (x.get("summary") or "") for k in OFFICE_KW)
-
-
-def _split_sgg(sigungu):
-    """'수원시 영통구'→('수원시','영통구') · '강남구'→('','강남구') · '화성시'→('화성시','') ·
-    '가평군'→('가평군','')  (시/군 과 구 분리)."""
-    parts = (sigungu or "").split()
-    if len(parts) >= 2:
-        return parts[0], parts[1]
-    p = parts[0] if parts else ""
-    return ("", p) if p.endswith("구") else (p, "")
 
 
 PYEONG_TOL = 3   # '평수도 같은' 허용 오차(평)
@@ -132,7 +116,7 @@ LIST_COLS = (
     "summary", "lat", "lng", "jibun_address", "road_address", "confirmed_at",
 )
 
-# 시군구 문자열 → (시/군, 구) 를 SQL에서 계산(파이썬 _split_sgg 와 동일 규칙).
+# 시군구 문자열 → (시/군, 구) 를 SQL에서 계산.
 #   "수원시 영통구" → ("수원시","영통구") · "강남구" → ("","강남구") · "화성시" → ("화성시","")
 # LIKE '%구' 의 %가 파라미터 바인딩과 충돌하므로 right(..,1) 로 대체.
 _SI_SQL = ("CASE WHEN position(' ' in sigungu) > 0 THEN split_part(sigungu, ' ', 1) "
