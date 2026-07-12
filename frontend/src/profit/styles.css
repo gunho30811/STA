@@ -69,6 +69,26 @@ tbody tr.on { background: #dbeafe; }
   input, select { font-size: 16px; }
 }
 
+@media (max-width: 640px) {
+  /* 헤더·탭 축소(제목이 2줄로 커지고 탭 글자가 깨지던 것 방지) */
+  header h1 { font-size: 16px; }
+  header p { font-size: 11px; line-height: 1.5; }
+  .tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tabs button { white-space: nowrap; padding: 8px 12px; font-size: 12.5px; }
+  /* 통계 카드 촘촘히(2열) */
+  .cards { gap: 8px; }
+  .card { min-width: 0; flex: 1 1 44%; padding: 8px 12px; }
+  .card .val { font-size: 18px; }
+  /* 표: 폰트·패딩 축소 + 보조 컬럼(시도·평·역·순수익·최대수익) 숨겨 핵심(매물명·동·기대순수익·예약률)만 */
+  table { font-size: 11.5px; }
+  th, td { padding: 6px 5px; }
+  .col-sido, .col-pyeong, .col-station, .col-net, .col-maxRev { display: none; }
+  /* 매물명은 길어서 폭을 제한하고 넘치면 …로 (핵심 지표 자리 확보) */
+  .col-name { max-width: 150px; }
+  .col-name .name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .col-name .sub { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+
 /* 순위 근거 매물 모달 (QA #8) */
 .rd-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; z-index: 10000; overflow: auto; }
 .rd-modal { background: #fff; border-radius: 14px; max-width: 900px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.3); }

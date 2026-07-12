@@ -383,7 +383,30 @@ h2.sec {
     padding: 14px 14px;
   }
 
+  header h1 {
+    font-size: 17px;
+  }
+
   .wrap {
-    padding: 14px 14px;
+    padding: 14px 12px;
+  }
+
+  /* 계정 연결 폼이 모바일에서 넘치지 않게 입력 전체폭 */
+  .addform {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fg input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .bubble {
+    max-width: 85%;
+  }
+
+  input, textarea {
+    font-size: 16px;
   }
 }
