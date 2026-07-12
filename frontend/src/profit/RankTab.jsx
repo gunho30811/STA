@@ -98,9 +98,11 @@ function RankPanel({ title, rows, minMatch, maxComp }) {
               return (
                 <tr key={r.name}>
                   <td style={{ fontWeight: 800, fontSize: i < 3 ? 15 : 12 }}>{medal(i + 1)}</td>
-                  <td className="l" style={{ fontWeight: 600 }}>{r.name}</td>
+                  <td className="l" style={{ fontWeight: 600 }}>{r.name}
+                    {r.n != null && r.n <= 2 && <span title="매칭 표본 1~2건 — 순위·순수익 신뢰도 낮음" style={{ marginLeft: 5, fontSize: 10, fontWeight: 700, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 5px' }}>표본부족</span>}
+                  </td>
                   <td>{n(r.comp)}</td>
-                  <td style={{ color: '#94a3b8' }}>{n(r.n)}</td>
+                  <td style={r.n != null && r.n <= 2 ? { color: '#dc2626', fontWeight: 700 } : { color: '#94a3b8' }}>{n(r.n)}</td>
                   <td className={ec} style={{ fontWeight: 800, ...(ec === '' ? { color: '#94a3b8' } : {}) }}>{n(r.expNet)}</td>
                   <td className={zeroOcc ? '' : 'occ'} style={zeroOcc ? { color: '#dc2626', fontWeight: 700 } : undefined} title={zeroOcc ? '예약률 0% — 수요 미검증' : undefined}>{n(r.occ)}%</td>
                   <td style={{ color: '#94a3b8' }}>{n(r.net)}</td>
