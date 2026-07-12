@@ -49,6 +49,12 @@ export default function ProfitList({ facets, month }) {
     doSearch(1, next)
   }
 
+  // 새 조건으로 검색하면 이전에 클릭해 둔 매물 상세는 초기화(QA #3). 정렬·페이징은 유지.
+  const runSearch = () => {
+    setSel(null)
+    doSearch(1)
+  }
+
   const reset = () => {
     setF(DEFAULTS)
     setSort({ col: 'expNet', dir: 'desc' })
@@ -79,8 +85,8 @@ export default function ProfitList({ facets, month }) {
           <Sel label="동" value={f.dong} onChange={(v) => upd('dong', v)} opts={dongs} />
           <Sel label="건물유형" value={f.btype} onChange={(v) => upd('btype', v)} opts={facets.btype || []} />
           <Sel label="방수" value={f.rooms} onChange={(v) => upd('rooms', v)} opts={['원룸', '투룸', '쓰리룸+']} />
-          <Txt label="🚇 역 검색" value={f.station} onChange={(v) => upd('station', v)} ph="예: 강남" onEnter={() => doSearch(1)} />
-          <Txt label="키워드" value={f.keyword} onChange={(v) => upd('keyword', v)} ph="매물/건물" onEnter={() => doSearch(1)} />
+          <Txt label="🚇 역 검색" value={f.station} onChange={(v) => upd('station', v)} ph="예: 강남" onEnter={runSearch} />
+          <Txt label="키워드" value={f.keyword} onChange={(v) => upd('keyword', v)} ph="매물/건물" onEnter={runSearch} />
           <Num label="매칭수 ≥" value={f.matches_min} onChange={(v) => upd('matches_min', v)} ph="개" />
           <Num label="순수익 ≥" value={f.net_min} onChange={(v) => upd('net_min', v)} ph="만원" />
           <Num label="최대수익 ≥" value={f.maxrev_min} onChange={(v) => upd('maxrev_min', v)} ph="만원" />
@@ -94,7 +100,7 @@ export default function ProfitList({ facets, month }) {
               <input type="number" value={f.pyeong_max} onChange={(e) => upd('pyeong_max', e.target.value)} placeholder="최대" style={{ width: 60 }} />
             </div>
           </div>
-          <div className="fg"><label>&nbsp;</label><button className="btn btn-go" onClick={() => doSearch(1)}>검색</button></div>
+          <div className="fg"><label>&nbsp;</label><button className="btn btn-go" onClick={runSearch}>검색</button></div>
           <div className="fg"><label>&nbsp;</label><button className="btn btn-reset" onClick={reset}>초기화</button></div>
         </div>
         <div className="legend">

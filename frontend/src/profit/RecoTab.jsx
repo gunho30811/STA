@@ -45,12 +45,12 @@ export default function RecoTab({ month }) {
         <div style={{ overflow: 'auto', maxHeight: '60vh' }}>
           <table>
             <thead>
-              <tr>{['#', '매물명', '동', '역', '평', '경쟁', '예약률%', '기대월순수익', '기회점수', '링크'].map((t, i) =>
-                <th key={i} className={[1, 2, 3, 9].includes(i) ? 'l' : ''}>{t}</th>)}</tr>
+              <tr>{['#', '매물명', '동', '역', '평', '경쟁', '매칭', '예약률%', '기대월순수익', '기회점수', '링크'].map((t, i) =>
+                <th key={i} className={[1, 2, 3, 10].includes(i) ? 'l' : ''}>{t}</th>)}</tr>
             </thead>
             <tbody>
               {d.office.length === 0 ? (
-                <tr><td colSpan={10} className="d-empty">조건에 맞는 오피스텔 없음</td></tr>
+                <tr><td colSpan={11} className="d-empty">조건에 맞는 오피스텔 없음</td></tr>
               ) : d.office.map((r, i) => (
                 <tr key={i}>
                   <td style={{ fontWeight: 800 }}>{medal(i + 1)}</td>
@@ -59,6 +59,7 @@ export default function RecoTab({ month }) {
                   <td className="l">{r.station || '-'}</td>
                   <td>{n(r.pyeong)}</td>
                   <td>{n(r.comp)}</td>
+                  <td style={{ color: r.matches != null && r.matches <= 2 ? '#dc2626' : '#94a3b8', fontWeight: r.matches != null && r.matches <= 2 ? 700 : 400 }} title={r.matches != null && r.matches <= 2 ? '표본 부족 — 신뢰도 낮음' : ''}>{n(r.matches)}</td>
                   <td className="occ">{n(r.occ)}%</td>
                   <td className="pos" style={{ fontWeight: 800 }}>{n(r.expNet)}</td>
                   <td style={{ fontWeight: 800, color: '#7c3aed' }}>{n(r.score)}</td>

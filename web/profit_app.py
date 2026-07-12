@@ -274,15 +274,21 @@ def _rows_for(a):
     return out
 
 
+# 순위 라벨에서 서울/인천은 시군구가 '강남구'처럼 구만이라 어느 시인지 안 보임(QA #4).
+# → 시/도를 축약해 앞에 붙인다. 경기는 시군구에 이미 시(수원시)가 들어 있어 '경기 수원시 …'가 됨.
+_SIDO_SHORT = {"서울특별시": "서울", "경기도": "경기", "인천광역시": "인천"}
+
+
 def _group(field_or_key, rows=None):
-    """rows(기본 P())를 동(시군구+동)/역 단위로 묶는다. dong은 구 다르면 분리(같은 동명 병합 방지)."""
+    """rows(기본 P())를 동(시도+시군구+동)/역 단위로 묶는다. dong은 구 다르면 분리(같은 동명 병합 방지)."""
     by = {}
     for x in (P() if rows is None else rows):
         if field_or_key == "dong":
             sg, dg = x.get("sigungu") or "", x.get("dong") or ""
             if not dg:
                 continue
-            by.setdefault(f"{sg} {dg}".strip(), []).append(x)
+            sido = _SIDO_SHORT.get(x.get("sido") or "", x.get("sido") or "")
+            by.setdefault(f"{sido} {sg} {dg}".strip(), []).append(x)
         else:
             k = x.get(field_or_key) or ""
             if not k:
@@ -348,6 +354,7 @@ def api_recommend():
             "name": x.get("name") or "", "dong": f"{x.get('sigungu','')} {x.get('dong','')}".strip(),
             "station": x.get("station") or "", "pyeong": x.get("pyeong"),
             "comp": comp, "occ": x["occ"], "net": x["net"], "expNet": x["expNet"], "maxRev": x.get("maxRev"),
+            "matches": x.get("matches"),   # 부동산 매칭 표본수(신뢰도) — QA #11
             "score": score(x["expNet"], comp),
             "samUrl": x.get("samUrl") or "", "naverUrl": x.get("naverUrl") or "",
         })
