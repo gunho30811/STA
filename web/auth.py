@@ -477,6 +477,14 @@ def member_delete():
     return redirect(url_for("auth.members"))
 
 
+# 빈 #root 대체용 로딩 스켈레톤(첫 페인트에 nav와 함께 화면을 채움 → React가 교체).
+_ROOT_SKELETON = (
+    '<div id="root"><div style="min-height:60vh;display:flex;align-items:center;'
+    "justify-content:center;color:#94a3b8;font:600 14px 'Malgun Gothic',sans-serif\">"
+    '불러오는 중…</div></div>'
+)
+
+
 def init_auth(app):
     """앱에 로그인 게이트 적용. 모든 라우트를 보호하고 /auth/* 와 정적파일만 허용."""
     app.secret_key = os.environ.get("SECRET_KEY", "dev-insecure-change-me")
@@ -510,6 +518,9 @@ def init_auth(app):
                     gt = html.find(">", i)
                     if gt != -1:
                         html = html[:gt + 1] + _nav_html() + html[gt + 1:]
+                        # 빈 #root 를 로딩 스켈레톤으로 채워 JS 로드 전에도 nav와 함께 화면이 차게 한다
+                        # (React가 마운트되며 교체) → 'nav만 먼저 뜨는' 깜빡임 제거.
+                        html = html.replace('<div id="root"></div>', _ROOT_SKELETON)
                         resp.set_data(html)
         except Exception:
             pass
