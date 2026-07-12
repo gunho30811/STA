@@ -149,10 +149,11 @@ def L():
 
 @app.route("/")
 def index():
-    # React(Vite) 빌드를 서빙. 빌드 전이면 안내.
+    # index.html은 '문자열'로 반환(auth.py after_request 네비 주입이 동작하려면 direct_passthrough 회피).
     idx = os.path.join(DIST, "index.html")
     if os.path.exists(idx):
-        return send_from_directory(DIST, "index.html")
+        with open(idx, encoding="utf-8") as f:
+            return f.read()
     return ("<h3>프론트엔드 빌드가 없습니다.</h3>"
             "<p><code>cd frontend &amp;&amp; npm run build:gangnam</code> 후 새로고침하세요.</p>"), 200
 

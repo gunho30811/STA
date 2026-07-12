@@ -8,9 +8,11 @@
     "dev": "cross-env VIEWER=profit vite",
     "dev:profit": "cross-env VIEWER=profit vite",
     "dev:gangnam": "cross-env VIEWER=gangnam vite",
+    "dev:samsam": "cross-env VIEWER=samsam vite",
     "build:profit": "cross-env VIEWER=profit vite build",
     "build:gangnam": "cross-env VIEWER=gangnam vite build",
-    "build": "npm run build:profit && npm run build:gangnam",
+    "build:samsam": "cross-env VIEWER=samsam vite build",
+    "build": "npm run build:profit && npm run build:gangnam && npm run build:samsam",
     "preview": "vite preview"
   },
   "dependencies": {

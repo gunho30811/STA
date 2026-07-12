@@ -112,10 +112,12 @@ def P():
 
 @app.route("/")
 def index():
-    # React(Vite) 빌드를 서빙. 빌드 전이면(개발 중 dist 없음) 안내.
+    # React(Vite) 빌드를 서빙. index.html은 '문자열'로 반환해야 auth.py after_request의
+    # 공통 네비게이션 주입(HTML 본문 수정)이 동작한다(send_file은 direct_passthrough라 주입 안 됨).
     idx = os.path.join(DIST, "index.html")
     if os.path.exists(idx):
-        return send_from_directory(DIST, "index.html")
+        with open(idx, encoding="utf-8") as f:
+            return f.read()
     return ("<h3>프론트엔드 빌드가 없습니다.</h3>"
             "<p><code>cd frontend &amp;&amp; npm run build</code> 후 새로고침하세요. "
             "(개발 중이면 <code>npm run dev</code> → http://localhost:5173/profit/)</p>"), 200

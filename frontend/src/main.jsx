@@ -7,7 +7,9 @@ const viewer = import.meta.env.VITE_VIEWER || 'profit'
 
 const load = viewer === 'gangnam'
   ? () => import('./gangnam/App.jsx')
-  : () => import('./profit/App.jsx')
+  : viewer === 'samsam'
+    ? () => import('./samsam/App.jsx')
+    : () => import('./profit/App.jsx')
 
 load().then(({ default: App }) => {
   ReactDOM.createRoot(document.getElementById('root')).render(
