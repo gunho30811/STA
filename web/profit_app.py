@@ -21,8 +21,11 @@ from flask import Flask, jsonify, request, send_from_directory
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST = os.path.join(ROOT, "frontend", "dist", "profit")   # React(Vite) 빌드 산출물(뷰어별)
 app = Flask(__name__)
-from auth import init_auth  # noqa: E402
-init_auth(app)
+from auth import current_user, init_auth  # noqa: E402
+# 데모 게이트: 미로그인도 수익성 뷰어(매물 탭)만 상위 일부를 볼 수 있게 → 회원가입 유도.
+# 순위/추천/상세는 회원 전용. index·assets·facets·profit 만 허용.
+init_auth(app, demo_endpoints={"index", "assets", "api_facets", "api_profit"})
+DEMO_LIMIT = 15   # 미로그인 데모에서 보여줄 매물 수
 
 # net_profit 테이블 컬럼(=웹 내부 짧은키). maxRev=풀가동(100%) 상한, realRev=실현(예약률 반영).
 # (키는 export_net_profit.py 의 COL_MAP 값과 일치.)
@@ -162,6 +165,7 @@ def api_facets():
         "btype": uniq("btype"), "rooms": ["원룸", "투룸", "쓰리룸+"],
         "months": months,   # 달력월별 예약 데이터 있는 달(재크롤 전엔 빈 배열)
         "total": len(P()),
+        "demo": current_user() is None,   # 미로그인=데모 모드(프론트가 게이트 표시)
     })
 
 
@@ -215,6 +219,21 @@ def _filter(a):
 @app.route("/api/profit")
 def api_profit():
     a = request.args
+
+    # 데모(미로그인): 필터 무시하고 예약률 20%+ 중 기대순수익 상위 DEMO_LIMIT 개만. 나머지는 잠금.
+    if current_user() is None:
+        pool = [x for x in P() if (x.get("occ") or 0) >= 20]
+        pool.sort(key=lambda x: -(x.get("expNet") if x.get("expNet") is not None else -1e9))
+        shown = pool[:DEMO_LIMIT]
+        nets = [x["net"] for x in shown if x.get("net") is not None]
+        occs = [x["occ"] for x in shown if x.get("occ") is not None]
+        return jsonify({
+            "demo": True, "locked": max(0, len(pool) - DEMO_LIMIT), "total": len(shown),
+            "page": 1, "size": DEMO_LIMIT, "pages": 1, "items": shown,
+            "summary": {"count": len(P()), "net_med": _median(nets),
+                        "net_max": max(nets) if nets else None, "occ_med": _median(occs)},
+        })
+
     items = _filter(a)
 
     sort = a.get("sort", "net")

@@ -485,8 +485,10 @@ _ROOT_SKELETON = (
 )
 
 
-def init_auth(app):
-    """앱에 로그인 게이트 적용. 모든 라우트를 보호하고 /auth/* 와 정적파일만 허용."""
+def init_auth(app, demo_endpoints=None):
+    """앱에 로그인 게이트 적용. 모든 라우트를 보호하고 /auth/* 와 정적파일만 허용.
+    demo_endpoints: 미로그인도 접근 허용할 endpoint 집합(데모 게이트 — 일부 공개해 회원가입 유도)."""
+    demo_eps = set(demo_endpoints or ())
     app.secret_key = os.environ.get("SECRET_KEY", "dev-insecure-change-me")
     app.permanent_session_lifetime = dt.timedelta(days=14)
     try:
@@ -503,6 +505,8 @@ def init_auth(app):
         if (ep.startswith("auth.") or ep in ("static", "home", "chat_api_cron_poll")):
             return None
         if not session.get("uid"):
+            if ep in demo_eps:   # 데모 허용 endpoint는 미로그인도 통과(제한된 데이터)
+                return None
             return redirect(url_for("auth.login", next=request.path))
         return None
 
