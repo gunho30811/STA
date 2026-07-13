@@ -7,10 +7,10 @@ const viewer = import.meta.env.VITE_VIEWER || 'profit'
 
 // 4뷰어가 하나의 index.html을 공유해 빌드되므로, 브라우저 탭 제목을 뷰어별로 여기서 지정.
 const TITLES = {
-  profit: '삼삼 × 부동산 단기임대 수익성',
-  gangnam: '수도권 부동산 매물 뷰어',
-  samsam: '삼삼 옵션별 공실/예약률 분석',
-  chat: '삼삼엠투 통합 채팅',
+  profit: '렌트업 · 수익성',
+  gangnam: '렌트업 · 부동산 매물',
+  samsam: '렌트업 · 삼삼 분석',
+  chat: '렌트업 · 통합 채팅',
 }
 document.title = TITLES[viewer] || TITLES.profit
 

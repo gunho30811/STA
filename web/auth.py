@@ -540,7 +540,7 @@ def _nav_html():
     # 브랜드 로고 + 메뉴. 데스크탑은 가로 메뉴, 모바일은 햄버거(순수 CSS 체크박스 토글, JS 불필요).
     return f"""<input type=checkbox id=__navtog hidden>
 <nav id=__nav>
-  <a class=__brand href="/">삼삼<b>수익</b></a>
+  <a class=__brand href="/">렌트<b>업</b></a>
   <label for=__navtog class=__ham aria-label="메뉴">☰</label>
   <div class=__menu>
     <a href="/profit/">수익성</a>
