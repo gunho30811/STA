@@ -28,7 +28,8 @@ portal = Flask(__name__)
 init_auth(portal)
 
 LANDING = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
-<meta name=viewport content="width=device-width,initial-scale=1"><title>부동산 단기임대 분석</title>
+<meta name=viewport content="width=device-width,initial-scale=1"><title>렌트Up · 단기임대 분석</title>
+<link rel=stylesheet href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard-dynamic-subset.css">
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
 background:linear-gradient(140deg,#0f172a,#1e293b);min-height:100vh;color:#e2e8f0;padding:40px 20px}
@@ -84,6 +85,7 @@ box-shadow:0 10px 30px rgba(0,0,0,.25);transition:.15s}
 PUBLIC_LANDING = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
 <title>렌트Up · 단기임대 수익성 분석</title>
+<link rel=stylesheet href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard-dynamic-subset.css">
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
 background:radial-gradient(1200px 600px at 50% -10%,#1e293b,#0f172a);min-height:100vh;color:#e2e8f0}

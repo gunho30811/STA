@@ -121,20 +121,30 @@ def current_user():
 # ── 공통 페이지 셸 ──────────────────────────────────────────────────────────────
 PAGE = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
 <meta name=viewport content="width=device-width,initial-scale=1"><title>{{title}}</title>
+<link rel=stylesheet href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard-dynamic-subset.css">
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;background:#0f172a;color:#1f2937;
 display:flex;min-height:100vh;align-items:center;justify-content:center;padding:20px}
 .box{background:#fff;border-radius:16px;padding:32px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
 h1{font-size:20px;margin:0 0 4px;font-weight:800}.sub{font-size:12.5px;color:#94a3b8;margin:0 0 20px}
 label{font-size:12px;font-weight:700;color:#4b5563;display:block;margin:12px 0 4px}
-input{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px}
-.btn{width:100%;margin-top:18px;padding:11px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:14px;font-weight:700;cursor:pointer}
+input{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-family:inherit}
+input:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.btn{display:block;width:100%;margin-top:16px;padding:11px;border:none;border-radius:8px;
+background:#2563eb;color:#fff;font-size:14px;font-weight:700;cursor:pointer;text-align:center;font-family:inherit}
 .btn:hover{background:#1d4ed8}
+.kakao-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:0;
+padding:12px;border-radius:8px;background:#FEE500;color:#191919;font-size:14px;font-weight:700;
+text-decoration:none;font-family:inherit}
+.kakao-btn:hover{background:#f5dc00}
+.kakao-btn svg{flex-shrink:0}
+.or-sep{display:flex;align-items:center;gap:10px;margin:18px 0;color:#94a3b8;font-size:12px}
+.or-sep hr{flex:1;border:none;border-top:1px solid #e5e7eb}
 .msg{margin:12px 0;padding:10px 12px;border-radius:8px;font-size:13px}
 .err{background:#fef2f2;color:#b91c1c}.ok{background:#ecfdf5;color:#047857}.info{background:#eff6ff;color:#1e40af}
-.lnk{text-align:center;margin-top:16px;font-size:13px}.lnk a{color:#2563eb;text-decoration:none;font-weight:700}
+.lnk{text-align:center;margin-top:20px;font-size:13px;color:#6b7280}.lnk a{color:#2563eb;text-decoration:none;font-weight:700}
 table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 10px;border-bottom:1px solid #eef0f2;text-align:left}
-th{background:#f9fafb}.danger{color:#dc2626;cursor:pointer;border:none;background:none;font-weight:700}
+th{background:#f9fafb;font-weight:700}.danger{color:#dc2626;cursor:pointer;border:none;background:none;font-weight:700}
 .code{font-size:24px;font-weight:800;letter-spacing:4px;color:#2563eb;text-align:center;background:#eff6ff;padding:12px;border-radius:8px;margin:8px 0}
 .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
 @media(max-width:640px){body{padding:12px}.box{padding:22px 16px}
@@ -167,26 +177,19 @@ def login():
             session["role"] = r["role"]
             session.permanent = True
             return redirect(request.args.get("next") or "/")
-    _or = ('<div style="display:flex;align-items:center;gap:10px;margin:18px 0;'
-           'color:#94a3b8;font-size:12px"><hr style="flex:1;border:none;border-top:1px solid #e5e7eb">'
-           '<span>또는</span><hr style="flex:1;border:none;border-top:1px solid #e5e7eb"></div>')
-    _kakao = (f'<a href="{url_for("auth.kakao_login")}" style="display:flex;align-items:center;'
-              'justify-content:center;gap:8px;width:100%;padding:12px;border-radius:8px;'
-              'background:#FEE500;color:#191919;font-size:14px;font-weight:700;'
-              'text-decoration:none;box-sizing:border-box">'
-              '<svg width="18" height="18" viewBox="0 0 18 18" style="flex-shrink:0">'
-              '<path fill="#191919" d="M9 1.5C4.86 1.5 1.5 4.19 1.5 7.5c0 2.1 1.27 3.94 '
-              '3.19 5.06l-.81 3.01 3.48-2.29C7.72 13.42 8.35 13.5 9 13.5c4.14 0 7.5-2.69 '
-              '7.5-6S13.14 1.5 9 1.5z"/></svg>카카오로 시작하기</a>')
-    body = (f'<h1 style="margin-bottom:2px">렌트Up</h1>'
+    _ico = ('<svg width="18" height="18" viewBox="0 0 18 18"><path fill="#191919" d="M9 1.5C4.86'
+            ' 1.5 1.5 4.19 1.5 7.5c0 2.1 1.27 3.94 3.19 5.06l-.81 3.01 3.48-2.29C7.72 13.42'
+            ' 8.35 13.5 9 13.5c4.14 0 7.5-2.69 7.5-6S13.14 1.5 9 1.5z"/></svg>')
+    body = (f'<h1>렌트Up</h1>'
             f'<p class="sub">부동산 단기임대 수익성 분석 · 회원 전용</p>{msg}'
-            f'{_kakao}{_or}'
+            f'<a href="{url_for("auth.kakao_login")}" class="kakao-btn">{_ico}카카오로 시작하기</a>'
+            f'<div class="or-sep"><hr><span>또는</span><hr></div>'
             f'<form method=post>'
             f'<label>아이디 또는 이메일</label><input name=login_id autofocus>'
             f'<label>비밀번호</label><input name=password type=password>'
-            f'<button class=btn style="margin-top:14px">이메일로 로그인</button>'
+            f'<button class=btn>이메일로 로그인</button>'
             f'</form>'
-            f'<div class=lnk style="margin-top:20px">처음이신가요?'
+            f'<div class=lnk>처음이신가요?'
             f' <a href="{url_for("auth.signup")}">이메일로 가입</a>'
             f'&ensp;·&ensp;카카오 계정은 위 버튼으로 바로 가입됩니다</div>')
     return _render("로그인", body)
@@ -255,7 +258,7 @@ def signup():
             conn.commit()
             shown = send_verify_email(email, code)
             return redirect(url_for("auth.verify", email=email, dev=shown))
-    body = (f'<h1 style="margin-bottom:2px">이메일로 가입</h1>'
+    body = (f'<h1>이메일로 가입</h1>'
             f'<p class="sub">이름·생년월일·이메일 · 비밀번호는 특수문자 필수</p>{msg}'
             f'<form method=post onsubmit="var b=this.querySelector(\'button\');'
             f'if(b)setTimeout(function(){{b.disabled=true;b.textContent=\'처리 중…\';}},0)">'
@@ -264,9 +267,9 @@ def signup():
             f'<label>이메일</label><input name=email type=email value="{f.get("email","")}">'
             f'<label>비밀번호 (8자+ 특수문자 필수)</label><input name=password type=password>'
             f'<label>비밀번호 확인</label><input name=password2 type=password>'
-            f'<button class=btn style="margin-top:14px">인증메일 받기</button>'
+            f'<button class=btn>인증메일 받기</button>'
             f'</form>'
-            f'<div class=lnk style="margin-top:20px">'
+            f'<div class=lnk>'
             f'카카오 계정은 <a href="{url_for("auth.login")}">로그인 화면</a>에서 바로 가입 가능'
             f'&ensp;·&ensp;<a href="{url_for("auth.login")}">로그인</a></div>')
     return _render("회원가입", body)
@@ -664,7 +667,7 @@ font-family:'Pretendard','Malgun Gothic',sans-serif;box-shadow:0 1px 6px rgba(0,
 #__nav .__menu a:hover{{background:#1e293b;color:#fff}}
 #__nav .__menu .__logout{{color:#94a3b8}}
 #__nav .__ham{{display:none;font-size:22px;color:#e2e8f0;cursor:pointer;padding:2px 8px;user-select:none}}
-@media(max-width:760px){{
+@media(max-width:640px){{
   #__nav .__ham{{display:block}}
   #__nav .__menu{{display:none;position:absolute;top:100%;left:0;right:0;background:#0f172a;
     flex-direction:column;align-items:stretch;padding:6px 10px 12px;gap:0;box-shadow:0 8px 20px rgba(0,0,0,.35)}}
