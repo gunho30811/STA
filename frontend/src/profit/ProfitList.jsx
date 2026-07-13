@@ -171,7 +171,7 @@ export default function ProfitList({ facets, month, demo = false, onSignup }) {
             </tbody>
           </table>
         </div>
-        {!demo && <Detail item={sel} />}
+        {!demo && <Detail item={sel} onClose={() => setSel(null)} />}
       </div>
       {demo ? (
         <div className="panel" style={{ textAlign: 'center', padding: '24px 16px', background: 'linear-gradient(180deg,#fff,#f1f5f9)' }}>
