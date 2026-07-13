@@ -25,7 +25,7 @@ from auth import current_user, init_auth  # noqa: E402
 # 데모 게이트: 미로그인도 수익성 뷰어(매물 탭)만 상위 일부를 볼 수 있게 → 회원가입 유도.
 # 순위/추천/상세는 회원 전용. index·assets·facets·profit 만 허용.
 init_auth(app, demo_endpoints={"index", "assets", "api_facets", "api_profit"})
-DEMO_TOP_LOCK = 10   # 데모에서 가릴 상위(베스트) 매물 수 — 회원가입 유도(위는 잠그고 중간만 맛보기)
+DEMO_TOP_LOCK = 40   # 데모에서 가릴 상위(베스트) 매물 수 — 회원가입 유도(위는 잠그고 중간만 맛보기)
 DEMO_LIMIT = 15      # 그 다음 노출할 '중간' 매물 수
 
 # net_profit 테이블 컬럼(=웹 내부 짧은키). maxRev=풀가동(100%) 상한, realRev=실현(예약률 반영).
