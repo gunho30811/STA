@@ -167,17 +167,28 @@ def login():
             session["role"] = r["role"]
             session.permanent = True
             return redirect(request.args.get("next") or "/")
-    body = f"""<h1>🔐 로그인</h1><p class="sub">부동산 단기임대 분석 · 회원 전용</p>{msg}
-    <form method=post>
-      <label>아이디 또는 이메일</label><input name=login_id autofocus>
-      <label>비밀번호</label><input name=password type=password>
-      <button class=btn>로그인</button>
-    </form>
-    <a href="{url_for('auth.kakao_login')}" class=btn
-       style="display:block;margin-top:10px;background:#FEE500;color:#000;text-align:center;text-decoration:none;padding:11px">
-      카카오로 시작하기
-    </a>
-    <div class=lnk>계정이 없으신가요? <a href="{url_for('auth.signup')}">회원가입</a></div>"""
+    _or = ('<div style="display:flex;align-items:center;gap:10px;margin:18px 0;'
+           'color:#94a3b8;font-size:12px"><hr style="flex:1;border:none;border-top:1px solid #e5e7eb">'
+           '<span>또는</span><hr style="flex:1;border:none;border-top:1px solid #e5e7eb"></div>')
+    _kakao = (f'<a href="{url_for("auth.kakao_login")}" style="display:flex;align-items:center;'
+              'justify-content:center;gap:8px;width:100%;padding:12px;border-radius:8px;'
+              'background:#FEE500;color:#191919;font-size:14px;font-weight:700;'
+              'text-decoration:none;box-sizing:border-box">'
+              '<svg width="18" height="18" viewBox="0 0 18 18" style="flex-shrink:0">'
+              '<path fill="#191919" d="M9 1.5C4.86 1.5 1.5 4.19 1.5 7.5c0 2.1 1.27 3.94 '
+              '3.19 5.06l-.81 3.01 3.48-2.29C7.72 13.42 8.35 13.5 9 13.5c4.14 0 7.5-2.69 '
+              '7.5-6S13.14 1.5 9 1.5z"/></svg>카카오로 시작하기</a>')
+    body = (f'<h1 style="margin-bottom:2px">렌트Up</h1>'
+            f'<p class="sub">부동산 단기임대 수익성 분석 · 회원 전용</p>{msg}'
+            f'{_kakao}{_or}'
+            f'<form method=post>'
+            f'<label>아이디 또는 이메일</label><input name=login_id autofocus>'
+            f'<label>비밀번호</label><input name=password type=password>'
+            f'<button class=btn style="margin-top:14px">이메일로 로그인</button>'
+            f'</form>'
+            f'<div class=lnk style="margin-top:20px">처음이신가요?'
+            f' <a href="{url_for("auth.signup")}">이메일로 가입</a>'
+            f'&ensp;·&ensp;카카오 계정은 위 버튼으로 바로 가입됩니다</div>')
     return _render("로그인", body)
 
 
@@ -244,16 +255,20 @@ def signup():
             conn.commit()
             shown = send_verify_email(email, code)
             return redirect(url_for("auth.verify", email=email, dev=shown))
-    body = f"""<h1>📝 회원가입</h1><p class="sub">이름·생년월일·이메일 · 비밀번호는 특수문자 필수</p>{msg}
-    <form method=post onsubmit="var b=this.querySelector('button');if(b)setTimeout(function(){{b.disabled=true;b.textContent='처리 중…';}},0)">
-      <label>이름</label><input name=name value="{f.get('name','')}">
-      <label>생년월일</label><input name=birthdate type=date value="{f.get('birthdate','')}">
-      <label>이메일</label><input name=email type=email value="{f.get('email','')}">
-      <label>비밀번호 (8자+ 특수문자 필수)</label><input name=password type=password>
-      <label>비밀번호 확인</label><input name=password2 type=password>
-      <button class=btn>인증메일 받기</button>
-    </form>
-    <div class=lnk>이미 회원이신가요? <a href="{url_for('auth.login')}">로그인</a></div>"""
+    body = (f'<h1 style="margin-bottom:2px">이메일로 가입</h1>'
+            f'<p class="sub">이름·생년월일·이메일 · 비밀번호는 특수문자 필수</p>{msg}'
+            f'<form method=post onsubmit="var b=this.querySelector(\'button\');'
+            f'if(b)setTimeout(function(){{b.disabled=true;b.textContent=\'처리 중…\';}},0)">'
+            f'<label>이름</label><input name=name value="{f.get("name","")}">'
+            f'<label>생년월일</label><input name=birthdate type=date value="{f.get("birthdate","")}">'
+            f'<label>이메일</label><input name=email type=email value="{f.get("email","")}">'
+            f'<label>비밀번호 (8자+ 특수문자 필수)</label><input name=password type=password>'
+            f'<label>비밀번호 확인</label><input name=password2 type=password>'
+            f'<button class=btn style="margin-top:14px">인증메일 받기</button>'
+            f'</form>'
+            f'<div class=lnk style="margin-top:20px">'
+            f'카카오 계정은 <a href="{url_for("auth.login")}">로그인 화면</a>에서 바로 가입 가능'
+            f'&ensp;·&ensp;<a href="{url_for("auth.login")}">로그인</a></div>')
     return _render("회원가입", body)
 
 
@@ -525,13 +540,19 @@ def kakao_callback():
     kakao_id = str(info.get("id") or "")
     ka = info.get("kakao_account") or {}
     email = (ka.get("email") or "").lower() or None
-    name = (ka.get("profile") or {}).get("nickname") or "카카오회원"
+    name = ((ka.get("profile") or {}).get("nickname")
+            or (info.get("properties") or {}).get("nickname")
+            or "카카오회원")
     if not kakao_id:
         return redirect(url_for("auth.login"))
 
     conn = db.connect()
     try:
         row = conn.execute("SELECT id,role FROM members WHERE kakao_id=%s", (kakao_id,)).fetchone()
+        if row and name and name != "카카오회원":
+            # 로그인마다 닉네임 갱신(최초 '카카오회원'으로 저장된 경우 포함)
+            conn.execute("UPDATE members SET name=%s WHERE id=%s", (name, row["id"]))
+            conn.commit()
         if not row and email:
             # 이메일로 기존 계정에 kakao_id 연결
             row2 = conn.execute("SELECT id,role FROM members WHERE email=%s", (email,)).fetchone()
@@ -570,7 +591,7 @@ def init_auth(app, demo_endpoints=None):
     """앱에 로그인 게이트 적용. 모든 라우트를 보호하고 /auth/* 와 정적파일만 허용.
     demo_endpoints: 미로그인도 접근 허용할 endpoint 집합(데모 게이트 — 일부 공개해 회원가입 유도)."""
     demo_eps = set(demo_endpoints or ())
-    app.secret_key = os.environ.get("SECRET_KEY", "dev-insecure-change-me")
+    app.secret_key = os.environ.get("SECRET_KEY") or "dev-insecure-change-me"
     app.permanent_session_lifetime = dt.timedelta(days=14)
     try:
         db.init_db()
