@@ -535,16 +535,38 @@ def init_auth(app, demo_endpoints=None):
 
 
 def _nav_html():
-    admin = ('<a href="/auth/crawl">크롤현황</a><a href="/auth/members">회원관리</a>'
+    admin = ('<a href="/auth/crawl">크롤 현황</a><a href="/auth/members">회원 관리</a>'
              if session.get("role") == "admin" else "")
-    return f"""<div id=__nav style="position:sticky;top:0;z-index:9999;background:#0f172a;
-color:#e2e8f0;display:flex;flex-wrap:wrap;gap:4px 2px;align-items:center;
-padding:7px 12px;font-size:13px;font-family:'Pretendard','Malgun Gothic',sans-serif;
-box-shadow:0 1px 6px rgba(0,0,0,.2)">
-<a href="/" style="font-weight:800;color:#fff;text-decoration:none;margin-right:6px">🏠 홈</a>
-<a href="/profit/">💰 수익성</a><a href="/samsam/">🛋️ 삼삼분석</a><a href="/gangnam/">🏙️ 부동산매물</a><a href="/samsam/chat/">💬 통합채팅</a>
-{admin}<a href="/auth/logout" id=__logout>로그아웃</a>
-<style>#__nav a{{color:#cbd5e1;text-decoration:none;padding:5px 10px;border-radius:6px;font-weight:600;
-white-space:nowrap}}
-#__nav a:hover{{background:#1e293b;color:#fff}}
-@media(min-width:760px){{#__nav #__logout{{margin-left:auto}}}}</style></div>"""
+    # 브랜드 로고 + 메뉴. 데스크탑은 가로 메뉴, 모바일은 햄버거(순수 CSS 체크박스 토글, JS 불필요).
+    return f"""<input type=checkbox id=__navtog hidden>
+<nav id=__nav>
+  <a class=__brand href="/">삼삼<b>수익</b></a>
+  <label for=__navtog class=__ham aria-label="메뉴">☰</label>
+  <div class=__menu>
+    <a href="/profit/">수익성</a>
+    <a href="/samsam/">삼삼분석</a>
+    <a href="/gangnam/">부동산매물</a>
+    <a href="/samsam/chat/">통합채팅</a>
+    {admin}
+    <a href="/auth/logout" class=__logout>로그아웃</a>
+  </div>
+</nav>
+<style>
+#__nav{{position:sticky;top:0;z-index:9999;background:#0f172a;color:#e2e8f0;
+display:flex;align-items:center;gap:6px;padding:10px 16px;
+font-family:'Pretendard','Malgun Gothic',sans-serif;box-shadow:0 1px 6px rgba(0,0,0,.2)}}
+#__nav .__brand{{font-size:17px;font-weight:900;color:#fff;text-decoration:none;letter-spacing:-.02em;margin-right:auto}}
+#__nav .__brand b{{color:#60a5fa;font-weight:900}}
+#__nav .__menu{{display:flex;align-items:center;gap:2px}}
+#__nav .__menu a{{color:#cbd5e1;text-decoration:none;padding:7px 12px;border-radius:7px;font-weight:600;font-size:13.5px;white-space:nowrap}}
+#__nav .__menu a:hover{{background:#1e293b;color:#fff}}
+#__nav .__menu .__logout{{color:#94a3b8}}
+#__nav .__ham{{display:none;font-size:22px;color:#e2e8f0;cursor:pointer;padding:2px 8px;user-select:none}}
+@media(max-width:760px){{
+  #__nav .__ham{{display:block}}
+  #__nav .__menu{{display:none;position:absolute;top:100%;left:0;right:0;background:#0f172a;
+    flex-direction:column;align-items:stretch;padding:6px 10px 12px;gap:0;box-shadow:0 8px 20px rgba(0,0,0,.35)}}
+  #__navtog:checked ~ #__nav .__menu{{display:flex}}
+  #__nav .__menu a{{padding:12px 10px;border-bottom:1px solid #1e293b;font-size:15px}}
+}}
+</style>"""
