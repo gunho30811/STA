@@ -7,17 +7,23 @@ function KV({ k, v }) {
   )
 }
 
-export default function Detail({ item }) {
+export default function Detail({ item, onClose }) {
+  // 선택 전: 데스크탑은 안내 패널, 모바일은 숨김(.empty가 모바일에서 display:none).
   if (!item) {
     return (
-      <div className="detail">
+      <div className="detail empty">
         <div className="d-empty">왼쪽 매물을 클릭하면<br />여기에 상세가 떠요</div>
       </div>
     )
   }
   const x = item
   return (
-    <div className="detail">
+    <>
+      {/* 모바일 바텀시트 뒤 어둡게(데스크탑은 CSS로 숨김) — 눌러서 닫기 */}
+      <div className="sheet-overlay" onClick={onClose} />
+      <div className="detail has-item">
+        {/* 모바일 바텀시트 닫기 버튼(데스크탑은 숨김) */}
+        <button className="sheet-close" onClick={onClose} aria-label="닫기">×</button>
       <div className="d-title">{x.name || ''}</div>
       <div className="d-sub">
         {x.btype || ''} · {x.rooms || ''} · {x.sigungu || ''} {x.dong || ''} · {x.pyeong || '-'}평
@@ -61,6 +67,7 @@ export default function Detail({ item }) {
         {x.naverUrl && <a className="lnk n" href={x.naverUrl} target="_blank" rel="noreferrer">부동산</a>}
         {x.samUrl && <a className="lnk s" href={x.samUrl} target="_blank" rel="noreferrer">삼삼</a>}
       </div>
-    </div>
+      </div>
+    </>
   )
 }
