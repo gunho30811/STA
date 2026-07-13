@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { fetchProfit, fmt as n } from '../shared/api.js'
+import { fetchProfit, fmt as n, shortSido } from '../shared/api.js'
 import Detail from './Detail.jsx'
 import Pager from './Pager.jsx'
 
@@ -175,6 +175,15 @@ export default function ProfitList({ facets, month, demo = false, onSignup }) {
               })}
             </tbody>
           </table>
+
+          {/* 모바일 전용 카드 목록(표는 좁은 화면에서 잘려 CSS로 숨김). 매물명 전체·시·동·역이 다 보임 */}
+          <div className="listcards">
+            {res.items.length === 0 ? (
+              <div className="d-empty">조건에 맞는 매물 없음</div>
+            ) : res.items.map((x) => (
+              <MatchCard key={x.id} x={x} onClick={() => (demo ? onSignup() : setSel(x))} />
+            ))}
+          </div>
         </div>
         {!demo && <Detail item={sel} onClose={() => setSel(null)} />}
       </div>
@@ -193,6 +202,26 @@ export default function ProfitList({ facets, month, demo = false, onSignup }) {
 
 function Card({ lbl, val, cls }) {
   return <div className="card"><div className="lbl">{lbl}</div><div className={`val ${cls || ''}`}>{val}</div></div>
+}
+
+// 모바일 매물 카드 — 매물명 전체 + 지역(시·동·역·평) + 기대월순수익/예약률.
+function MatchCard({ x, onClick }) {
+  const ec = x.expNet != null && x.expNet >= 0 ? 'pos' : 'neg'
+  const zeroOcc = x.occ == null || x.occ === 0
+  const area = [shortSido(x.sido), x.dong, x.station].filter(Boolean).join(' · ')
+  return (
+    <div className="mcard" onClick={onClick}>
+      <div className="mc-main">
+        <div className="mc-name">{x.name || ''}</div>
+        {x.bldg && <div className="mc-bldg">{x.bldg}</div>}
+        <div className="mc-area">{area}{x.pyeong ? ` · ${n(x.pyeong)}평` : ''}</div>
+      </div>
+      <div className="mc-nums">
+        <div className={`mc-net ${ec}`}>{n(x.expNet)}<small>만</small></div>
+        <div className={`mc-occ ${zeroOcc ? 'zero' : ''}`}>예약 {n(x.occ)}%</div>
+      </div>
+    </div>
+  )
 }
 function Sel({ label, value, onChange, opts }) {
   return (
