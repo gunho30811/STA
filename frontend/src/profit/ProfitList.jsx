@@ -3,17 +3,17 @@ import { fetchProfit, fmt as n } from '../shared/api.js'
 import Detail from './Detail.jsx'
 import Pager from './Pager.jsx'
 
-// 매물명 옆 시/도 컬럼 포함(기존 요청 반영). k=API 정렬키, l=좌측정렬.
+// 매물명 옆 시/도 컬럼 포함(기존 요청 반영). k=API 정렬키, l=좌측정렬, tip=헤더 툴팁 설명.
 const COLS = [
   { k: 'name', t: '매물명 / 건물', l: true },
   { k: 'sido', t: '시/도', l: true },
   { k: 'dong', t: '동', l: true },
-  { k: 'station', t: '역', l: true },
+  { k: 'station', t: '역', l: true, tip: '매물 500m 반경 내 지하철역(없으면 공란)' },
   { k: 'pyeong', t: '평' },
-  { k: 'expNet', t: '기대월순수익' },
-  { k: 'occ', t: '예약률%' },
-  { k: 'net', t: '순수익(풀가동)' },
-  { k: 'maxRev', t: '최대수익' },
+  { k: 'expNet', t: '기대월순수익', tip: '실제 예약률을 반영한 한 달 순수익. 삼삼 단기임대로 돌렸을 때 실제로 손에 남는 돈 — 이 값이 클수록 좋아요(핵심 지표).' },
+  { k: 'occ', t: '예약률%', tip: '한 달 중 예약이 찬 비율(수요). 높을수록 실제로 잘 나가는 매물.' },
+  { k: 'net', t: '순수익(풀가동)', tip: '예약률 100%를 가정한 이론상 상한. 참고용(실제는 기대월순수익).' },
+  { k: 'maxRev', t: '최대수익', tip: '풀가동(100% 예약) 시 한 달 매출(주당×4.345).' },
 ]
 
 const DEFAULTS = {
@@ -135,14 +135,19 @@ export default function ProfitList({ facets, month, demo = false, onSignup }) {
       </div>
       )}
 
+      {/* 첫 진입 안내: 이 표가 무엇을, 어떤 순서로 보여주는지 한 줄로 */}
+      <div style={{ background: '#eff6ff', border: '1px solid #dbeafe', borderRadius: 9, padding: '9px 13px', margin: '0 0 10px', fontSize: 13, color: '#1e3a5f', lineHeight: 1.55 }}>
+        💡 이 표는 <b>단기임대로 돌리면 한 달에 얼마 남나(기대월순수익)</b> 높은 순이에요. 헤더의 <b>ⓘ</b>에 마우스를 올리면 용어 설명이 나와요{demo ? '' : ' · 매물을 누르면 상세'}.
+      </div>
+
       <div className="md">
         <div className="listcol">
           <table>
             <thead>
               <tr>
                 {COLS.map((c) => (
-                  <th key={c.k} className={`col-${c.k}${c.l ? ' l' : ''}`} onClick={() => onSort(c.k)}>
-                    {c.t}{c.k === sort.col ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                  <th key={c.k} className={`col-${c.k}${c.l ? ' l' : ''}`} onClick={() => onSort(c.k)} title={c.tip || ''}>
+                    {c.t}{c.tip ? <span style={{ color: '#93c5fd', fontWeight: 400 }}> ⓘ</span> : ''}{c.k === sort.col ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                   </th>
                 ))}
               </tr>
