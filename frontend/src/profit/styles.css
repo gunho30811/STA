@@ -124,6 +124,10 @@ tbody tr.on { background: #dbeafe; }
   /* 매물 목록: 좁은 화면에선 표 대신 카드(표는 컬럼이 많아 잘림). 카드엔 매물명 전체·시·동·역이 다 보임 */
   .listcol > table { display: none; }
   .listcards { display: block; }
+  /* 순위: 동별/역별을 세로 1열로(좌우 2열이면 각 표가 눌려 잘림) + 표 대신 카드 */
+  .rankwrap { flex-direction: column; }
+  .rankwrap .panel { width: 100%; }
+  .rankwrap table { display: none; }
 }
 
 /* 순위 근거 매물 모달 (QA #8) */

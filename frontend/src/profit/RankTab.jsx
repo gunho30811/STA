@@ -119,6 +119,31 @@ function RankPanel({ title, rows, minMatch, maxComp, onOpenDetail }) {
             })}
           </tbody>
         </table>
+
+        {/* 모바일 카드(표는 좁은 화면서 잘려 CSS로 숨김) */}
+        <div className="listcards">
+          {data.length === 0 ? (
+            <div className="d-empty">조건에 맞는 항목 없음</div>
+          ) : data.map((r, i) => {
+            const zeroOcc = r.occ == null || r.occ === 0
+            const ec = r.expNet == null ? 'neg' : r.expNet >= 0 ? 'pos' : 'neg'
+            return (
+              <div className="mcard" key={r.name} onClick={() => onOpenDetail && onOpenDetail(r.name)}>
+                <div className="mc-main">
+                  <div className="mc-name">
+                    <span style={{ marginRight: 5 }}>{medal(i + 1)}</span>{r.name}
+                    {r.n != null && r.n <= 2 && <span style={{ marginLeft: 5, fontSize: 10, fontWeight: 700, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 5px' }}>표본부족</span>}
+                  </div>
+                  <div className="mc-area">경쟁 {fmtComp(r.comp)} · 매칭 {n(r.n)}</div>
+                </div>
+                <div className="mc-nums">
+                  <div className={`mc-net ${ec}`}>{n(r.expNet)}<small>만</small></div>
+                  <div className={`mc-occ ${zeroOcc ? 'zero' : ''}`}>예약 {n(r.occ)}%</div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
