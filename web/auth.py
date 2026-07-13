@@ -510,8 +510,10 @@ def member_delete():
 def kakao_login():
     state = secrets.token_urlsafe(16)
     session["_kst"] = state
+    # 접속한 호스트 기준으로 redirect_uri 생성 → PC(localhost)·폰(IP) 모두 자동 대응
+    redirect_uri = url_for("auth.kakao_callback", _external=True)
     params = (f"client_id={_KAKAO_CLIENT_ID}"
-              f"&redirect_uri={_KAKAO_REDIRECT_URI}"
+              f"&redirect_uri={redirect_uri}"
               f"&response_type=code&state={state}")
     return redirect(f"https://kauth.kakao.com/oauth/authorize?{params}")
 
@@ -522,9 +524,10 @@ def kakao_callback():
         return redirect(url_for("auth.login"))
     code = request.args.get("code", "")
 
-    # 토큰 교환
+    # 토큰 교환 (redirect_uri는 인가 요청과 동일해야 함)
+    redirect_uri = url_for("auth.kakao_callback", _external=True)
     data = {"grant_type": "authorization_code", "client_id": _KAKAO_CLIENT_ID,
-            "redirect_uri": _KAKAO_REDIRECT_URI, "code": code}
+            "redirect_uri": redirect_uri, "code": code}
     if _KAKAO_CLIENT_SECRET:
         data["client_secret"] = _KAKAO_CLIENT_SECRET
     tok = _requests.post("https://kauth.kakao.com/oauth/token", data=data, timeout=10)
