@@ -25,7 +25,8 @@ from auth import current_user, init_auth  # noqa: E402
 # 데모 게이트: 미로그인도 수익성 뷰어(매물 탭)만 상위 일부를 볼 수 있게 → 회원가입 유도.
 # 순위/추천/상세는 회원 전용. index·assets·facets·profit 만 허용.
 init_auth(app, demo_endpoints={"index", "assets", "api_facets", "api_profit"})
-DEMO_LIMIT = 15   # 미로그인 데모에서 보여줄 매물 수
+DEMO_TOP_LOCK = 10   # 데모에서 가릴 상위(베스트) 매물 수 — 회원가입 유도(위는 잠그고 중간만 맛보기)
+DEMO_LIMIT = 15      # 그 다음 노출할 '중간' 매물 수
 
 # net_profit 테이블 컬럼(=웹 내부 짧은키). maxRev=풀가동(100%) 상한, realRev=실현(예약률 반영).
 # (키는 export_net_profit.py 의 COL_MAP 값과 일치.)
@@ -220,15 +221,18 @@ def _filter(a):
 def api_profit():
     a = request.args
 
-    # 데모(미로그인): 필터 무시하고 예약률 20%+ 중 기대순수익 상위 DEMO_LIMIT 개만. 나머지는 잠금.
+    # 데모(미로그인): 베스트(상위 DEMO_TOP_LOCK개)는 가리고 '중간'을 맛보기로 노출 →
+    # "위에 더 좋은 게 있다"는 궁금증으로 회원가입 유도(혁신의숲 방식). 필터 무시.
     if current_user() is None:
         pool = [x for x in P() if (x.get("occ") or 0) >= 20]
         pool.sort(key=lambda x: -(x.get("expNet") if x.get("expNet") is not None else -1e9))
-        shown = pool[:DEMO_LIMIT]
+        top_lock = min(DEMO_TOP_LOCK, len(pool))
+        shown = pool[top_lock: top_lock + DEMO_LIMIT]
         nets = [x["net"] for x in shown if x.get("net") is not None]
         occs = [x["occ"] for x in shown if x.get("occ") is not None]
         return jsonify({
-            "demo": True, "locked": max(0, len(pool) - DEMO_LIMIT), "total": len(shown),
+            "demo": True, "top_locked": top_lock,
+            "locked": max(0, len(pool) - top_lock - len(shown)), "total": len(shown),
             "page": 1, "size": DEMO_LIMIT, "pages": 1, "items": shown,
             "summary": {"count": len(P()), "net_med": _median(nets),
                         "net_max": max(nets) if nets else None, "occ_med": _median(occs)},

@@ -67,6 +67,11 @@ tbody tr.on { background: #dbeafe; }
 .term-pop { background: #fff; border-radius: 14px; padding: 20px 22px; max-width: 340px; width: 100%; box-shadow: 0 20px 60px rgba(0, 0, 0, .3); text-align: center; }
 .term-t { font-size: 16px; font-weight: 800; color: #111827; }
 .term-d { font-size: 13.5px; color: #475569; line-height: 1.6; margin-top: 8px; text-align: left; }
+/* 데모: 상위(베스트) 잠금 티저 — 블러된 가짜 카드 위에 자물쇠 안내 */
+.demo-top { position: relative; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; margin-bottom: 12px; cursor: pointer; }
+.demo-top-blur { filter: blur(5px); opacity: .55; pointer-events: none; padding: 4px 8px; }
+.demo-top-blur .mc-name, .demo-top-blur .mc-area, .demo-top-blur .mc-net, .demo-top-blur .mc-occ { color: #94a3b8; }
+.demo-top-lock { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 2px; background: rgba(255,255,255,.72); font-size: 13.5px; color: #1e293b; padding: 16px; line-height: 1.5; }
 /* 모바일 매물 카드(데스크탑은 숨김 — 표를 씀) */
 .listcards { display: none; }
 .mcard { display: flex; justify-content: space-between; gap: 10px; padding: 12px 14px; border-bottom: 1px solid #eef0f2; cursor: pointer; }
