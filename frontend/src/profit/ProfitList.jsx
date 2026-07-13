@@ -27,6 +27,7 @@ export default function ProfitList({ facets, month, demo = false, onSignup }) {
   const [sort, setSort] = useState({ col: 'expNet', dir: 'desc' })
   const [res, setRes] = useState({ items: [], summary: {}, total: 0, page: 1, pages: 1 })
   const [sel, setSel] = useState(null)
+  const [showAdv, setShowAdv] = useState(false)   // 상세 옵션 접기(핵심만 먼저 보여주려고)
 
   const tree = facets.tree || {}
   const upd = (k, v) => setF((s) => ({ ...s, [k]: v }))
@@ -85,30 +86,43 @@ export default function ProfitList({ facets, month, demo = false, onSignup }) {
         </div>
       ) : (
       <div className="panel">
+        {/* 핵심 필터 — 대부분은 지역·방수·예약률만 있으면 충분 */}
         <div className="filters">
           <Sel label="시/도" value={f.sido} onChange={(v) => setF((st) => ({ ...st, sido: v, sigungu: '', dong: '' }))} opts={facets.sido || []} />
-          <Sel label="시군구" value={f.sigungu} onChange={(v) => setF((st) => ({ ...st, sigungu: v, dong: '' }))} opts={sigungus} />
-          <Sel label="동" value={f.dong} onChange={(v) => upd('dong', v)} opts={dongs} />
-          <Sel label="건물유형" value={f.btype} onChange={(v) => upd('btype', v)} opts={facets.btype || []} />
           <Sel label="방수" value={f.rooms} onChange={(v) => upd('rooms', v)} opts={['원룸', '투룸', '쓰리룸+']} />
-          <Txt label="🚇 역 검색" value={f.station} onChange={(v) => upd('station', v)} ph="예: 강남" onEnter={runSearch} />
-          <Txt label="키워드" value={f.keyword} onChange={(v) => upd('keyword', v)} ph="매물/건물" onEnter={runSearch} />
-          <Num label="매칭수 ≥" value={f.matches_min} onChange={(v) => upd('matches_min', v)} ph="개" />
-          <Num label="순수익 ≥" value={f.net_min} onChange={(v) => upd('net_min', v)} ph="만원" />
-          <Num label="최대수익 ≥" value={f.maxrev_min} onChange={(v) => upd('maxrev_min', v)} ph="만원" />
           <Num label="예약률 ≥ (기본 20%)" value={f.occ_min} onChange={(v) => upd('occ_min', v)} ph="%" />
-          <Num label="동예약률 ≥" value={f.dongocc_min} onChange={(v) => upd('dongocc_min', v)} ph="%" />
-          <Num label="보증금 ≤" value={f.dep_max} onChange={(v) => upd('dep_max', v)} ph="만원" />
-          <div className="fg">
-            <label>평수</label>
-            <div style={{ display: 'flex', gap: 4 }}>
-              <input type="number" value={f.pyeong_min} onChange={(e) => upd('pyeong_min', e.target.value)} placeholder="최소" style={{ width: 60 }} />
-              <input type="number" value={f.pyeong_max} onChange={(e) => upd('pyeong_max', e.target.value)} placeholder="최대" style={{ width: 60 }} />
-            </div>
-          </div>
           <div className="fg"><label>&nbsp;</label><button className="btn btn-go" onClick={runSearch}>검색</button></div>
           <div className="fg"><label>&nbsp;</label><button className="btn btn-reset" onClick={reset}>초기화</button></div>
+          <div className="fg"><label>&nbsp;</label>
+            <button className="btn" style={{ background: '#eef2ff', color: '#3730a3' }} onClick={() => setShowAdv((s) => !s)}>
+              🔧 상세 옵션 {showAdv ? '▲' : '▾'}
+            </button>
+          </div>
         </div>
+
+        {/* 상세 옵션 — 필요할 때만 펼쳐서(지역 세부·건물유형·역·금액·평수 등) */}
+        {showAdv && (
+          <div className="filters" style={{ marginTop: 12, paddingTop: 12, borderTop: '1px dashed #e5e7eb' }}>
+            <Sel label="시군구" value={f.sigungu} onChange={(v) => setF((st) => ({ ...st, sigungu: v, dong: '' }))} opts={sigungus} />
+            <Sel label="동" value={f.dong} onChange={(v) => upd('dong', v)} opts={dongs} />
+            <Sel label="건물유형" value={f.btype} onChange={(v) => upd('btype', v)} opts={facets.btype || []} />
+            <Txt label="🚇 역 검색" value={f.station} onChange={(v) => upd('station', v)} ph="예: 강남" onEnter={runSearch} />
+            <Txt label="키워드" value={f.keyword} onChange={(v) => upd('keyword', v)} ph="매물/건물" onEnter={runSearch} />
+            <Num label="매칭수 ≥" value={f.matches_min} onChange={(v) => upd('matches_min', v)} ph="개" />
+            <Num label="순수익 ≥" value={f.net_min} onChange={(v) => upd('net_min', v)} ph="만원" />
+            <Num label="최대수익 ≥" value={f.maxrev_min} onChange={(v) => upd('maxrev_min', v)} ph="만원" />
+            <Num label="동예약률 ≥" value={f.dongocc_min} onChange={(v) => upd('dongocc_min', v)} ph="%" />
+            <Num label="보증금 ≤" value={f.dep_max} onChange={(v) => upd('dep_max', v)} ph="만원" />
+            <div className="fg">
+              <label>평수</label>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <input type="number" value={f.pyeong_min} onChange={(e) => upd('pyeong_min', e.target.value)} placeholder="최소" style={{ width: 60 }} />
+                <input type="number" value={f.pyeong_max} onChange={(e) => upd('pyeong_max', e.target.value)} placeholder="최대" style={{ width: 60 }} />
+              </div>
+            </div>
+            <div className="fg"><label>&nbsp;</label><button className="btn btn-go" onClick={runSearch}>적용</button></div>
+          </div>
+        )}
         <div className="legend">
           <b>최대수익</b>=삼삼 풀가동 월매출(주당×4.345) · <b>순수익</b>=최대수익−부동산월총 ·
           <b>예약률</b>=1달 예약일/(30−막힘일) · <b>동예약률</b>=같은 동 평균 예약률 ·
