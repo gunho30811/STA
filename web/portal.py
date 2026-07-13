@@ -62,7 +62,23 @@ box-shadow:0 10px 30px rgba(0,0,0,.25);transition:.15s}
 </div>
 {% if user.role == 'admin' %}<div class=admin><a href="/auth/crawl">📊 크롤링 현황</a>
   &nbsp;·&nbsp; <a href="/auth/members">👥 회원 관리 →</a></div>{% endif %}
-</div></body></html>"""
+</div>
+<script>
+// 로그인 직후 대시보드에서 수익성 첫 화면을 미리 받아 캐시에 저장 → 수익성 탭 클릭 시 즉시 표시.
+// 키는 ProfitList의 기본 조회 path(sta: 접두)와 동일해야 함.
+(function(){
+  var q='occ_min=20&sort=expNet&dir=desc&page=1&size=40';
+  var key='sta:api/profit?'+q;
+  try{
+    if(localStorage.getItem(key))return;   // 이미 있으면 스킵
+    fetch('/profit/api/profit?'+q,{credentials:'same-origin'})
+      .then(function(r){return r.ok?r.json():null})
+      .then(function(d){ if(d&&!d.demo){ try{localStorage.setItem(key,JSON.stringify({t:Date.now(),data:d}))}catch(e){} } })
+      .catch(function(){});
+  }catch(e){}
+})();
+</script>
+</body></html>"""
 
 
 PUBLIC_LANDING = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
