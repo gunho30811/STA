@@ -60,7 +60,7 @@ export default function App() {
             <option value="">전체 (오늘기준 1달·롤링)</option>
             {months.map((m) => <option key={m} value={m}>{m.replace('-', '년 ')}월</option>)}
           </select>
-          <span className="legend" style={{ margin: 0 }}>
+          <span className="legend hide-mobile" style={{ margin: 0 }}>
             {months.length
               ? '달력월별(예: 2026-08 예약률)은 삼삼 재크롤분부터 채워져요.'
               : '아직 달력월별 데이터가 없어요 — 삼삼 재크롤 후 채워집니다.'}
