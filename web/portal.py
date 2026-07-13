@@ -51,7 +51,7 @@ box-shadow:0 10px 30px rgba(0,0,0,.25);transition:.15s}
   <div class=who>{{user.name or user.username or user.email}} 님
     <a href="/auth/logout">로그아웃</a></div>
 </div>
-<p class=sub>삼삼엠투 단기임대 × 부동산 월세 매칭 · 회원 전용</p>
+<p class=sub>부동산을 단기임대로 돌리면 얼마 버는지 · 회원 전용</p>
 <div class=grid>
   <a class=card href="/profit/"><div class=ic>💰</div><h2>통합 수익성</h2>
     <p>삼삼 단기임대 풀가동 시 부동산 월세 대비 최대수익·순수익, 동/역 순위</p></a>
@@ -120,7 +120,7 @@ grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
   </div>
 </div>
 <div class=hero>
-  <span class=tag>🏠 부동산 × 삼삼엠투 단기임대</span>
+  <span class=tag>🏠 부동산 단기임대 수익 분석</span>
   <h1>부동산 월세 매물,<br><span class=hl>단기임대로 돌리면 얼마 벌까?</span></h1>
   <p>네이버부동산 매물을 삼삼엠투 단기임대 데이터와 매칭해, <b>월세로 줄 때 대비 얼마나 더 버는지</b>
      예약률·순수익까지 한눈에. 임대인·투자자를 위한 수익성 분석 도구입니다.</p>
