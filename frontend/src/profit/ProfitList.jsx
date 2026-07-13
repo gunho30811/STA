@@ -28,6 +28,8 @@ export default function ProfitList({ facets, month, demo = false, onSignup }) {
   const [res, setRes] = useState({ items: [], summary: {}, total: 0, page: 1, pages: 1 })
   const [sel, setSel] = useState(null)
   const [showAdv, setShowAdv] = useState(false)   // 상세 옵션 접기(핵심만 먼저 보여주려고)
+  const [term, setTerm] = useState(null)          // 용어 설명 팝업({t, tip}) — ⓘ/헤더 눌러서
+  const [showTerms, setShowTerms] = useState(false)  // 전체 용어 설명(모바일 카드엔 헤더가 없어서)
 
   const tree = facets.tree || {}
   const upd = (k, v) => setF((s) => ({ ...s, [k]: v }))
@@ -123,21 +125,17 @@ export default function ProfitList({ facets, month, demo = false, onSignup }) {
             <div className="fg"><label>&nbsp;</label><button className="btn btn-go" onClick={runSearch}>적용</button></div>
           </div>
         )}
-        <div className="legend">
-          <b>최대수익</b>=삼삼 풀가동 월매출(주당×4.345) · <b>순수익</b>=최대수익−부동산월총 ·
-          <b>예약률</b>=1달 예약일/(30−막힘일) · <b>동예약률</b>=같은 동 평균 예약률 ·
-          <b>인근역</b>=매물 <b>500m 반경</b> 내 지하철역(없으면 공란) — 매물명 속 '○○역'은 등록자 문구라 실제 거리와 다를 수 있어요
-        </div>
         <div className="legend warn">
-          ⚠️ <b>순수익·최대수익은 "풀가동(100% 예약) 가정" 이론값</b>이에요. 예약률이 0%인 매물도 커 보일 수 있어
-          기본값으로 <b>예약률 20% 이상</b>만 보여줍니다. 전체를 보려면 <b>예약률 ≥</b> 칸을 비우고 검색하세요.
+          ⚠️ 기본값으로 <b>예약률 20% 이상</b>만 보여줘요(예약 0%인 이론값 매물 제외). 전체는 예약률 칸을 비우고 검색.
         </div>
       </div>
       )}
 
-      {/* 첫 진입 안내: 이 표가 무엇을, 어떤 순서로 보여주는지 한 줄로 */}
+      {/* 첫 진입 안내: 무엇을·어떤 순서로 + 용어는 눌러서(모바일 터치 대응) */}
       <div style={{ background: '#eff6ff', border: '1px solid #dbeafe', borderRadius: 9, padding: '9px 13px', margin: '0 0 10px', fontSize: 13, color: '#1e3a5f', lineHeight: 1.55 }}>
-        💡 이 표는 <b>단기임대로 돌리면 한 달에 얼마 남나(기대월순수익)</b> 높은 순이에요. 헤더의 <b>ⓘ</b>에 마우스를 올리면 용어 설명이 나와요{demo ? '' : ' · 매물을 누르면 상세'}.
+        💡 <b>단기임대로 돌리면 한 달에 얼마 남나(기대월순수익)</b> 높은 순이에요.{' '}
+        <b role="button" style={{ color: '#2563eb', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => setShowTerms(true)}>용어 설명 보기</b>
+        {demo ? '' : ' · 매물을 누르면 상세'}.
       </div>
 
       <div className="md">
@@ -146,8 +144,13 @@ export default function ProfitList({ facets, month, demo = false, onSignup }) {
             <thead>
               <tr>
                 {COLS.map((c) => (
-                  <th key={c.k} className={`col-${c.k}${c.l ? ' l' : ''}`} onClick={() => onSort(c.k)} title={c.tip || ''}>
-                    {c.t}{c.tip ? <span style={{ color: '#93c5fd', fontWeight: 400 }}> ⓘ</span> : ''}{c.k === sort.col ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                  <th key={c.k} className={`col-${c.k}${c.l ? ' l' : ''}`} onClick={() => onSort(c.k)}>
+                    {c.t}
+                    {c.tip && (
+                      <span role="button" title="설명 보기" style={{ color: '#2563eb', fontWeight: 700, cursor: 'help' }}
+                        onClick={(e) => { e.stopPropagation(); setTerm({ t: c.t, tip: c.tip }) }}> ⓘ</span>
+                    )}
+                    {c.k === sort.col ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                   </th>
                 ))}
               </tr>
@@ -195,6 +198,35 @@ export default function ProfitList({ facets, month, demo = false, onSignup }) {
         </div>
       ) : (
         <Pager page={res.page} pages={res.pages} onGo={(p) => doSearch(p)} />
+      )}
+
+      {/* 용어 설명 팝업 — 헤더 ⓘ를 눌러서(단일). 바깥/확인 눌러 닫기 */}
+      {term && (
+        <div className="term-overlay" onClick={() => setTerm(null)}>
+          <div className="term-pop" onClick={(e) => e.stopPropagation()}>
+            <div className="term-t">{term.t}</div>
+            <div className="term-d">{term.tip}</div>
+            <button className="btn btn-go" style={{ marginTop: 12 }} onClick={() => setTerm(null)}>확인</button>
+          </div>
+        </div>
+      )}
+
+      {/* 전체 용어 설명 — 안내 배너의 '용어 설명 보기'(모바일 카드엔 헤더가 없어서) */}
+      {showTerms && (
+        <div className="term-overlay" onClick={() => setShowTerms(false)}>
+          <div className="term-pop" style={{ maxWidth: 380, textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>
+            <div className="term-t" style={{ textAlign: 'center' }}>용어 설명</div>
+            <div style={{ marginTop: 10 }}>
+              {COLS.filter((c) => c.tip).map((c) => (
+                <div key={c.k} style={{ padding: '8px 0', borderBottom: '1px solid #eef0f2' }}>
+                  <div style={{ fontWeight: 800, fontSize: 13.5, color: '#111827' }}>{c.t}</div>
+                  <div style={{ fontSize: 12.5, color: '#475569', lineHeight: 1.5, marginTop: 2 }}>{c.tip}</div>
+                </div>
+              ))}
+            </div>
+            <button className="btn btn-go" style={{ marginTop: 14, width: '100%' }} onClick={() => setShowTerms(false)}>확인</button>
+          </div>
+        </div>
       )}
     </div>
   )

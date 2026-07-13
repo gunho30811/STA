@@ -62,6 +62,11 @@ tbody tr.on { background: #dbeafe; }
 /* 바텀시트 부속(데스크탑은 숨김 — 상세는 우측 패널로 그대로) */
 .sheet-overlay { display: none; }
 .sheet-close { display: none; }
+/* 용어 설명 팝업(ⓘ 클릭 — 모바일/데스크탑 공통) */
+.term-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, .5); z-index: 10001; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.term-pop { background: #fff; border-radius: 14px; padding: 20px 22px; max-width: 340px; width: 100%; box-shadow: 0 20px 60px rgba(0, 0, 0, .3); text-align: center; }
+.term-t { font-size: 16px; font-weight: 800; color: #111827; }
+.term-d { font-size: 13.5px; color: #475569; line-height: 1.6; margin-top: 8px; text-align: left; }
 /* 모바일 매물 카드(데스크탑은 숨김 — 표를 씀) */
 .listcards { display: none; }
 .mcard { display: flex; justify-content: space-between; gap: 10px; padding: 12px 14px; border-bottom: 1px solid #eef0f2; cursor: pointer; }
@@ -106,9 +111,10 @@ tbody tr.on { background: #dbeafe; }
 @keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
 @media (max-width: 640px) {
-  /* 헤더·탭 축소(제목이 2줄로 커지고 탭 글자가 깨지던 것 방지) */
+  /* 헤더 축소 + 긴 설명문은 숨겨 매물이 바로 보이게(설명은 랜딩/용어팝업에 있음) */
   header h1 { font-size: 16px; }
-  header p { font-size: 11px; line-height: 1.5; }
+  header p { display: none; }
+  .hide-mobile { display: none; }
   .tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .tabs button { white-space: nowrap; padding: 8px 12px; font-size: 12.5px; }
   /* 통계 카드 촘촘히(2열) */
