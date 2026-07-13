@@ -19,8 +19,8 @@ export default function RecoTab({ month }) {
   const d = data || { dong: [], station: [], office: [] }
 
   return (
-    <div>
-      <p className="legend" style={{ margin: '0 0 10px' }}>
+    <div className="reco">
+      <p className="legend hide-mobile" style={{ margin: '0 0 10px' }}>
         🎯 <b>신규진입 추천(블루오션)</b> — 수요 있고 <b>기대 월순수익</b> 좋은데 <b>경쟁 삼삼 매물이 적은</b> 동/역/오피스텔.
         <b>기회점수</b> = 기대월순수익 ÷ √경쟁수.
       </p>
@@ -71,6 +71,30 @@ export default function RecoTab({ month }) {
               ))}
             </tbody>
           </table>
+
+          {/* 모바일 카드 — 추천 오피스텔(표는 컬럼 많아 잘림) */}
+          <div className="listcards">
+            {d.office.length === 0 ? (
+              <div className="d-empty">조건에 맞는 오피스텔 없음</div>
+            ) : d.office.map((r, i) => (
+              <div className="mcard" key={i}>
+                <div className="mc-main">
+                  <div className="mc-name"><span style={{ marginRight: 5 }}>{medal(i + 1)}</span>{r.name}
+                    {r.matches != null && r.matches <= 2 && <span style={{ marginLeft: 5, fontSize: 10, fontWeight: 700, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 5px' }}>표본부족</span>}
+                  </div>
+                  <div className="mc-area">{[r.dong, r.station].filter(Boolean).join(' · ')}{r.pyeong ? ` · ${n(r.pyeong)}평` : ''} · 경쟁 {fmtComp(r.comp)}</div>
+                  <div className="mc-area">기회점수 <b style={{ color: '#7c3aed' }}>{n(r.score)}</b>
+                    {r.naverUrl && <a className="lnk n" style={{ padding: '2px 7px', marginLeft: 6 }} href={r.naverUrl} target="_blank" rel="noreferrer">부동산</a>}
+                    {r.samUrl && <a className="lnk s" style={{ padding: '2px 7px', marginLeft: 4 }} href={r.samUrl} target="_blank" rel="noreferrer">삼삼</a>}
+                  </div>
+                </div>
+                <div className="mc-nums">
+                  <div className="mc-net pos">{n(r.expNet)}<small>만</small></div>
+                  <div className="mc-occ">예약 {n(r.occ)}%</div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -102,6 +126,26 @@ function RecoArea({ title, rows }) {
             ))}
           </tbody>
         </table>
+
+        {/* 모바일 카드 — 추천 동/역 */}
+        <div className="listcards">
+          {(!rows || rows.length === 0) ? (
+            <div className="d-empty">조건에 맞는 추천 없음 — 예약률/경쟁 조건을 완화해보세요</div>
+          ) : rows.map((r, i) => (
+            <div className="mcard" key={r.name}>
+              <div className="mc-main">
+                <div className="mc-name"><span style={{ marginRight: 5 }}>{medal(i + 1)}</span>{r.name}
+                  {r.n != null && r.n <= 2 && <span style={{ marginLeft: 5, fontSize: 10, fontWeight: 700, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 5px' }}>표본부족</span>}
+                </div>
+                <div className="mc-area">경쟁 {fmtComp(r.comp)} · 매칭 {n(r.n)} · 기회점수 <b style={{ color: '#7c3aed' }}>{n(r.score)}</b></div>
+              </div>
+              <div className="mc-nums">
+                <div className="mc-net pos">{n(r.expNet)}<small>만</small></div>
+                <div className="mc-occ">예약 {n(r.occ)}%</div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )

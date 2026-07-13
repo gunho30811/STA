@@ -128,6 +128,8 @@ tbody tr.on { background: #dbeafe; }
   .rankwrap { flex-direction: column; }
   .rankwrap .panel { width: 100%; }
   .rankwrap table { display: none; }
+  /* 신규진입 추천: 동/역/오피스텔 표 전부 카드로 */
+  .reco table { display: none; }
 }
 
 /* 순위 근거 매물 모달 (QA #8) */
