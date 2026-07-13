@@ -11,9 +11,12 @@ localhost 쿠키는 포트를 구분하지 않으므로 같은 SECRET_KEY를 쓰
 import datetime as dt
 import os
 import re
+import secrets
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import requests as _requests
 
 from flask import (Blueprint, redirect, render_template_string, request,
                    session, url_for)
@@ -26,6 +29,10 @@ PW_RE = re.compile(f"[{re.escape(SPECIAL)}]")
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 CODE_TTL_MIN = 10
 DAILY_SIGNUP_LIMIT = int(os.environ.get("DAILY_SIGNUP_LIMIT", 10))  # 하루 가입 한도(스팸 방지)
+
+_KAKAO_CLIENT_ID = os.environ.get("KAKAO_CLIENT_ID", "")
+_KAKAO_CLIENT_SECRET = os.environ.get("KAKAO_CLIENT_SECRET", "")
+_KAKAO_REDIRECT_URI = os.environ.get("KAKAO_REDIRECT_URI", "")
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -166,6 +173,10 @@ def login():
       <label>비밀번호</label><input name=password type=password>
       <button class=btn>로그인</button>
     </form>
+    <a href="{url_for('auth.kakao_login')}" class=btn
+       style="display:block;margin-top:10px;background:#FEE500;color:#000;text-align:center;text-decoration:none;padding:11px">
+      카카오로 시작하기
+    </a>
     <div class=lnk>계정이 없으신가요? <a href="{url_for('auth.signup')}">회원가입</a></div>"""
     return _render("로그인", body)
 
@@ -475,6 +486,76 @@ def member_delete():
                  (request.form.get("id"),))
     conn.commit()
     return redirect(url_for("auth.members"))
+
+
+@bp.route("/kakao")
+def kakao_login():
+    state = secrets.token_urlsafe(16)
+    session["_kst"] = state
+    params = (f"client_id={_KAKAO_CLIENT_ID}"
+              f"&redirect_uri={_KAKAO_REDIRECT_URI}"
+              f"&response_type=code&state={state}")
+    return redirect(f"https://kauth.kakao.com/oauth/authorize?{params}")
+
+
+@bp.route("/kakao/callback")
+def kakao_callback():
+    if request.args.get("error") or request.args.get("state") != session.pop("_kst", None):
+        return redirect(url_for("auth.login"))
+    code = request.args.get("code", "")
+
+    # 토큰 교환
+    data = {"grant_type": "authorization_code", "client_id": _KAKAO_CLIENT_ID,
+            "redirect_uri": _KAKAO_REDIRECT_URI, "code": code}
+    if _KAKAO_CLIENT_SECRET:
+        data["client_secret"] = _KAKAO_CLIENT_SECRET
+    tok = _requests.post("https://kauth.kakao.com/oauth/token", data=data, timeout=10)
+    if tok.status_code != 200:
+        return redirect(url_for("auth.login"))
+    access_token = tok.json().get("access_token", "")
+    if not access_token:
+        return redirect(url_for("auth.login"))
+
+    # 사용자 정보 조회
+    me = _requests.get("https://kapi.kakao.com/v2/user/me",
+                       headers={"Authorization": f"Bearer {access_token}"}, timeout=10)
+    if me.status_code != 200:
+        return redirect(url_for("auth.login"))
+    info = me.json()
+    kakao_id = str(info.get("id") or "")
+    ka = info.get("kakao_account") or {}
+    email = (ka.get("email") or "").lower() or None
+    name = (ka.get("profile") or {}).get("nickname") or "카카오회원"
+    if not kakao_id:
+        return redirect(url_for("auth.login"))
+
+    conn = db.connect()
+    try:
+        row = conn.execute("SELECT id,role FROM members WHERE kakao_id=%s", (kakao_id,)).fetchone()
+        if not row and email:
+            # 이메일로 기존 계정에 kakao_id 연결
+            row2 = conn.execute("SELECT id,role FROM members WHERE email=%s", (email,)).fetchone()
+            if row2:
+                conn.execute("UPDATE members SET kakao_id=%s WHERE id=%s", (kakao_id, row2["id"]))
+                conn.commit()
+                row = row2
+        if not row:
+            # 신규 회원 자동 생성(카카오 인증 = 이메일 인증·관리자 승인 대체)
+            conn.execute(
+                "INSERT INTO members(email,password_hash,name,role,email_verified,approved,"
+                "kakao_id,created_at) VALUES(%s,'!',%s,'member',TRUE,TRUE,%s,%s)",
+                (email, name, kakao_id, _now().isoformat(timespec="seconds")))
+            conn.commit()
+            row = conn.execute("SELECT id,role FROM members WHERE kakao_id=%s",
+                               (kakao_id,)).fetchone()
+        if not row:
+            return redirect(url_for("auth.login"))
+        session["uid"] = row["id"]
+        session["role"] = row["role"]
+        session.permanent = True
+    finally:
+        conn.close()
+    return redirect(request.args.get("next") or "/")
 
 
 # 빈 #root 대체용 로딩 스켈레톤(첫 페인트에 nav와 함께 화면을 채움 → React가 교체).

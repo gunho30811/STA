@@ -211,6 +211,9 @@ def init_db(force=False):
     if not force:
         try:
             if conn.execute("SELECT to_regclass('public.members')").fetchone()[0]:
+                # 기존 DB: 신규 컬럼 마이그레이션만 실행
+                conn.execute("ALTER TABLE members ADD COLUMN IF NOT EXISTS kakao_id TEXT")
+                conn.commit()
                 _INITED = True
                 conn.close()
                 return
@@ -425,12 +428,14 @@ def init_db(force=False):
         role            TEXT DEFAULT 'member',
         email_verified  BOOLEAN DEFAULT FALSE,
         approved        BOOLEAN DEFAULT FALSE,
+        kakao_id        TEXT UNIQUE,
         verify_code     TEXT,
         verify_expires  TEXT,
         created_at      TEXT
     )""")
-    # 기존 테이블에 승인 컬럼 보강(이미 있으면 무시)
+    # 기존 테이블에 신규 컬럼 보강(이미 있으면 무시)
     conn.execute("ALTER TABLE members ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT FALSE")
+    conn.execute("ALTER TABLE members ADD COLUMN IF NOT EXISTS kakao_id TEXT")
     _seed_admin(conn)
 
     # 삼삼엠투 통합 채팅: 회원이 연결한 삼삼 계정(비번·refreshToken은 암호화해 저장).
