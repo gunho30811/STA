@@ -140,7 +140,7 @@ export default function OptionView({ filters, runSeq }) {
                       {x.options.map((o, i) => <span className="pill" key={i}>{o}</span>)}
                       {curMode === 'none' && <span className="pill miss">{list.oname}</span>}
                     </td>
-                    <td className="l"><a className="lnk" href={x.url} target="_blank" rel="noreferrer">삼삼</a></td>
+                    <td className="l"><a className="lnk" href={x.url} target="_blank" rel="noreferrer">렌트</a></td>
                   </tr>
                 ))}
               </tbody>

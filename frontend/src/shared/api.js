@@ -86,7 +86,7 @@ export function fmt(x) {
   return x == null ? '-' : x.toLocaleString()
 }
 
-// 경쟁(동삼삼매물수) 표시. 삼삼 API 조회 상한 400에서 잘리므로 400은 '400+'로 표기.
+// 경쟁(동렌트매물수) 표시. 렌트 API 조회 상한 400에서 잘리므로 400은 '400+'로 표기.
 export function fmtComp(x) {
   if (x == null) return '-'
   return x >= 400 ? '400+' : x.toLocaleString()

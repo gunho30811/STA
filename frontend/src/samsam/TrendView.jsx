@@ -39,7 +39,7 @@ export default function TrendView({ filters, runSeq }) {
       <p className="hint"><b>최신예약률</b>·<b>전주대비 Δ</b>(▲상승, ▼하락) + 주차별 값. 위 시/도·시군구 필터 적용.</p>
       <div style={{ margin: '4px 0 10px', display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', fontSize: 12.5 }}>
         <span>최소 매물수 <input type="number" value={minn} style={{ width: 64, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6 }} onChange={(e) => setMinn(e.target.value)} />개 이상</span>
-        <span className="mut" style={{ fontSize: 11.5 }}>1달/2달/3달 예약률 · 평균순수익(보증금1000·삼삼운영) · 예약률 20%↑ 동만 · 헤더 클릭 정렬</span>
+        <span className="mut" style={{ fontSize: 11.5 }}>1달/2달/3달 예약률 · 평균순수익(보증금1000·렌트운영) · 예약률 20%↑ 동만 · 헤더 클릭 정렬</span>
       </div>
       {trd.items.length === 0 && (
         <div className="empty">아직 스냅샷이 없어요. 크롤 후 <code>python pipeline/samsam/snapshot.py</code> 실행하면 첫 데이터가 쌓여요.</div>

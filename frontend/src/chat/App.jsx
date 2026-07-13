@@ -44,8 +44,8 @@ export default function App() {
     <>
       <header>
         <div>
-          <h1>💬 삼삼엠투 통합 채팅</h1>
-          <p>연결한 여러 삼삼 계정의 채팅을 한 곳에서 확인</p>
+          <h1>💬 렌트 통합 채팅</h1>
+          <p>연결한 여러 렌트 계정의 채팅을 한 곳에서 확인</p>
         </div>
         <button className="btn btn-ghost" disabled={refreshing} onClick={refreshNow}>
           {refreshing ? '새로고침 중...' : '지금 새로고침'}

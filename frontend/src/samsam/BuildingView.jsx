@@ -50,7 +50,7 @@ export default function BuildingView({ filters, runSeq }) {
   const downloadCsv = () => {
     if (!rows.length) { alert('다운로드할 건물이 없습니다.'); return }
     const header = ['건물명', '시군구', '동', '유형', '평', '역', '매물수', '1달예약률%', '2달예약률%', '3달예약률%', '최저예약률%(1달)', '최고예약률%(1달)',
-      '평균주당(만원)', '월순수익(만원)', '손익분기점(주)', '매칭수', '부동산번호', '중개사무소', '대표월세(만원)', '대표보증금(만원)', '대표층수', '부동산링크', '삼삼엠투_경쟁예시링크']
+      '평균주당(만원)', '월순수익(만원)', '손익분기점(주)', '매칭수', '부동산번호', '중개사무소', '대표월세(만원)', '대표보증금(만원)', '대표층수', '부동산링크', '렌트_경쟁예시링크']
     const lines = [header.map(csvCell).join(',')]
     rows.forEach((r) => lines.push([r.building, r.sigungu, r.dong, r.btype, r.pyeong ?? '', r.station || '', r.n, r.occ_avg,
       r.occ2_avg, r.occ3_avg, r.occ_min, r.occ_max, r.week_avg, r.net_avg ?? '', r.breakeven ?? '', r.n_matched || 0,
@@ -58,15 +58,15 @@ export default function BuildingView({ filters, runSeq }) {
     const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = `삼삼_건물인기_${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `렌트_건물인기_${new Date().toISOString().slice(0, 10)}.csv`
     document.body.appendChild(a); a.click(); a.remove()
   }
 
   return (
     <div className="panel">
-      <h2 className="sec">건물(오피스텔) 인기 순위 — 한 건물에 삼삼 여러 채가 <b>다 잘 나가면</b> 검증된 건물 🔥</h2>
+      <h2 className="sec">건물(오피스텔) 인기 순위 — 한 건물에 렌트 여러 채가 <b>다 잘 나가면</b> 검증된 건물 🔥</h2>
       <p className="hint">
-        <b>매물수</b>=그 건물의 삼삼 매물 수. <b>최저예약률</b>이 높으면 <b>전 호실이 다 잘 나간다</b>는 뜻. 위 필터 적용됨.{' '}
+        <b>매물수</b>=그 건물의 렌트 매물 수. <b>최저예약률</b>이 높으면 <b>전 호실이 다 잘 나간다</b>는 뜻. 위 필터 적용됨.{' '}
         <b>건물명 검색</b> <input value={ctrl.building} placeholder="예: 롯데캐슬" style={{ width: 110 }} onChange={(e) => c('building', e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') load() }} /> ·{' '}
         <b>역 검색</b> <input value={ctrl.station} placeholder="예: 강남역" style={{ width: 100 }} onChange={(e) => c('station', e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') load() }} />{' '}
         <button className="btn btn-go" style={{ padding: '4px 10px', fontSize: 12 }} onClick={load}>검색</button> ·{' '}
@@ -76,7 +76,7 @@ export default function BuildingView({ filters, runSeq }) {
         <b>최저예약률</b> <input type="number" value={ctrl.occmin} placeholder="예: 50" style={{ width: 60 }} onChange={(e) => c('occmin', e.target.value)} /> % 이상 ·{' '}
         <b>월순수익</b> <input type="number" value={ctrl.netmin} placeholder="예: 0" style={{ width: 60 }} onChange={(e) => c('netmin', e.target.value)} /> 만원 이상 ·{' '}
         <b>손익분기점</b> <input type="number" value={ctrl.bemax} placeholder="예: 3" style={{ width: 55 }} onChange={(e) => c('bemax', e.target.value)} /> 주 이하 ·<br />
-        월순수익=삼삼월매출−부동산월세@보증금−관리비−고정비 (셀에 마우스 올리면 분해) · <b>손익분기점(주)</b>=작을수록 회수 빠름 · 헤더 클릭 정렬.
+        월순수익=렌트월매출−부동산월세@보증금−관리비−고정비 (셀에 마우스 올리면 분해) · <b>손익분기점(주)</b>=작을수록 회수 빠름 · 헤더 클릭 정렬.
       </p>
       <div className="flex">
         <span className="mut" style={{ fontSize: 12 }}>{rows.length ? `${rows.length.toLocaleString()}개 건물` : ''}</span>
@@ -107,7 +107,7 @@ function BuildingRow({ r }) {
   const minc = r.occ_min >= 60 ? 'good' : r.occ_min < 30 ? 'bad' : 'mut'
   const netc = r.net_avg == null ? 'mut' : r.net_avg >= 0 ? 'good' : 'bad'
   let netTip = ''
-  if (r.bd) { const b = r.bd; netTip = `삼삼 월매출 ${b.maxRev}\n− 부동산월세(보증금 ${b.dep}만 기준) ${b.rent}\n− 관리비 ${b.mgmt}` + (b.fixed ? `\n− 고정비 ${b.fixed}` : '') + `\n= 월순수익 ${r.net_avg} 만원` }
+  if (r.bd) { const b = r.bd; netTip = `렌트 월매출 ${b.maxRev}\n− 부동산월세(보증금 ${b.dep}만 기준) ${b.rent}\n− 관리비 ${b.mgmt}` + (b.fixed ? `\n− 고정비 ${b.fixed}` : '') + `\n= 월순수익 ${r.net_avg} 만원` }
   const bc = r.breakeven == null ? '' : r.breakeven <= 3 ? 'good' : r.breakeven > 6 ? 'bad' : ''
   let beTip = ''
   if (r.bd && r.breakeven != null) { const b = r.bd; beTip = `(부동산월세 ${b.rent} + 관리비 ${b.mgmt}) ÷ 주당 ${r.week_avg}\n= ${r.breakeven}주면 월 고정비용 회수` }
@@ -124,7 +124,7 @@ function BuildingRow({ r }) {
         : <span className={bc} style={{ fontWeight: 800, cursor: 'help', borderBottom: '1px dotted #94a3b8' }} title={beTip}>{r.breakeven}주</span>}</td>
       <td className="mut">{r.n_matched || 0}</td>
       <td className="l">
-        {r.sam_url ? <a className="lnk" href={r.sam_url} target="_blank" rel="noreferrer">삼삼 예시</a> : null}
+        {r.sam_url ? <a className="lnk" href={r.sam_url} target="_blank" rel="noreferrer">렌트 예시</a> : null}
         {r.naver_url ? <> <a className="lnk" style={{ background: '#2563eb' }} href={r.naver_url} target="_blank" rel="noreferrer">부동산</a></> : null}
         {!r.sam_url && !r.naver_url ? <span className="mut">-</span> : null}
       </td>

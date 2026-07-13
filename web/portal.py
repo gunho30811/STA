@@ -4,7 +4,7 @@
 
   /            랜딩(로그인 필요) — 각 뷰어 링크
   /profit/...  통합 수익성(profit_app)
-  /samsam/...  삼삼 분석(samsam_app)
+  /samsam/...  렌트 분석(samsam_app)
   /gangnam/... 부동산 강남 매물(gangnam_app)
   /auth/...    로그인/가입/회원관리
 
@@ -47,15 +47,15 @@ box-shadow:0 10px 30px rgba(0,0,0,.25);transition:.15s}
 @media(max-width:640px){body{padding:24px 14px}h1{font-size:21px}.card{padding:18px}}
 </style></head><body><div class=wrap>
 <div class=top>
-  <h1>🏠 렌트업 <span style="font-size:15px;font-weight:600;color:#94a3b8">단기임대 수익성 분석</span></h1>
+  <h1>🏠 렌트Up <span style="font-size:15px;font-weight:600;color:#94a3b8">단기임대 수익성 분석</span></h1>
   <div class=who>{{user.name or user.username or user.email}} 님
     <a href="/auth/logout">로그아웃</a></div>
 </div>
 <p class=sub>부동산을 단기임대로 돌리면 얼마 버는지 · 회원 전용</p>
 <div class=grid>
   <a class=card href="/profit/"><div class=ic>💰</div><h2>통합 수익성</h2>
-    <p>삼삼 단기임대 풀가동 시 부동산 월세 대비 최대수익·순수익, 동/역 순위</p></a>
-  <a class=card href="/samsam/"><div class=ic>🛋️</div><h2>삼삼 분석</h2>
+    <p>렌트 단기임대 풀가동 시 부동산 월세 대비 최대수익·순수익, 동/역 순위</p></a>
+  <a class=card href="/samsam/"><div class=ic>🛋️</div><h2>렌트 분석</h2>
     <p>옵션별 예약률 영향, 건물 인기(월순수익), 지역 예약률 트렌드</p></a>
   <a class=card href="/gangnam/"><div class=ic>🏙️</div><h2>부동산 매물</h2>
     <p>수도권(서울·경기·인천) 부동산 매물 카드/상세 탐색</p></a>
@@ -83,7 +83,7 @@ box-shadow:0 10px 30px rgba(0,0,0,.25);transition:.15s}
 
 PUBLIC_LANDING = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
-<title>렌트업 · 단기임대 수익성 분석</title>
+<title>렌트Up · 단기임대 수익성 분석</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
 background:radial-gradient(1200px 600px at 50% -10%,#1e293b,#0f172a);min-height:100vh;color:#e2e8f0}
@@ -113,7 +113,7 @@ grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
 @media(max-width:640px){.hero h1{font-size:32px}.hero{padding:40px 20px 30px}.nav{padding:14px 18px}}
 </style></head><body>
 <div class=nav>
-  <div class=brand>렌트<span class=dot>업</span></div>
+  <div class=brand>렌트<span class=dot>Up</span><svg width="30" height="20" viewBox="0 0 30 20" fill="none" style="margin-left:5px"><g stroke="#60a5fa" stroke-width="3" stroke-linecap="round"><line x1="2" y1="17" x2="11" y2="4"/><line x1="10" y1="17" x2="19" y2="4"/><line x1="18" y1="17" x2="27" y2="5"/></g></svg></div>
   <div class=cta>
     <a class=login href="/auth/login">로그인</a>
     <a class=signup href="/auth/signup">회원가입</a>
@@ -122,7 +122,7 @@ grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
 <div class=hero>
   <span class=tag>🏠 부동산 단기임대 수익 분석</span>
   <h1>부동산 월세 매물,<br><span class=hl>단기임대로 돌리면 얼마 벌까?</span></h1>
-  <p>네이버부동산 매물을 삼삼엠투 단기임대 데이터와 매칭해, <b>월세로 줄 때 대비 얼마나 더 버는지</b>
+  <p>네이버부동산 매물을 렌트(단기임대) 데이터와 매칭해, <b>월세로 줄 때 대비 얼마나 더 버는지</b>
      예약률·순수익까지 한눈에. 임대인·투자자를 위한 수익성 분석 도구입니다.</p>
   <div class=btns>
     <a class="btn btn-primary" href="/auth/signup">무료로 시작하기 →</a>
@@ -132,7 +132,7 @@ grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
 <div class=cards>
   <div class=card><div class=ic>💰</div><h3>수익성 분석</h3>
     <p>단기임대 풀가동 시 부동산 월세 대비 최대수익·기대 월순수익. 동·역별 순위로 어디가 잘 나가는지 바로.</p></div>
-  <div class=card><div class=ic>🛋️</div><h3>삼삼 데이터</h3>
+  <div class=card><div class=ic>🛋️</div><h3>렌트 데이터</h3>
     <p>옵션별 예약률 영향, 건물 인기 랭킹, 지역 예약률 트렌드까지 — 실제 단기임대 수요를 데이터로.</p></div>
   <div class=card><div class=ic>🏙️</div><h3>부동산 매물</h3>
     <p>수도권(서울·경기·인천) 월세 매물을 근처 단기임대 수요와 함께. 이 집으로 운영 시 예상 순수익까지.</p></div>

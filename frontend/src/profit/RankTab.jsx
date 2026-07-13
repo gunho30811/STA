@@ -29,7 +29,7 @@ export default function RankTab({ month }) {
   return (
     <div>
       <p className="legend" style={{ margin: '0 0 10px' }}>
-        <b>기대 월순수익</b>(예약률 반영) 높은 순 = 실제로 가장 많이 남는 곳. <b>경쟁</b>=그 지역 삼삼 매물수 ·
+        <b>기대 월순수익</b>(예약률 반영) 높은 순 = 실제로 가장 많이 남는 곳. <b>경쟁</b>=그 지역 렌트 매물수 ·
         <b>매칭수</b>=부동산 매칭 표본 · 동은 <b>시군구</b>로 구분. 헤더 클릭 정렬 · <b>행 클릭 시 그 동/역의 근거 매물</b> 확인.
       </p>
       <div className="panel" style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 10 }}>
@@ -109,7 +109,7 @@ function RankPanel({ title, rows, minMatch, maxComp, onOpenDetail }) {
                   <td className="l" style={{ fontWeight: 600 }}>{r.name}
                     {r.n != null && r.n <= 2 && <span title="매칭 표본 1~2건 — 순위·순수익 신뢰도 낮음" style={{ marginLeft: 5, fontSize: 10, fontWeight: 700, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 5px' }}>표본부족</span>}
                   </td>
-                  <td title={r.comp >= 400 ? '삼삼 조회 상한(400)에 도달 — 실제는 더 많을 수 있음' : ''}>{fmtComp(r.comp)}</td>
+                  <td title={r.comp >= 400 ? '렌트 조회 상한(400)에 도달 — 실제는 더 많을 수 있음' : ''}>{fmtComp(r.comp)}</td>
                   <td style={r.n != null && r.n <= 2 ? { color: '#dc2626', fontWeight: 700 } : { color: '#94a3b8' }}>{n(r.n)}</td>
                   <td className={ec} style={{ fontWeight: 800, ...(ec === '' ? { color: '#94a3b8' } : {}) }}>{n(r.expNet)}</td>
                   <td className={zeroOcc ? '' : 'occ'} style={zeroOcc ? { color: '#dc2626', fontWeight: 700 } : undefined} title={zeroOcc ? '예약률 0% — 수요 미검증' : undefined}>{n(r.occ)}%</td>

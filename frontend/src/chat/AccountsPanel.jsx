@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { sendJSON } from '../shared/api.js'
 import { statusLabel } from './helpers.js'
 
-// 연결된 삼삼 계정 목록 + 새 계정 연결 폼.
+// 연결된 렌트 계정 목록 + 새 계정 연결 폼.
 // props:
 //   accounts   - 계정 배열
 //   onChanged  - 계정이 추가/삭제됐을 때(목록·방 재로딩) 호출
@@ -51,7 +51,7 @@ export default function AccountsPanel({ accounts, onChanged }) {
 
   return (
     <div className="panel">
-      <h2 className="sec">연결된 삼삼 계정</h2>
+      <h2 className="sec">연결된 렌트 계정</h2>
 
       <div className="accounts">
         {accounts.length === 0 && (
@@ -72,7 +72,7 @@ export default function AccountsPanel({ accounts, onChanged }) {
 
       <div className="addform">
         <div className="fg">
-          <label>삼삼 이메일</label>
+          <label>렌트 이메일</label>
           <input
             type="email"
             placeholder="you@example.com"
