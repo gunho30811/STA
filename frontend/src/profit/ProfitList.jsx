@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { fetchProfit, fmt as n, shortSido } from '../shared/api.js'
+import { fetchProfit, getJSON, qs, readCache, writeCache, fmt as n, shortSido } from '../shared/api.js'
 import Detail from './Detail.jsx'
 import Pager from './Pager.jsx'
 
@@ -36,9 +36,16 @@ export default function ProfitList({ facets, month, demo = false, onSignup }) {
 
   const doSearch = useCallback(async (page, sortOverride) => {
     const srt = sortOverride || sort
-    const data = await fetchProfit({
-      ...f, month, sort: srt.col, dir: srt.dir, page, size: 40,
-    })
+    const params = { ...f, month, sort: srt.col, dir: srt.dir, page, size: 40 }
+    const path = 'api/profit?' + qs(params).toString()
+    // 기본 화면(첫 진입 조건)은 localStorage에 저장해뒀다가 재방문 때 즉시 표시 → 그 다음 최신 갱신.
+    const isDefault = page === 1 && !sortOverride && JSON.stringify(f) === JSON.stringify(DEFAULTS)
+    if (isDefault) {
+      const cached = readCache(path)
+      if (cached) setRes(cached)   // 네트워크 대기 없이 바로
+    }
+    const data = await getJSON(path)
+    if (isDefault) writeCache(path, data)
     setRes(data)
   }, [f, month, sort])
 

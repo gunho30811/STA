@@ -41,6 +41,28 @@ export async function sendJSON(path, method = 'POST', body) {
   return { ok: res.ok, status: res.status, data }
 }
 
+// ── localStorage 영속 캐시(stale-while-revalidate) ──
+// 첫 방문 결과를 브라우저에 저장 → 재방문/새로고침 때 네트워크 대기 없이 즉시 표시하고
+// 뒤에서 조용히 최신으로 갱신. 매물처럼 하루 1회 갱신되는 데이터에 적합.
+const LS_PREFIX = 'sta:'
+const LS_TTL = 24 * 60 * 60 * 1000   // 24시간(그 이상 오래된 캐시는 안 씀)
+
+export function readCache(path) {
+  try {
+    const raw = localStorage.getItem(LS_PREFIX + path)
+    if (!raw) return null
+    const { t, data } = JSON.parse(raw)
+    if (Date.now() - t > LS_TTL) return null
+    return data
+  } catch { return null }
+}
+
+export function writeCache(path, data) {
+  try {
+    localStorage.setItem(LS_PREFIX + path, JSON.stringify({ t: Date.now(), data }))
+  } catch { /* 용량 초과 등은 무시 */ }
+}
+
 // URLSearchParams 빌더: 빈 값 제외. multi에 담긴 키는 append(다중선택).
 export function qs(params, multi = {}) {
   const p = new URLSearchParams()
