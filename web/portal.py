@@ -168,4 +168,4 @@ application = DispatcherMiddleware(portal, {
 if __name__ == "__main__":
     from werkzeug.serving import run_simple
     print("통합 포털: http://127.0.0.1:8000")
-    run_simple("0.0.0.0", 8000, application, use_reloader=False)
+    run_simple("0.0.0.0", 8000, application, use_reloader=True)
