@@ -145,6 +145,28 @@ export default function ProfitList({ facets, month, demo = false, onSignup }) {
         {demo ? '' : ' · 매물을 누르면 상세'}.
       </div>
 
+      {/* 데모: 베스트(상위)는 잠그고 티저로 궁금증 유발 → 아래 '중간'은 실제 노출 */}
+      {demo && res.top_locked > 0 && (
+        <div className="demo-top" onClick={onSignup}>
+          <div className="demo-top-blur">
+            {[0, 1, 2].map((i) => (
+              <div className="mcard" key={i} style={{ pointerEvents: 'none' }}>
+                <div className="mc-main">
+                  <div className="mc-name">●●●●● ●●●●</div>
+                  <div className="mc-area">●● · ●●● · ●●●역</div>
+                </div>
+                <div className="mc-nums"><div className="mc-net pos">●●●만</div><div className="mc-occ">예약 ●●%</div></div>
+              </div>
+            ))}
+          </div>
+          <div className="demo-top-lock">
+            🔒 <b>기대순수익 상위 {res.top_locked}개(베스트)는 회원 전용</b>이에요.<br />
+            아래는 그 다음 매물 맛보기 — <b>회원가입하면 1위부터 전부</b> 볼 수 있어요.
+            <button className="btn btn-go" style={{ marginTop: 10 }} onClick={(e) => { e.stopPropagation(); onSignup() }}>회원가입하고 TOP 매물 보기 →</button>
+          </div>
+        </div>
+      )}
+
       <div className="md">
         <div className="listcol">
           <table>
