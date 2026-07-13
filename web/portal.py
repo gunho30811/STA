@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # web/
 
 from flask import Flask, render_template_string
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from auth import current_user, init_auth
 
@@ -160,11 +161,14 @@ from gangnam_app import app as gangnam_app  # noqa: E402
 from profit_app import app as profit_app  # noqa: E402
 from samsam_app import app as samsam_app  # noqa: E402
 
-application = DispatcherMiddleware(portal, {
-    "/profit": profit_app,
-    "/samsam": samsam_app,
-    "/gangnam": gangnam_app,
-})
+application = ProxyFix(
+    DispatcherMiddleware(portal, {
+        "/profit": profit_app,
+        "/samsam": samsam_app,
+        "/gangnam": gangnam_app,
+    }),
+    x_proto=1, x_host=1,
+)
 
 
 if __name__ == "__main__":
