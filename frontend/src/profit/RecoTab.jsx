@@ -21,12 +21,12 @@ export default function RecoTab({ month }) {
   return (
     <div className="reco">
       <p className="legend hide-mobile" style={{ margin: '0 0 10px' }}>
-        🎯 <b>신규진입 추천(블루오션)</b> — 수요 있고 <b>기대 월순수익</b> 좋은데 <b>경쟁 삼삼 매물이 적은</b> 동/역/오피스텔.
+        🎯 <b>신규진입 추천(블루오션)</b> — 수요 있고 <b>기대 월순수익</b> 좋은데 <b>경쟁 렌트 매물이 적은</b> 동/역/오피스텔.
         <b>기회점수</b> = 기대월순수익 ÷ √경쟁수.
       </p>
       <div className="panel" style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 10 }}>
         <div className="fg"><label>최소 예약률 ≥ (수요)</label><input type="number" value={occ} onChange={(e) => setOcc(e.target.value)} /></div>
-        <div className="fg"><label>최대 경쟁 ≤ (삼삼 매물수)</label><input type="number" value={comp} placeholder="비우면 전체" onChange={(e) => setComp(e.target.value)} /></div>
+        <div className="fg"><label>최대 경쟁 ≤ (렌트 매물수)</label><input type="number" value={comp} placeholder="비우면 전체" onChange={(e) => setComp(e.target.value)} /></div>
         <div className="fg"><label>최소 표본(매칭수) ≥</label><input type="number" value={minN} onChange={(e) => setMinN(e.target.value)} /></div>
         <div className="fg"><label>🛏️ 방 타입</label>
           <select value={rooms} onChange={(e) => setRooms(e.target.value)}>
@@ -58,14 +58,14 @@ export default function RecoTab({ month }) {
                   <td className="l">{r.dong}</td>
                   <td className="l">{r.station || '-'}</td>
                   <td>{n(r.pyeong)}</td>
-                  <td title={r.comp >= 400 ? '삼삼 조회 상한(400) 도달' : ''}>{fmtComp(r.comp)}</td>
+                  <td title={r.comp >= 400 ? '렌트 조회 상한(400) 도달' : ''}>{fmtComp(r.comp)}</td>
                   <td style={{ color: r.matches != null && r.matches <= 2 ? '#dc2626' : '#94a3b8', fontWeight: r.matches != null && r.matches <= 2 ? 700 : 400 }} title={r.matches != null && r.matches <= 2 ? '표본 부족 — 신뢰도 낮음' : ''}>{n(r.matches)}</td>
                   <td className="occ">{n(r.occ)}%</td>
                   <td className="pos" style={{ fontWeight: 800 }}>{n(r.expNet)}</td>
                   <td style={{ fontWeight: 800, color: '#7c3aed' }}>{n(r.score)}</td>
                   <td className="l">
                     {r.naverUrl && <a className="lnk n" style={{ padding: '3px 8px' }} href={r.naverUrl} target="_blank" rel="noreferrer">부동산</a>}
-                    {r.samUrl && <a className="lnk s" style={{ padding: '3px 8px' }} href={r.samUrl} target="_blank" rel="noreferrer">삼삼</a>}
+                    {r.samUrl && <a className="lnk s" style={{ padding: '3px 8px' }} href={r.samUrl} target="_blank" rel="noreferrer">렌트</a>}
                   </td>
                 </tr>
               ))}
@@ -85,7 +85,7 @@ export default function RecoTab({ month }) {
                   <div className="mc-area">{[r.dong, r.station].filter(Boolean).join(' · ')}{r.pyeong ? ` · ${n(r.pyeong)}평` : ''} · 경쟁 {fmtComp(r.comp)}</div>
                   <div className="mc-area">기회점수 <b style={{ color: '#7c3aed' }}>{n(r.score)}</b>
                     {r.naverUrl && <a className="lnk n" style={{ padding: '2px 7px', marginLeft: 6 }} href={r.naverUrl} target="_blank" rel="noreferrer">부동산</a>}
-                    {r.samUrl && <a className="lnk s" style={{ padding: '2px 7px', marginLeft: 4 }} href={r.samUrl} target="_blank" rel="noreferrer">삼삼</a>}
+                    {r.samUrl && <a className="lnk s" style={{ padding: '2px 7px', marginLeft: 4 }} href={r.samUrl} target="_blank" rel="noreferrer">렌트</a>}
                   </div>
                 </div>
                 <div className="mc-nums">
@@ -117,7 +117,7 @@ function RecoArea({ title, rows }) {
                 <td className="l" style={{ fontWeight: 600 }}>{r.name}
                   {r.n != null && r.n <= 2 && <span title="매칭 표본 1~2건 — 신뢰도 낮음" style={{ marginLeft: 5, fontSize: 10, fontWeight: 700, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 5px' }}>표본부족</span>}
                 </td>
-                <td title={r.comp >= 400 ? '삼삼 조회 상한(400) 도달' : ''}>{fmtComp(r.comp)}</td>
+                <td title={r.comp >= 400 ? '렌트 조회 상한(400) 도달' : ''}>{fmtComp(r.comp)}</td>
                 <td style={r.n != null && r.n <= 2 ? { color: '#dc2626', fontWeight: 700 } : { color: '#94a3b8' }}>{n(r.n)}</td>
                 <td className="occ">{n(r.occ)}%</td>
                 <td className="pos" style={{ fontWeight: 800 }}>{n(r.expNet)}</td>

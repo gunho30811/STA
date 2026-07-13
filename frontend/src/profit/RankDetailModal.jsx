@@ -25,7 +25,7 @@ export default function RankDetailModal({ field, label, month, rooms, onClose })
         <div className="rd-head">
           <div>
             <div className="rd-title">{label}</div>
-            <div className="rd-sub">{field === 'dong' ? '동' : '역'} 순위 근거 — 이 지역을 이루는 삼삼 매물 {data ? `${data.total}건` : ''}</div>
+            <div className="rd-sub">{field === 'dong' ? '동' : '역'} 순위 근거 — 이 지역을 이루는 렌트 매물 {data ? `${data.total}건` : ''}</div>
           </div>
           <button className="rd-x" onClick={onClose}>&times;</button>
         </div>
@@ -54,7 +54,7 @@ export default function RankDetailModal({ field, label, month, rooms, onClose })
                       title={r.matches != null && r.matches <= 2 ? '표본 부족' : ''}>{n(r.matches)}</td>
                     <td>{n(r.nRent)}</td>
                     <td className="l">
-                      {r.samUrl && <a className="lnk s" style={{ padding: '3px 8px' }} href={r.samUrl} target="_blank" rel="noreferrer">삼삼</a>}
+                      {r.samUrl && <a className="lnk s" style={{ padding: '3px 8px' }} href={r.samUrl} target="_blank" rel="noreferrer">렌트</a>}
                       {r.naverUrl && <a className="lnk n" style={{ padding: '3px 8px' }} href={r.naverUrl} target="_blank" rel="noreferrer">부동산</a>}
                     </td>
                   </tr>

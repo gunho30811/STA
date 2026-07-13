@@ -358,7 +358,7 @@ def members():
 @bp.route("/crawl")
 def crawl_status():
     """관리자 전용 크롤링 현황 대시보드.
-    부동산(목록·상세)/삼삼 테이블별 총 건수 + 마지막 크롤 시각 + 최근 일별 신규(증분) 추이.
+    부동산(목록·상세)/렌트 테이블별 총 건수 + 마지막 크롤 시각 + 최근 일별 신규(증분) 추이.
     크롤이 매일/매주 정상적으로 돌며 데이터가 쌓이는지 모니터링하는 용도."""
     u = current_user()
     if not u or u["role"] != "admin":
@@ -410,7 +410,7 @@ def crawl_status():
     cards = (f'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:14px 0">'
              f'{card("부동산 목록 (listings)", n_list, last_list)}'
              f'{card("부동산 상세 (naver_listings)", n_naver, last_naver)}'
-             f'{card("삼삼 매물 (samsam_listings)", n_samsam, last_samsam)}</div>')
+             f'{card("렌트 매물 (samsam_listings)", n_samsam, last_samsam)}</div>')
 
     dates = sorted(set(d_samsam) | set(d_naver), reverse=True)[:14]
     if dates:
@@ -418,7 +418,7 @@ def crawl_status():
             f"<tr><td>{d}</td><td style='text-align:right'>{d_samsam.get(d,0):,}</td>"
             f"<td style='text-align:right'>{d_naver.get(d,0):,}</td></tr>" for d in dates)
         daily = (f'<h2 style="font-size:15px;margin:22px 0 6px">📈 일별 신규 매물 (최근 14일)</h2>'
-                 f'<div class="tw"><table><thead><tr><th>날짜</th><th style="text-align:right">삼삼 신규</th>'
+                 f'<div class="tw"><table><thead><tr><th>날짜</th><th style="text-align:right">렌트 신규</th>'
                  f'<th style="text-align:right">부동산 상세 신규</th></tr></thead><tbody>{drows}</tbody></table></div>')
     else:
         daily = '<div class="msg info" style="margin-top:20px">아직 일별 수집 기록이 없습니다.</div>'
@@ -427,7 +427,7 @@ def crawl_status():
         srows = "".join(
             f"<tr><td>{r[0]}</td><td style='text-align:right'>{r[1]:,}</td>"
             f"<td style='text-align:right'>{r[2]:,}</td></tr>" for r in snaps)
-        snap_tbl = (f'<h2 style="font-size:15px;margin:22px 0 6px">🗓️ 삼삼 예약률 스냅샷 이력 (최근 14회)</h2>'
+        snap_tbl = (f'<h2 style="font-size:15px;margin:22px 0 6px">🗓️ 렌트 예약률 스냅샷 이력 (최근 14회)</h2>'
                     f'<div class="tw"><table><thead><tr><th>스냅샷 날짜</th><th style="text-align:right">지역×유형 수</th>'
                     f'<th style="text-align:right">매물 합계</th></tr></thead><tbody>{srows}</tbody></table></div>')
     else:
@@ -437,7 +437,7 @@ def crawl_status():
             f'<p class="sub">관리자: {u["username"] or u["email"]} · '
             f'<a href="/">홈</a> · <a href="{url_for("auth.members")}">회원 관리</a> · '
             f'<a href="{url_for("auth.logout")}">로그아웃</a></p>'
-            f'<div class="msg info">부동산: 매주 월 10:00(KST) · 삼삼: 매일 00:00(KST) 자동 크롤</div>'
+            f'<div class="msg info">부동산: 매주 월 10:00(KST) · 렌트: 매일 00:00(KST) 자동 크롤</div>'
             f'{cards}{daily}{snap_tbl}')
     return _render("크롤링 현황", body, boxstyle="max-width:820px")
 
@@ -540,11 +540,11 @@ def _nav_html():
     # 브랜드 로고 + 메뉴. 데스크탑은 가로 메뉴, 모바일은 햄버거(순수 CSS 체크박스 토글, JS 불필요).
     return f"""<input type=checkbox id=__navtog hidden>
 <nav id=__nav>
-  <a class=__brand href="/">렌트<b>업</b></a>
+  <a class=__brand href="/">렌트<b>Up</b><svg width="26" height="18" viewBox="0 0 26 18" fill="none" style="margin-left:4px;vertical-align:-1px"><g stroke="#60a5fa" stroke-width="2.6" stroke-linecap="round"><line x1="2" y1="15" x2="10" y2="4"/><line x1="9" y1="15" x2="17" y2="4"/><line x1="16" y1="15" x2="24" y2="5"/></g></svg></a>
   <label for=__navtog class=__ham aria-label="메뉴">☰</label>
   <div class=__menu>
     <a href="/profit/">수익성</a>
-    <a href="/samsam/">삼삼분석</a>
+    <a href="/samsam/">렌트 분석</a>
     <a href="/gangnam/">부동산매물</a>
     <a href="/samsam/chat/">통합채팅</a>
     {admin}

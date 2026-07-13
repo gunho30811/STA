@@ -37,7 +37,7 @@ export default function Detail({ item, onClose }) {
         </span>
       </div>
       <div className="d-sec">
-        <h4>삼삼 단기임대</h4>
+        <h4>렌트 단기임대</h4>
         <KV k="주당 임대료" v={`${n(x.wk)} 만원`} />
         <KV k="실현매출(월, 예약률 반영)" v={`${n(x.realRev)} 만원`} />
         <KV k="최대수익(월환산, 풀가동)" v={`${n(x.maxRev)} 만원`} />
@@ -56,8 +56,8 @@ export default function Detail({ item, onClose }) {
       </div>
       <div className="d-sec">
         <h4>건물 · 지역</h4>
-        <KV k="이 건물 삼삼 매물수" v={n(x.samBldg)} />
-        <KV k="동 경쟁(삼삼)" v={fmtComp(x.dongCnt)} />
+        <KV k="이 건물 렌트 매물수" v={n(x.samBldg)} />
+        <KV k="동 경쟁(렌트)" v={fmtComp(x.dongCnt)} />
         <KV k="동 예약률" v={`${n(x.dongOcc)} %`} />
         <KV k="인근역" v={`${x.station || '-'} (역예약률 ${n(x.stOcc)}%)`} />
         <KV k="건물 부동산 매물수" v={n(x.bldgCnt)} />
@@ -65,7 +65,7 @@ export default function Detail({ item, onClose }) {
       </div>
       <div>
         {x.naverUrl && <a className="lnk n" href={x.naverUrl} target="_blank" rel="noreferrer">부동산</a>}
-        {x.samUrl && <a className="lnk s" href={x.samUrl} target="_blank" rel="noreferrer">삼삼</a>}
+        {x.samUrl && <a className="lnk s" href={x.samUrl} target="_blank" rel="noreferrer">렌트</a>}
       </div>
       </div>
     </>
