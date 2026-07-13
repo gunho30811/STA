@@ -47,7 +47,7 @@ box-shadow:0 10px 30px rgba(0,0,0,.25);transition:.15s}
 @media(max-width:640px){body{padding:24px 14px}h1{font-size:21px}.card{padding:18px}}
 </style></head><body><div class=wrap>
 <div class=top>
-  <h1>🏠 부동산 단기임대 분석</h1>
+  <h1>🏠 렌트업 <span style="font-size:15px;font-weight:600;color:#94a3b8">단기임대 수익성 분석</span></h1>
   <div class=who>{{user.name or user.username or user.email}} 님
     <a href="/auth/logout">로그아웃</a></div>
 </div>
@@ -83,7 +83,7 @@ box-shadow:0 10px 30px rgba(0,0,0,.25);transition:.15s}
 
 PUBLIC_LANDING = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
-<title>삼삼수익 · 단기임대 수익성 분석</title>
+<title>렌트업 · 단기임대 수익성 분석</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
 background:radial-gradient(1200px 600px at 50% -10%,#1e293b,#0f172a);min-height:100vh;color:#e2e8f0}
@@ -113,7 +113,7 @@ grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
 @media(max-width:640px){.hero h1{font-size:32px}.hero{padding:40px 20px 30px}.nav{padding:14px 18px}}
 </style></head><body>
 <div class=nav>
-  <div class=brand>삼삼<span class=dot>수익</span></div>
+  <div class=brand>렌트<span class=dot>업</span></div>
   <div class=cta>
     <a class=login href="/auth/login">로그인</a>
     <a class=signup href="/auth/signup">회원가입</a>
