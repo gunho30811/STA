@@ -69,3 +69,9 @@ export function fmtComp(x) {
   if (x == null) return '-'
   return x >= 400 ? '400+' : x.toLocaleString()
 }
+
+// 시/도 축약(서울특별시→서울). 좁은 화면에서 지역을 짧게 보여줄 때.
+const _SIDO_SHORT = { 서울특별시: '서울', 경기도: '경기', 인천광역시: '인천' }
+export function shortSido(s) {
+  return _SIDO_SHORT[s] || s || ''
+}
