@@ -125,7 +125,7 @@ function BuildingRow({ r }) {
       <td className="mut">{r.n_matched || 0}</td>
       <td className="l">
         {r.sam_url ? <a className="lnk" href={r.sam_url} target="_blank" rel="noreferrer">렌트 예시</a> : null}
-        {r.naver_url ? <> <a className="lnk" style={{ background: '#2563eb' }} href={r.naver_url} target="_blank" rel="noreferrer">부동산</a></> : null}
+        {r.naver_url ? <> <a className="lnk" style={{ background: '#4321F3' }} href={r.naver_url} target="_blank" rel="noreferrer">부동산</a></> : null}
         {!r.sam_url && !r.naver_url ? <span className="mut">-</span> : null}
       </td>
     </tr>

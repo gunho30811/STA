@@ -129,10 +129,10 @@ display:flex;min-height:100vh;align-items:center;justify-content:center;padding:
 h1{font-size:20px;margin:0 0 4px;font-weight:800}.sub{font-size:12.5px;color:#94a3b8;margin:0 0 20px}
 label{font-size:12px;font-weight:700;color:#4b5563;display:block;margin:12px 0 4px}
 input{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-family:inherit}
-input:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+input:focus{outline:none;border-color:#4321F3;box-shadow:0 0 0 3px rgba(67,33,243,.1)}
 .btn{display:block;width:100%;margin-top:16px;padding:11px;border:none;border-radius:8px;
-background:#2563eb;color:#fff;font-size:14px;font-weight:700;cursor:pointer;text-align:center;font-family:inherit}
-.btn:hover{background:#1d4ed8}
+background:#4321F3;color:#fff;font-size:14px;font-weight:700;cursor:pointer;text-align:center;font-family:inherit}
+.btn:hover{background:#3517c4}
 .kakao-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:0;
 padding:12px;border-radius:8px;background:#FEE500;color:#191919;font-size:14px;font-weight:700;
 text-decoration:none;font-family:inherit}
@@ -142,10 +142,10 @@ text-decoration:none;font-family:inherit}
 .or-sep hr{flex:1;border:none;border-top:1px solid #e5e7eb}
 .msg{margin:12px 0;padding:10px 12px;border-radius:8px;font-size:13px}
 .err{background:#fef2f2;color:#b91c1c}.ok{background:#ecfdf5;color:#047857}.info{background:#eff6ff;color:#1e40af}
-.lnk{text-align:center;margin-top:20px;font-size:13px;color:#6b7280}.lnk a{color:#2563eb;text-decoration:none;font-weight:700}
+.lnk{text-align:center;margin-top:20px;font-size:13px;color:#6b7280}.lnk a{color:#4321F3;text-decoration:none;font-weight:700}
 table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 10px;border-bottom:1px solid #eef0f2;text-align:left}
 th{background:#f9fafb;font-weight:700}.danger{color:#dc2626;cursor:pointer;border:none;background:none;font-weight:700}
-.code{font-size:24px;font-weight:800;letter-spacing:4px;color:#2563eb;text-align:center;background:#eff6ff;padding:12px;border-radius:8px;margin:8px 0}
+.code{font-size:24px;font-weight:800;letter-spacing:4px;color:#4321F3;text-align:center;background:#eff6ff;padding:12px;border-radius:8px;margin:8px 0}
 .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
 @media(max-width:640px){body{padding:12px}.box{padding:22px 16px}
 table{font-size:12px}th,td{padding:7px 8px}input{font-size:16px}}
@@ -180,7 +180,7 @@ def login():
     _ico = ('<svg width="18" height="18" viewBox="0 0 18 18"><path fill="#191919" d="M9 1.5C4.86'
             ' 1.5 1.5 4.19 1.5 7.5c0 2.1 1.27 3.94 3.19 5.06l-.81 3.01 3.48-2.29C7.72 13.42'
             ' 8.35 13.5 9 13.5c4.14 0 7.5-2.69 7.5-6S13.14 1.5 9 1.5z"/></svg>')
-    body = (f'<h1>렌트Up</h1>'
+    body = (f'<h1 style="letter-spacing:-.02em;color:#171A23">ren<b style="color:#4321F3">dit</b></h1>'
             f'<p class="sub">부동산 단기임대 수익성 분석 · 회원 전용</p>{msg}'
             f'<a href="{url_for("auth.kakao_login")}" class="kakao-btn">{_ico}카카오로 시작하기</a>'
             f'<div class="or-sep"><hr><span>또는</span><hr></div>'
@@ -370,7 +370,7 @@ def members():
             act = _form("auth.member_approve", r["id"], "승인취소", "approve", "0", "#64748b")
         else:
             ap = '<span style="color:#dc2626;font-weight:700">대기</span>'
-            act = _form("auth.member_approve", r["id"], "✔ 승인", "approve", "1", "#2563eb")
+            act = _form("auth.member_approve", r["id"], "✔ 승인", "approve", "1", "#4321F3")
         delbtn = _form("auth.member_delete", r["id"], "삭제", confirm=True) if r["role"] != "admin" else ""
         trs += (f"<tr><td>{r['id']}</td><td>{r.get('email') or '-'}</td><td>{r.get('name') or ''}</td>"
                 f"<td>{r.get('birthdate') or ''}</td><td>{vr}</td><td>{ap}</td>"
@@ -661,7 +661,7 @@ def _nav_html():
     # 브랜드 로고 + 메뉴. 데스크탑은 가로 메뉴, 모바일은 햄버거(순수 CSS 체크박스 토글, JS 불필요).
     return f"""<input type=checkbox id=__navtog hidden>
 <nav id=__nav>
-  <a class=__brand href="/">렌트<b>Up</b><svg width="26" height="18" viewBox="0 0 26 18" fill="none" style="margin-left:4px;vertical-align:-1px"><g stroke="#60a5fa" stroke-width="2.6" stroke-linecap="round"><line x1="2" y1="15" x2="10" y2="4"/><line x1="9" y1="15" x2="17" y2="4"/><line x1="16" y1="15" x2="24" y2="5"/></g></svg></a>
+  <a class=__brand href="/">ren<b>dit</b></a>
   <label for=__navtog class=__ham aria-label="메뉴">☰</label>
   <div class=__menu>
     <a href="/profit/">수익성</a>
@@ -677,7 +677,7 @@ def _nav_html():
 display:flex;align-items:center;gap:6px;padding:10px 16px;
 font-family:'Pretendard','Malgun Gothic',sans-serif;box-shadow:0 1px 6px rgba(0,0,0,.2)}}
 #__nav .__brand{{font-size:17px;font-weight:900;color:#fff;text-decoration:none;letter-spacing:-.02em;margin-right:auto}}
-#__nav .__brand b{{color:#60a5fa;font-weight:900}}
+#__nav .__brand b{{color:#8b7dff;font-weight:900}}
 #__nav .__menu{{display:flex;align-items:center;gap:2px}}
 #__nav .__menu a{{color:#cbd5e1;text-decoration:none;padding:7px 12px;border-radius:7px;font-weight:600;font-size:13.5px;white-space:nowrap}}
 #__nav .__menu a:hover{{background:#1e293b;color:#fff}}

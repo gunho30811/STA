@@ -29,7 +29,7 @@ portal = Flask(__name__)
 init_auth(portal)
 
 LANDING = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
-<meta name=viewport content="width=device-width,initial-scale=1"><title>렌트Up · 단기임대 분석</title>
+<meta name=viewport content="width=device-width,initial-scale=1"><title>rendit · 단기임대 분석</title>
 <link rel=stylesheet href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard-dynamic-subset.css">
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
@@ -49,17 +49,17 @@ box-shadow:0 10px 30px rgba(0,0,0,.25);transition:.15s}
 @media(max-width:640px){body{padding:24px 14px}h1{font-size:21px}.card{padding:18px}}
 </style></head><body><div class=wrap>
 <div class=top>
-  <h1>🏠 렌트Up <span style="font-size:15px;font-weight:600;color:#94a3b8">단기임대 수익성 분석</span></h1>
+  <h1>ren<b style="color:#8b7dff">dit</b> <span style="font-size:15px;font-weight:600;color:#94a3b8">단기임대 수익성 분석</span></h1>
   <div class=who>{{user.name or user.username or user.email}} 님
     <a href="/auth/logout">로그아웃</a></div>
 </div>
 <p class=sub>부동산을 단기임대로 돌리면 얼마 버는지 · 회원 전용</p>
 <div class=grid>
-  <a class=card href="/profit/"><div class=ic>💰</div><h2>통합 수익성</h2>
+  <a class=card href="/profit/"><div class=ic>{ICON_PROFIT}</div><h2>통합 수익성</h2>
     <p>렌트 단기임대 풀가동 시 부동산 월세 대비 최대수익·순수익, 동/역 순위</p></a>
-  <a class=card href="/samsam/"><div class=ic>🛋️</div><h2>렌트 분석</h2>
+  <a class=card href="/samsam/"><div class=ic>{ICON_RENT}</div><h2>렌트 분석</h2>
     <p>옵션별 예약률 영향, 건물 인기(월순수익), 지역 예약률 트렌드</p></a>
-  <a class=card href="/gangnam/"><div class=ic>🏙️</div><h2>부동산 매물</h2>
+  <a class=card href="/gangnam/"><div class=ic>{ICON_ESTATE}</div><h2>부동산 매물</h2>
     <p>수도권(서울·경기·인천) 부동산 매물 카드/상세 탐색</p></a>
 </div>
 {% if user.role == 'admin' %}<div class=admin><a href="/auth/crawl">📊 크롤링 현황</a>
@@ -85,25 +85,25 @@ box-shadow:0 10px 30px rgba(0,0,0,.25);transition:.15s}
 
 PUBLIC_LANDING = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
-<title>렌트Up · 단기임대 수익성 분석</title>
+<title>rendit · 단기임대 수익성 분석</title>
 <link rel=stylesheet href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard-dynamic-subset.css">
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
 background:radial-gradient(1200px 600px at 50% -10%,#1e293b,#0f172a);min-height:100vh;color:#e2e8f0}
 .nav{display:flex;justify-content:space-between;align-items:center;padding:18px 28px;max-width:1080px;margin:0 auto}
-.brand{font-size:20px;font-weight:900;color:#fff;letter-spacing:-.02em}.brand .dot{color:#60a5fa}
+.brand{font-size:20px;font-weight:900;color:#fff;letter-spacing:-.02em}.brand .dot{color:#8b7dff}
 .nav .cta{display:flex;gap:8px}
 .nav a{text-decoration:none;font-weight:700;font-size:14px;padding:9px 16px;border-radius:9px}
-.nav .login{color:#cbd5e1}.nav .signup{background:#2563eb;color:#fff}
+.nav .login{color:#cbd5e1}.nav .signup{background:#4321F3;color:#fff}
 .hero{max-width:1080px;margin:0 auto;padding:60px 28px 40px;text-align:center}
-.hero .tag{display:inline-block;font-size:13px;font-weight:700;color:#93c5fd;background:rgba(37,99,235,.15);
+.hero .tag{display:inline-block;font-size:13px;font-weight:700;color:#93c5fd;background:rgba(67,33,243,.15);
 border:1px solid rgba(96,165,250,.3);padding:6px 14px;border-radius:999px;margin-bottom:24px}
 .hero h1{font-size:44px;line-height:1.2;font-weight:900;margin:0 0 18px;color:#fff;letter-spacing:-.03em}
-.hero h1 .hl{color:#60a5fa}
+.hero h1 .hl{color:#8b7dff}
 .hero p{font-size:17px;line-height:1.7;color:#94a3b8;margin:0 auto 32px;max-width:640px}
 .hero .btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
 .btn{text-decoration:none;font-weight:800;font-size:15px;padding:14px 28px;border-radius:11px}
-.btn-primary{background:#2563eb;color:#fff;box-shadow:0 8px 24px rgba(37,99,235,.4)}
+.btn-primary{background:#4321F3;color:#fff;box-shadow:0 8px 24px rgba(67,33,243,.4)}
 .btn-ghost{background:rgba(255,255,255,.06);color:#e2e8f0;border:1px solid rgba(255,255,255,.14)}
 .cards{max-width:1080px;margin:20px auto 0;padding:20px 28px 70px;display:grid;
 grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
@@ -116,7 +116,7 @@ grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
 @media(max-width:640px){.hero h1{font-size:32px}.hero{padding:40px 20px 30px}.nav{padding:14px 18px}}
 </style></head><body>
 <div class=nav>
-  <div class=brand>렌트<span class=dot>Up</span><svg width="30" height="20" viewBox="0 0 30 20" fill="none" style="margin-left:5px"><g stroke="#60a5fa" stroke-width="3" stroke-linecap="round"><line x1="2" y1="17" x2="11" y2="4"/><line x1="10" y1="17" x2="19" y2="4"/><line x1="18" y1="17" x2="27" y2="5"/></g></svg></div>
+  <div class=brand>ren<span class=dot>dit</span></div>
   <div class=cta>
     <a class=login href="/auth/login">로그인</a>
     <a class=signup href="/auth/signup">회원가입</a>
@@ -133,11 +133,11 @@ grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
   </div>
 </div>
 <div class=cards>
-  <div class=card><div class=ic>💰</div><h3>수익성 분석</h3>
+  <div class=card><div class=ic>{ICON_PROFIT}</div><h3>수익성 분석</h3>
     <p>단기임대 풀가동 시 부동산 월세 대비 최대수익·기대 월순수익. 동·역별 순위로 어디가 잘 나가는지 바로.</p></div>
-  <div class=card><div class=ic>🛋️</div><h3>렌트 데이터</h3>
+  <div class=card><div class=ic>{ICON_RENT}</div><h3>렌트 데이터</h3>
     <p>옵션별 예약률 영향, 건물 인기 랭킹, 지역 예약률 트렌드까지 — 실제 단기임대 수요를 데이터로.</p></div>
-  <div class=card><div class=ic>🏙️</div><h3>부동산 매물</h3>
+  <div class=card><div class=ic>{ICON_ESTATE}</div><h3>부동산 매물</h3>
     <p>수도권(서울·경기·인천) 월세 매물을 근처 단기임대 수요와 함께. 이 집으로 운영 시 예상 순수익까지.</p></div>
 </div>
 <div class=steps>
@@ -145,6 +145,29 @@ grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
 </div>
 <div class=foot>회원 전용 서비스 · 가입 후 관리자 승인 시 이용 가능</div>
 </body></html>"""
+
+
+# rendit 아이콘 타일(퍼플 라운드 사각 + 흰 글리프, 로고의 둥근 기하학 톤). 다크/라이트 배경 공통.
+def _tile(glyph):
+    return (
+        '<svg width="46" height="46" viewBox="0 0 46 46" fill="none" '
+        'style="display:block">'
+        '<rect width="46" height="46" rx="13" fill="#4321F3"/>'
+        '<g stroke="#fff" stroke-width="2.5" stroke-linecap="round" '
+        'stroke-linejoin="round">' + glyph + '</g></svg>'
+    )
+# 수익성: 우상향 라인 + 화살촉
+ICON_PROFIT = _tile('<path d="M14 31l7-7 5 4 7-9"/><path d="M29 17h5v5"/>')
+# 렌트 데이터: 예약 캘린더 + 체크
+ICON_RENT = _tile('<rect x="14" y="16" width="18" height="16" rx="3"/>'
+                  '<path d="M14 21h18M19 14v4M27 14v4M19 26l2.4 2.4L26 24"/>')
+# 부동산 매물: 건물/집 + 문
+ICON_ESTATE = _tile('<path d="M16 32V20l7-6 7 6v12"/><path d="M20 32v-6h6v6"/>')
+
+for _k, _v in {"ICON_PROFIT": ICON_PROFIT, "ICON_RENT": ICON_RENT,
+               "ICON_ESTATE": ICON_ESTATE}.items():
+    LANDING = LANDING.replace("{" + _k + "}", _v)
+    PUBLIC_LANDING = PUBLIC_LANDING.replace("{" + _k + "}", _v)
 
 
 @portal.route("/")

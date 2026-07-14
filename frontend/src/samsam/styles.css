@@ -15,11 +15,11 @@ header p { margin: 5px 0 0; font-size: 12.5px; color: #94a3b8; }
 .fg select { padding: 7px 9px; border: 1px solid #d1d5db; border-radius: 7px; font-size: 13px; background: #fff; min-width: 120px; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .chips label { display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; border: 1px solid #d1d5db; border-radius: 999px; font-size: 13px; font-weight: 600; color: #475569; background: #fff; cursor: pointer; user-select: none; }
-.chips label.on { background: #2563eb; border-color: #2563eb; color: #fff; }
+.chips label.on { background: #4321F3; border-color: #4321F3; color: #fff; }
 .chips input { display: none; }
 .fg input { padding: 7px 9px; border: 1px solid #d1d5db; border-radius: 7px; font-size: 13px; background: #fff; }
 .btn { cursor: pointer; border: none; border-radius: 7px; padding: 9px 20px; font-size: 13px; font-weight: 700; }
-.btn-go { background: #2563eb; color: #fff; }
+.btn-go { background: #4321F3; color: #fff; }
 .cards { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
 .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 13px 18px; min-width: 140px; box-shadow: 0 1px 2px rgba(0, 0, 0, .03); }
 .card .lbl { font-size: 12px; color: #6b7280; }
@@ -48,11 +48,11 @@ tbody tr.on { background: #dbeafe; }
 .toggle button { border: 1px solid #d1d5db; background: #fff; color: #475569; padding: 6px 13px; font-size: 12px; cursor: pointer; font-weight: 700; }
 .toggle button:first-child { border-radius: 7px 0 0 7px; }
 .toggle button:last-child { border-radius: 0 7px 7px 0; border-left: none; }
-.toggle button.on { background: #2563eb; color: #fff; border-color: #2563eb; }
+.toggle button.on { background: #4321F3; color: #fff; border-color: #4321F3; }
 .empty { text-align: center; color: #9ca3af; padding: 40px 0; }
 .tabs2 { display: flex; gap: 6px; margin-bottom: 12px; }
 .tabs2 button { border: 1px solid #d1d5db; background: #fff; color: #475569; padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; }
-.tabs2 button.on { background: #2563eb; color: #fff; border-color: #2563eb; }
+.tabs2 button.on { background: #4321F3; color: #fff; border-color: #4321F3; }
 .occ { font-weight: 700; color: #0369a1; }
 @media (max-width: 640px) {
   header { padding: 14px 14px; }
