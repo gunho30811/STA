@@ -662,33 +662,38 @@ def _nav_html():
     # 브랜드 로고 + 메뉴. 데스크탑은 가로 메뉴, 모바일은 햄버거(순수 CSS 체크박스 토글, JS 불필요).
     return f"""<input type=checkbox id=__navtog hidden>
 <nav id=__nav>
-  <a class=__brand href="/">ren<b>dit</b></a>
-  <label for=__navtog class=__ham aria-label="메뉴">☰</label>
-  <div class=__menu>
-    <a href="/profit/">수익성</a>
-    <a href="/samsam/">렌트 분석</a>
-    <a href="/gangnam/">부동산매물</a>
-    <a href="/samsam/chat/">통합채팅</a>
-    {admin}
-    <a href="/auth/logout" class=__logout>로그아웃</a>
+  <div class=__inner>
+    <a class=__brand href="/">ren<b>dit</b></a>
+    <label for=__navtog class=__ham aria-label="메뉴">☰</label>
+    <div class=__menu>
+      <a href="/profit/">수익성</a>
+      <a href="/samsam/">렌트 분석</a>
+      <a href="/gangnam/">부동산매물</a>
+      <a href="/samsam/chat/">통합채팅</a>
+      {admin}
+      <a href="/auth/logout" class=__logout>로그아웃</a>
+    </div>
   </div>
 </nav>
 <style>
 #__nav{{position:sticky;top:0;z-index:9999;background:#0f172a;color:#e2e8f0;
-display:flex;align-items:center;gap:6px;padding:10px 16px;
 font-family:'Pretendard','Malgun Gothic',sans-serif;box-shadow:0 1px 6px rgba(0,0,0,.2)}}
-#__nav .__brand{{font-size:17px;font-weight:900;color:#fff;text-decoration:none;letter-spacing:-.02em;margin-right:auto}}
+/* 컨텐츠와 같은 폭으로 가운데 정렬 — 로고/메뉴가 화면 끝에 붙지 않게 */
+#__nav .__inner{{max-width:1080px;margin:0 auto;width:100%;
+display:flex;align-items:center;gap:8px;padding:14px 0}}
+#__nav .__brand{{font-size:24px;font-weight:900;color:#fff;text-decoration:none;letter-spacing:-.02em;margin-right:auto}}
 #__nav .__brand b{{color:#8b7dff;font-weight:900}}
-#__nav .__menu{{display:flex;align-items:center;gap:2px}}
-#__nav .__menu a{{color:#cbd5e1;text-decoration:none;padding:7px 12px;border-radius:7px;font-weight:600;font-size:13.5px;white-space:nowrap}}
+#__nav .__menu{{display:flex;align-items:center;gap:4px}}
+#__nav .__menu a{{color:#cbd5e1;text-decoration:none;padding:8px 14px;border-radius:8px;font-weight:600;font-size:15px;white-space:nowrap}}
 #__nav .__menu a:hover{{background:#1e293b;color:#fff}}
 #__nav .__menu .__logout{{color:#94a3b8}}
-#__nav .__ham{{display:none;font-size:22px;color:#e2e8f0;cursor:pointer;padding:2px 8px;user-select:none}}
+#__nav .__ham{{display:none;font-size:24px;color:#e2e8f0;cursor:pointer;padding:2px 8px;user-select:none}}
 @media(max-width:640px){{
+  #__nav .__inner{{padding:12px 18px}}
   #__nav .__ham{{display:block}}
   #__nav .__menu{{display:none;position:absolute;top:100%;left:0;right:0;background:#0f172a;
     flex-direction:column;align-items:stretch;padding:6px 10px 12px;gap:0;box-shadow:0 8px 20px rgba(0,0,0,.35)}}
   #__navtog:checked ~ #__nav .__menu{{display:flex}}
-  #__nav .__menu a{{padding:12px 10px;border-bottom:1px solid #1e293b;font-size:15px}}
+  #__nav .__menu a{{padding:12px 10px;border-bottom:1px solid #1e293b;font-size:15.5px}}
 }}
 </style>"""
