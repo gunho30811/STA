@@ -35,7 +35,7 @@ LANDING = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
 <link rel=stylesheet href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard-dynamic-subset.css">
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
-background:linear-gradient(140deg,#0f172a,#1e293b);min-height:100vh;color:#e2e8f0;padding:40px 20px}
+background:linear-gradient(140deg,#0f172a,#1e293b);min-height:100vh;color:#e2e8f0}
 .wrap{max-width:860px;margin:0 auto}
 .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px}
 h1{font-size:24px;font-weight:800;margin:0}
@@ -48,7 +48,7 @@ box-shadow:0 10px 30px rgba(0,0,0,.25);transition:.15s}
 .card .ic{font-size:30px}.card h2{font-size:17px;margin:10px 0 4px;font-weight:800}
 .card p{font-size:12.5px;color:#64748b;margin:0;line-height:1.5}
 .admin{margin-top:22px}.admin a{color:#fca5a5;text-decoration:none;font-weight:700;font-size:13px}
-@media(max-width:640px){body{padding:24px 14px}h1{font-size:21px}.card{padding:18px}}
+@media(max-width:640px){h1{font-size:21px}.card{padding:18px}}
 </style></head><body><div class=wrap>
 <div class=top>
   <h1>{{user.name or user.username or user.email}}님, 환영합니다 👋</h1>
