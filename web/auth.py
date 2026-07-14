@@ -678,9 +678,9 @@ def _nav_html():
 <style>
 #__nav{{position:sticky;top:0;z-index:9999;background:#0f172a;color:#e2e8f0;
 font-family:'Pretendard','Malgun Gothic',sans-serif;box-shadow:0 1px 6px rgba(0,0,0,.2)}}
-/* 컨텐츠와 같은 폭으로 가운데 정렬 — 로고/메뉴가 화면 끝에 붙지 않게 */
-#__nav .__inner{{max-width:1080px;margin:0 auto;width:100%;
-display:flex;align-items:center;gap:8px;padding:14px 0}}
+/* full-width + 좌우 22px 여백 — 뷰어(.wrap padding 22px) 컨텐츠와 로고 좌측 정렬 일치 */
+#__nav .__inner{{width:100%;
+display:flex;align-items:center;gap:8px;padding:14px 22px}}
 #__nav .__brand{{font-size:24px;font-weight:900;color:#fff;text-decoration:none;letter-spacing:-.02em;margin-right:auto}}
 #__nav .__brand b{{color:#8b7dff;font-weight:900}}
 #__nav .__menu{{display:flex;align-items:center;gap:4px}}
