@@ -552,6 +552,7 @@ def kakao_callback():
         return redirect(url_for("auth.login"))
 
     conn = db.connect()
+    pending = False
     try:
         row = conn.execute("SELECT id,role FROM members WHERE kakao_id=%s", (kakao_id,)).fetchone()
         if row and name and name != "카카오회원":
@@ -566,21 +567,34 @@ def kakao_callback():
                 conn.commit()
                 row = row2
         if not row:
-            # 신규 회원 자동 생성(카카오 인증 = 이메일 인증·관리자 승인 대체)
+            # 신규 회원 생성. 카카오 인증 = 이메일 인증 대체(email_verified=TRUE)이나,
+            # 관리자 승인은 이메일 가입과 동일하게 대기(approved=FALSE) → 승인 후 로그인.
             conn.execute(
                 "INSERT INTO members(email,password_hash,name,role,email_verified,approved,"
-                "kakao_id,created_at) VALUES(%s,'!',%s,'member',TRUE,TRUE,%s,%s)",
+                "kakao_id,created_at) VALUES(%s,'!',%s,'member',TRUE,FALSE,%s,%s)",
                 (email, name, kakao_id, _now().isoformat(timespec="seconds")))
             conn.commit()
             row = conn.execute("SELECT id,role FROM members WHERE kakao_id=%s",
                                (kakao_id,)).fetchone()
         if not row:
             return redirect(url_for("auth.login"))
-        session["uid"] = row["id"]
-        session["role"] = row["role"]
-        session.permanent = True
+        # 관리자 승인 게이트(이메일 로그인과 동일): 미승인 일반 회원은 로그인 불가.
+        st = conn.execute("SELECT role,approved FROM members WHERE id=%s",
+                          (row["id"],)).fetchone()
+        if st["role"] != "admin" and not st["approved"]:
+            pending = True
+        else:
+            session["uid"] = row["id"]
+            session["role"] = row["role"]
+            session.permanent = True
     finally:
         conn.close()
+    if pending:
+        body = (f'<h1>✅ 가입 완료</h1><p class="sub">{name}님, 카카오로 가입되었습니다.</p>'
+                f'<div class="msg ok"><b>관리자 승인 후</b> 로그인할 수 있습니다. '
+                f'승인되면 안내해 드립니다.</div>'
+                f'<div class=lnk><a href="{url_for("auth.login")}">로그인 화면으로</a></div>')
+        return _render("가입 완료", body)
     return redirect(request.args.get("next") or "/")
 
 
