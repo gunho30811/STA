@@ -18,6 +18,7 @@ import json
 import os
 import statistics
 import sys
+import time
 from datetime import datetime
 
 import requests
@@ -148,11 +149,23 @@ def load_listings():
     return rows, src
 
 
-_LC=None
+_LC = None
+_LOADED_AT = 0.0
+_TTL = 300   # 5분마다 캐시(_LC/_IDX/_MC) 무효화 → 크롤 갱신이 재배포 없이도 반영(웜 인스턴스 stale 방지).
+
+
+def _expire_if_stale():
+    global _LC, _IDX, _MC, _LOADED_AT
+    if time.time() - _LOADED_AT > _TTL:
+        _LC = _IDX = _MC = None
+        _LOADED_AT = time.time()
+
+
 def _ensure():
     global _LC
+    _expire_if_stale()
     if _LC is None:
-        _LC=load_listings()
+        _LC = load_listings()
     return _LC
 def L():
     return _ensure()[0]
@@ -166,6 +179,7 @@ def SRC():
 _IDX = None
 def _indexes():
     global _IDX
+    _expire_if_stale()
     if _IDX is None:
         bi, si = search.TextIndex(), search.TextIndex()
         for r in L():
@@ -215,11 +229,12 @@ def _load_matches():
     return out
 
 
-_MC=None
+_MC = None
 def M():
     global _MC
+    _expire_if_stale()
     if _MC is None:
-        _MC=_load_matches()
+        _MC = _load_matches()
     return _MC
 
 
