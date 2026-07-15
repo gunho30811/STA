@@ -186,13 +186,22 @@ class _Conn:
         return _Cursor(cur)
 
     def commit(self):
+        # 연결은 autocommit=True 로 열려 모든 execute/executemany 가 이미 커밋된다.
+        # 이 상태의 명시적 commit 은 열린 트랜잭션이 없어 불필요하고, Supabase 트랜잭션
+        # 풀러(pgbouncer)에선 bare 'commit' 이 백엔드 교체와 겹쳐 간헐적으로
+        # 'unnamed prepared statement does not exist'(26000)를 낸다 → autocommit 이면 건너뛴다.
+        if getattr(self._conn, 'autocommit', False):
+            return
         self._conn.commit()
 
     def close(self):
         self._conn.close()
 
     def rollback(self):
-        self._conn.rollback()
+        try:
+            self._conn.rollback()
+        except Exception:
+            pass
 
 
 def connect():
