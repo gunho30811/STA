@@ -18,11 +18,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import requests as _requests
 
-from flask import (Blueprint, redirect, render_template_string, request,
+from flask import (Blueprint, jsonify, redirect, render_template_string, request,
                    session, url_for)
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import db
+
+ONLINE_WINDOW_MIN = 5   # 이 시간 안에 핑이 온 세션만 "현재 접속중"으로 집계
 
 SPECIAL = r"""!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?~`"""
 PW_RE = re.compile(f"[{re.escape(SPECIAL)}]")
@@ -39,6 +41,60 @@ bp = Blueprint("auth", __name__, url_prefix="/auth")
 
 def _now():
     return dt.datetime.now()
+
+
+def _ping_visitor():
+    """현재 접속자수 집계용 핑. 세션마다 최근 활동시각을 기록. 부가기능이라 실패해도 요청을 막지 않는다."""
+    try:
+        vid = session.get("vid")
+        if not vid:
+            vid = secrets.token_hex(8)
+            session["vid"] = vid
+        conn = db.connect()
+        conn.execute(
+            "INSERT INTO visitor_pings(session_id,last_seen) VALUES(%s,%s) "
+            "ON CONFLICT (session_id) DO UPDATE SET last_seen=EXCLUDED.last_seen",
+            (vid, _now().isoformat(timespec="seconds")))
+        if secrets.randbelow(50) == 0:   # 가끔 오래된 핑 정리(별도 크론 없이 테이블 크기 관리)
+            cutoff = (_now() - dt.timedelta(days=1)).isoformat(timespec="seconds")
+            conn.execute("DELETE FROM visitor_pings WHERE last_seen < %s", (cutoff,))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+def online_count():
+    """최근 ONLINE_WINDOW_MIN 분 안에 활동한 세션 수(현재 접속자). 실패 시 None."""
+    try:
+        conn = db.connect()
+        cutoff = (_now() - dt.timedelta(minutes=ONLINE_WINDOW_MIN)).isoformat(timespec="seconds")
+        n = conn.execute("SELECT COUNT(*) FROM visitor_pings WHERE last_seen >= %s",
+                         (cutoff,)).fetchone()[0]
+        conn.close()
+        return n
+    except Exception:
+        return None
+
+
+def latest_listing_churn():
+    """가장 최근 크롤일의 수도권 시도별 매물 추가/삭제/총계.
+    반환: {'date': 'YYYY-MM-DD', 'rows': {sido: {'added':a,'removed':r,'total':t}}} 또는 None."""
+    try:
+        conn = db.connect()
+        d = conn.execute("SELECT MAX(crawl_date) FROM samsam_churn").fetchone()[0]
+        if not d:
+            conn.close()
+            return None
+        rows = conn.execute(
+            "SELECT sido, added, removed, total FROM samsam_churn WHERE crawl_date=%s",
+            (d,)).fetchall()
+        conn.close()
+        return {"date": d,
+                "rows": {r[0]: {"added": r[1] or 0, "removed": r[2] or 0, "total": r[3] or 0}
+                         for r in rows}}
+    except Exception:
+        return None
 
 
 def _gen_code():
@@ -385,6 +441,15 @@ def members():
     return _render("회원 관리", body, boxstyle="max-width:820px")
 
 
+@bp.route("/api/online")
+def api_online():
+    """현재 접속자수(관리자 전용). 대시보드/크롤현황에서 폴링."""
+    u = current_user()
+    if not u or u["role"] != "admin":
+        return jsonify({"error": "forbidden"}), 403
+    return jsonify({"online": online_count() or 0})
+
+
 @bp.route("/crawl")
 def crawl_status():
     """관리자 전용 크롤링 현황 대시보드.
@@ -463,12 +528,37 @@ def crawl_status():
     else:
         snap_tbl = ""
 
+    churn = latest_listing_churn()
+    online = online_count()
+
+    def _churn_section(ch):
+        if not ch or not ch["rows"]:
+            return ('<div class="msg info" style="margin-top:20px">렌트 매물 추가/삭제 집계가 '
+                    '아직 없습니다 (다음 렌트 크롤 후 표시).</div>')
+        tr = ""
+        for full, short in (("서울특별시", "서울"), ("경기도", "경기"), ("인천광역시", "인천")):
+            c = ch["rows"].get(full, {"added": 0, "removed": 0, "total": 0})
+            tr += (f"<tr><td>{short}</td>"
+                   f"<td style='text-align:right;color:#059669;font-weight:700'>+{c['added']:,}</td>"
+                   f"<td style='text-align:right;color:#dc2626;font-weight:700'>-{c['removed']:,}</td>"
+                   f"<td style='text-align:right'>{c['total']:,}</td></tr>")
+        return (f'<h2 style="font-size:15px;margin:22px 0 6px">🔄 렌트 매물 변동 (최근 크롤 {ch["date"]})</h2>'
+                f'<div class="tw"><table><thead><tr><th>지역</th>'
+                f'<th style="text-align:right">신규 추가</th><th style="text-align:right">삭제</th>'
+                f'<th style="text-align:right">현재</th></tr></thead><tbody>{tr}</tbody></table></div>')
+
+    online_txt = (online if online is not None else "-")
     body = (f'<h1>📊 크롤링 현황</h1>'
             f'<p class="sub">관리자: {u["username"] or u["email"]} · '
+            f'👥 현재 접속 <b id="online">{online_txt}</b>명 · '
             f'<a href="/">홈</a> · <a href="{url_for("auth.members")}">회원 관리</a> · '
             f'<a href="{url_for("auth.logout")}">로그아웃</a></p>'
             f'<div class="msg info">부동산: 매주 월 10:00(KST) · 렌트: 매일 00:00(KST) 자동 크롤</div>'
-            f'{cards}{daily}{snap_tbl}')
+            f'{cards}{_churn_section(churn)}{daily}{snap_tbl}'
+            '<script>setInterval(function(){fetch("/auth/api/online")'
+            '.then(function(r){return r.ok?r.json():null})'
+            '.then(function(d){if(d&&d.online!=null){var e=document.getElementById("online");'
+            'if(e)e.textContent=d.online}}).catch(function(){});},15000);</script>')
     return _render("크롤링 현황", body, boxstyle="max-width:820px")
 
 
@@ -622,6 +712,9 @@ def init_auth(app, demo_endpoints=None):
     @app.before_request
     def _guard():
         ep = request.endpoint or ""
+        # 현재 접속자 핑: 로그인 세션의 실제 페이지/데이터 요청마다 최근 활동시각 갱신(정적파일 제외).
+        if session.get("uid") and ep != "static":
+            _ping_visitor()
         # chat_api_cron_poll: 외부 크론 서비스가 세션 없이 호출 — 자체 CRON_SECRET 검증으로 대체 보호.
         # home: 공개 랜딩(미로그인도 서비스 소개를 보게 — 로그인 창부터 뜨지 않도록).
         if (ep.startswith("auth.") or ep in ("static", "home", "chat_api_cron_poll")):

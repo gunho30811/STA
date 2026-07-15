@@ -612,6 +612,46 @@ def deploy_lab(reason):
         log(f"배포 예외({reason}): {repr(e)[:150]}")
 
 
+# ── 매물 변동(추가/삭제) 집계 ─────────────────────────────────────────────────
+def record_churn(conn, rids):
+    """이번 크롤 라이브 매물을 직전(samsam_live)과 비교해 시도별 추가/삭제/총계를 samsam_churn 에
+    적재하고, samsam_live 를 이번 집합으로 교체한다. 첫 실행(직전셋 없음)은 기준선만 저장한다.
+    rids: {room_id: room(목록객체)} — 이미 수도권으로 필터된 라이브 집합."""
+    cur = {}
+    for rid, room in rids.items():
+        try:
+            cur[int(rid)] = _room_sido(room)
+        except (TypeError, ValueError):
+            continue
+    prev = {r[0]: r[1] for r in conn.execute("SELECT room_id, sido FROM samsam_live").fetchall()}
+    if prev:
+        today = date.today().isoformat()
+        added, removed, total = defaultdict(int), defaultdict(int), defaultdict(int)
+        for rid, sido in cur.items():
+            total[sido] += 1
+            if rid not in prev:
+                added[sido] += 1
+        for rid, sido in prev.items():
+            if rid not in cur:
+                removed[sido] += 1
+        for sido in set(total) | set(removed):
+            conn.execute(
+                "INSERT INTO samsam_churn(crawl_date,sido,added,removed,total) VALUES(%s,%s,%s,%s,%s) "
+                "ON CONFLICT (crawl_date,sido) DO UPDATE SET added=EXCLUDED.added,"
+                "removed=EXCLUDED.removed,total=EXCLUDED.total",
+                (today, sido, added[sido], removed[sido], total[sido]))
+        short = lambda s: s.replace('특별시', '').replace('광역시', '').replace('도', '')
+        log("매물 변동 집계(" + today + "): "
+            + ", ".join(f"{short(s)} +{added[s]}/-{removed[s]}" for s in sorted(total)))
+    else:
+        log("매물 변동: 첫 실행 — 기준선만 저장(집계는 다음 회차부터)")
+    conn.execute("DELETE FROM samsam_live")
+    if cur:
+        conn.executemany("INSERT INTO samsam_live(room_id,sido) VALUES(%s,%s)",
+                         [[rid, sido] for rid, sido in cur.items()])
+    conn.commit()
+
+
 # ── 메인 ───────────────────────────────────────────────────────────────────────
 def main():
     ap = argparse.ArgumentParser()
