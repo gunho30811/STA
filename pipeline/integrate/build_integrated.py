@@ -43,6 +43,8 @@ SAM_TO_NAV = {
     '원룸건물': {'OR'},             # 원룸
     '상가주택': {'SG', 'DDDGG'},    # 상가 + 단독/다가구(상가주택 성격 혼재)로 완화
 }
+# 네이버 매칭이 없어도 노출할 지역 — 네이버 커버리지가 있는 수도권만(비수도권 미매칭은 제외).
+METRO_SIDO = {'서울특별시', '경기도', '인천광역시'}
 
 
 # ── 공통 유틸 ──────────────────────────────────────────────────────────────────
@@ -158,13 +160,14 @@ def strict_match(s, nidx, fine):
                 if dist(slat, slng, nv['lat'], nv['lng']) <= 500:
                     cands[id(nv)] = nv
     else:
+        # 건물명 없으면 좌표 근접 매칭. 반경 200m — 0.001°(~100m) 격자를 ±2칸(5×5) 훑는다.
         ca, co = round(slat, 3), round(slng, 3)
-        for dla in (-0.001, 0, 0.001):
-            for dlo in (-0.001, 0, 0.001):
+        for dla in (-0.002, -0.001, 0, 0.001, 0.002):
+            for dlo in (-0.002, -0.001, 0, 0.001, 0.002):
                 for nv in fine.get((round(ca + dla, 3), round(co + dlo, 3)), []):
                     if nv.get('building_type_code') not in allowed:
                         continue
-                    if dist(slat, slng, nv['lat'], nv['lng']) <= 15:
+                    if dist(slat, slng, nv['lat'], nv['lng']) <= 200:
                         cands[id(nv)] = nv
 
     bldg_all = list(cands.values())
@@ -193,94 +196,82 @@ def build_rows(sam, nav, max_deposit=None):
     rows = []
     for s in sam:
         hits, bldg_all = strict_match(s, nidx, fine)
-        if not hits:
+        matched = bool(hits)
+        # 네이버 매칭이 없어도 수도권 매물은 삼삼 데이터만이라도 노출(요청). 비수도권 미매칭은 제외.
+        if not matched and s['sido'] not in METRO_SIDO:
             continue
 
-        # 보증금 하드 필터(선택). 환산월세가 이미 보증금을 정규화하므로 기본은 미적용.
-        use = hits
-        if max_deposit is not None:
-            capped = [h for h in hits if (h['deposit'] or 0) <= max_deposit]
-            use = capped if capped else hits
-
-        rent = statistics.median([h['rent_monthly'] for h in use])       # 원본 월세 중앙값(참고)
-        dep = statistics.median([(h['deposit'] or 0) for h in use])      # 보증금 중앙값
-        equiv = statistics.median([rent_equiv(h) for h in use])          # 환산월세 중앙값 ★
-
-        mgs = [h['maintenance_monthly'] for h in use
-               if h['maintenance_monthly'] not in (None, -1) and h['maintenance_monthly'] > 0]
-        navmgmt = (statistics.median(mgs) if mgs
-                   else round((s['area_pyeong'] or 0) * 2.0, 1))
-        mgmt_known = 1 if mgs else 0
-
-        rep = min(use, key=lambda h: abs(rent_equiv(h) - equiv))
-        nav_url = rep.get('url') or f"https://new.land.naver.com/offices?articleNo={rep['article_no']}"
-        nav_tot = round(equiv + navmgmt, 1)   # 환산월세 + 관리비 = 장기월세 월 비용(보증금 정규화) ★
-
-        # 삼삼 수익 계산 (원 → 만원)
+        # ── 삼삼 공통(매칭 여부 무관) ──
         sam_week = round(s['rent_total_weekly'] / 10000, 1)
         sam_month = round(sam_week * WEEKS, 1)
-
         booked = s['booked_days_1m'] or 0
         blocked = s['blocked_days_1m'] or 0
-        avail = max(31 - blocked, 1)   # 수집 윈도우 오늘~+30일=31일(양끝 포함) → 예약률 ≤100%
+        avail = max(31 - blocked, 1)   # 수집 윈도우 오늘~+30일=31일 → 예약률 ≤100%
         occ = min(1.0, booked / avail)
-        # 실현매출 = 월환산매출(최대수익) × 예약률. 예약률 100%면 실현=최대(풀가동 상한과 일치).
-        # (예전 sam_week×occ×30/7 은 30일 기준이라 4.345주 기준 최대수익과 어긋났음.)
-        realized = round(sam_month * occ, 1)
-
-        bldg_rents = [nv['rent_monthly'] for nv in bldg_all if nv['rent_monthly']]
-        bldg_cnt = len(bldg_all)
-
+        realized = round(sam_month * occ, 1)   # 실현매출 = 최대수익 × 예약률
         try:
             station = (json.loads(s['station_500m_names'] or '[]') or [''])[0]
         except Exception:
             station = ''
 
+        if matched:
+            use = hits
+            if max_deposit is not None:   # 보증금 하드 필터(선택)
+                capped = [h for h in hits if (h['deposit'] or 0) <= max_deposit]
+                use = capped if capped else hits
+            rent = statistics.median([h['rent_monthly'] for h in use])
+            dep = statistics.median([(h['deposit'] or 0) for h in use])
+            equiv = statistics.median([rent_equiv(h) for h in use])       # 환산월세 중앙값 ★
+            mgs = [h['maintenance_monthly'] for h in use
+                   if h['maintenance_monthly'] not in (None, -1) and h['maintenance_monthly'] > 0]
+            navmgmt = (statistics.median(mgs) if mgs else round((s['area_pyeong'] or 0) * 2.0, 1))
+            rep = min(use, key=lambda h: abs(rent_equiv(h) - equiv))
+            nav_url = rep.get('url') or f"https://new.land.naver.com/offices?articleNo={rep['article_no']}"
+            nav_tot = round(equiv + navmgmt, 1)   # 환산월세 + 관리비 = 장기월세 월 비용 ★
+            bldg_rents = [nv['rent_monthly'] for nv in bldg_all if nv['rent_monthly']]
+            nav_fields = {
+                'rent': rent, 'dep': dep, 'equiv': round(equiv, 1), 'navmgmt': navmgmt,
+                'mgmt_known': 1 if mgs else 0, 'nav_tot': nav_tot, 'n': len(use),
+                'nv_bldg': rep['building_name'], 'nv_url': nav_url,
+                'nv_phone': _fmt_phone(rep.get('agent_phone')), 'nv_office': rep.get('agent_office') or '',
+                'nv_rep_rent': rep.get('rent_monthly') if rep.get('rent_monthly') is not None else '',
+                'nv_rep_dep': rep.get('deposit') if rep.get('deposit') is not None else '',
+                'nv_rep_floor': rep.get('floor_current') if rep.get('floor_current') is not None else '',
+                'eff': round(nav_tot / sam_week, 2) if sam_week else 0,
+                'real_eff': round(realized / nav_tot, 2) if nav_tot else 0,
+                'real_eff_rent': round(realized / equiv, 2) if equiv else 0,
+                'net': round(realized - nav_tot, 1),
+                'bldg_cnt': len(bldg_all),
+                'bldg_rent_min': round(min(bldg_rents), 1) if bldg_rents else '',
+                'bldg_rent_med': round(statistics.median(bldg_rents), 1) if bldg_rents else '',
+                'bldg_rent_max': round(max(bldg_rents), 1) if bldg_rents else '',
+            }
+        else:
+            # 네이버 미매칭 — 비교 지표(월세·순수익 등)는 공란으로 두고 삼삼 데이터만 표시.
+            nav_fields = {
+                'rent': '', 'dep': '', 'equiv': '', 'navmgmt': '', 'mgmt_known': 0,
+                'nav_tot': '', 'n': 0, 'nv_bldg': '', 'nv_url': '', 'nv_phone': '', 'nv_office': '',
+                'nv_rep_rent': '', 'nv_rep_dep': '', 'nv_rep_floor': '',
+                'eff': '', 'real_eff': '', 'real_eff_rent': '', 'net': '',
+                'bldg_cnt': 0, 'bldg_rent_min': '', 'bldg_rent_med': '', 'bldg_rent_max': '',
+            }
+
         rows.append({
-            'rid': s['room_id'],
-            'name': s['name'],
-            'btype': s['building_type'],
-            'rooms': room_label(s['rooms']),
-            'sido': s['sido'],
-            'sigungu': s['sigungu'],
-            'dong': s['dong'],
-            'station': station,
+            'rid': s['room_id'], 'name': s['name'], 'btype': s['building_type'],
+            'rooms': room_label(s['rooms']), 'sido': s['sido'], 'sigungu': s['sigungu'],
+            'dong': s['dong'], 'station': station,
             'sam_nearby': dong_count[s['dong']] - 1,
-            'sam_bldg': sam_bldg_count[bldg_key(s)],   # 같은 오피스텔 삼삼 매물 수(자기 포함)
+            'sam_bldg': sam_bldg_count[bldg_key(s)],
             'pyeong': s['area_pyeong'] or '',
-            'sam_week': sam_week,
-            'sam_month': sam_month,
-            'bk': booked,
-            'bl': blocked,
-            'month_occ': s.get('month_occ') or '',   # 달력월별 예약 JSON({'YYYY-MM':{bk,bl,days}})
+            'sam_week': sam_week, 'sam_month': sam_month,
+            'bk': booked, 'bl': blocked,
+            'month_occ': s.get('month_occ') or '',
             'realized': realized,
-            'rent': rent,
-            'dep': dep,
-            'equiv': round(equiv, 1),
-            'navmgmt': navmgmt,
-            'mgmt_known': mgmt_known,
-            'nav_tot': nav_tot,
-            'n': len(use),
-            'nv_bldg': rep['building_name'],
-            'nv_url': nav_url,
-            # 대표(중앙값) 네이버 매물의 연락처·조건 — "전화해서 물어보기"용. 한 실제 매물 기준이라
-            # 전화·월세·보증금·층수가 서로 일관됨(중앙값 median과 달리 실재하는 한 건).
-            'nv_phone': _fmt_phone(rep.get('agent_phone')),
-            'nv_office': rep.get('agent_office') or '',
-            'nv_rep_rent': rep.get('rent_monthly') if rep.get('rent_monthly') is not None else '',
-            'nv_rep_dep': rep.get('deposit') if rep.get('deposit') is not None else '',
-            'nv_rep_floor': rep.get('floor_current') if rep.get('floor_current') is not None else '',
-            'eff': round(nav_tot / sam_week, 2) if sam_week else 0,
-            'real_eff': round(realized / nav_tot, 2) if nav_tot else 0,
-            'real_eff_rent': round(realized / equiv, 2) if equiv else 0,
-            'net': round(realized - nav_tot, 1),
-            'bldg_cnt': bldg_cnt,
-            'bldg_rent_min': round(min(bldg_rents), 1) if bldg_rents else '',
-            'bldg_rent_med': round(statistics.median(bldg_rents), 1) if bldg_rents else '',
-            'bldg_rent_max': round(max(bldg_rents), 1) if bldg_rents else '',
+            **nav_fields,
         })
 
-    rows.sort(key=lambda x: x['net'], reverse=True)
+    # 순수익(net) 큰 순. 미매칭(net='')은 항상 뒤로.
+    rows.sort(key=lambda x: (x['net'] if isinstance(x['net'], (int, float)) else -1e18), reverse=True)
     return rows
 
 
