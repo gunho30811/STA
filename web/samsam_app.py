@@ -54,7 +54,8 @@ import search  # noqa: E402  (건물명·역명 텍스트 검색 색인 — 외�
 SAM_COLS = ("room_id", "url", "name", "building_type", "building_name",
             "sido", "sigungu", "dong", "area_pyeong", "rent_total_weekly",
             "booked_days_1m", "booked_days_2m", "booked_days_3m", "blocked_days_1m",
-            "basic_options", "extra_options", "station_500m_names", "collected_at")
+            "basic_options", "extra_options", "station_500m_names", "collected_at",
+            "lat", "lng")   # 지도(/api/map) 표시용 좌표
 
 # 삼삼 옵션 영문 코드 → 한글 표시명
 OPTION_KO = {
@@ -586,6 +587,101 @@ def api_buildings():
     # 평균예약률 높고 매물 많은 순. (최저예약률도 높으면 전 호실 검증된 건물)
     out.sort(key=lambda r: (-r["occ_avg"], -r["n"]))
     return jsonify({"total": len(out), "items": out})
+
+
+@app.route("/api/map")
+def api_map():
+    """지도 검색 — bbox(뷰포트) 안의 렌트(삼삼)·부동산(네이버) 매물 + 동별 예약률 원.
+
+    파라미터: min_lat/max_lat/min_lng/max_lng(필수), building_type(선택),
+              rent=0/naver=0 으로 레이어 끔. 매물 마커는 과밀 방지로 상한(렌트 1500·네이버 1000).
+    circles: bbox 안 렌트 매물을 (시군구,동)으로 묶어 중심좌표·평균 예약률·매물수 — 지도의 '이 근처 예약률 N%' 원.
+    """
+    a = request.args
+    try:
+        b = {k: float(a[k]) for k in ("min_lat", "max_lat", "min_lng", "max_lng")}
+    except (KeyError, ValueError):
+        return jsonify({"error": "bbox(min_lat/max_lat/min_lng/max_lng) 필요"}), 400
+    bt = a.get("building_type", "").strip()
+
+    out = {"rent": [], "naver": [], "circles": []}
+
+    # ── 렌트(삼삼): 메모리(L())에서 bbox 필터 ──
+    in_box = []
+    for r in L():
+        la, ln = r.get("lat"), r.get("lng")
+        if la is None or ln is None:
+            continue
+        if not (b["min_lat"] <= la <= b["max_lat"] and b["min_lng"] <= ln <= b["max_lng"]):
+            continue
+        if bt and r.get("building_type") != bt:
+            continue
+        in_box.append(r)
+
+    # 동별 예약률 원 — 개별 마커 상한과 무관하게 bbox 전체로 집계.
+    agg = {}
+    for r in in_box:
+        key = (r.get("sigungu") or "", r.get("dong") or "")
+        g = agg.setdefault(key, [0.0, 0.0, 0.0, 0])   # [sum_lat, sum_lng, sum_occ, n]
+        g[0] += r["lat"]; g[1] += r["lng"]; g[2] += (r.get("occ") or 0) * 100; g[3] += 1
+    for (sg, dong), g in agg.items():
+        if g[3] < 3:   # 표본 3개 미만 동은 원 생략(신뢰도)
+            continue
+        out["circles"].append({
+            "sigungu": sg, "dong": dong, "n": g[3],
+            "lat": round(g[0] / g[3], 6), "lng": round(g[1] / g[3], 6),
+            "occ": round(g[2] / g[3], 1),
+        })
+
+    if a.get("rent", "1") != "0":
+        in_box.sort(key=lambda r: -(r.get("occ") or 0))
+        out["rent"] = [{
+            "id": r["room_id"], "lat": r["lat"], "lng": r["lng"],
+            "name": r.get("name") or r.get("building_name") or "",
+            "btype": r.get("building_type") or "", "pyeong": r.get("area_pyeong"),
+            "occ": round((r.get("occ") or 0) * 100, 1),
+            "week": r.get("sam_week_man"), "url": r.get("url") or "",
+        } for r in in_box[:1500]]
+
+    # ── 부동산(네이버): nl_live 를 bbox SQL 조회 ──
+    if a.get("naver", "1") != "0":
+        try:
+            # Supabase 풀러+pg8000 은 파라미터 쿼리에서 간헐적으로 26000
+            # (unnamed prepared statement)이 난다 → 새 연결로 1회 재시도.
+            rows, last_err = [], None
+            for _ in range(2):
+                try:
+                    conn = db.connect()
+                    rows = conn.execute(
+                        "SELECT article_no, building_name, building_type_code, deposit, rent_monthly,"
+                        " area_exclusive_m2, floor_current, lat, lng"
+                        " FROM nl_live"
+                        " WHERE lat BETWEEN %s AND %s AND lng BETWEEN %s AND %s"
+                        "   AND rent_monthly IS NOT NULL"
+                        " ORDER BY crawled_at DESC NULLS LAST LIMIT 1000",
+                        (b["min_lat"], b["max_lat"], b["min_lng"], b["max_lng"])).fetchall()
+                    conn.close()
+                    last_err = None
+                    break
+                except Exception as e:
+                    last_err = e
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+            if last_err is not None:
+                raise last_err
+            out["naver"] = [{
+                "id": r["article_no"], "lat": r["lat"], "lng": r["lng"],
+                "name": r["building_name"] or "", "btcode": r["building_type_code"] or "",
+                "dep": r["deposit"], "rent": r["rent_monthly"],
+                "m2": r["area_exclusive_m2"], "floor": r["floor_current"],
+                "url": f"https://new.land.naver.com/offices?articleNo={r['article_no']}",
+            } for r in rows]
+        except Exception as e:
+            out["naver_error"] = str(e)[:80]
+
+    return jsonify(out)
 
 
 @app.route("/api/trend")
