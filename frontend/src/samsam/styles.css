@@ -123,3 +123,19 @@ tbody tr.on td.l:first-child { background: #dbeafe; }
 .ztag.air { background: #ecfeff; color: #0369a1; }
 .ztag.sbd { background: #fef2f2; color: #b91c1c; }
 .md-v .ztag { margin-left: 4px; }
+
+/* 지도 검색 */
+.map-box { height: 68vh; min-height: 420px; border-radius: 12px; border: 1px solid #e5e7eb; }
+.map-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 10px; }
+.map-tog { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; border: 1.5px solid #d1d5db;
+  border-radius: 999px; font-size: 12.5px; font-weight: 700; color: #94a3b8; background: #fff; cursor: pointer; user-select: none; }
+.map-tog input { display: none; }
+.map-tog.on { background: #fff; }
+.occ-badge-wrap { background: none; border: none; }
+.occ-badge { transform: translate(-50%, -50%); background: rgba(255,255,255,.92); border: 1.5px solid;
+  border-radius: 10px; padding: 3px 8px; font-size: 11px; font-weight: 700; text-align: center; line-height: 1.25;
+  white-space: nowrap; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+.occ-badge b { font-size: 13px; }
+.occ-n { font-weight: 500; color: #94a3b8; font-size: 10px; }
+.leaflet-popup-content { font-size: 12.5px; line-height: 1.55; }
+@media (max-width: 640px) { .map-box { height: 62vh; } }

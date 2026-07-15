@@ -6,9 +6,11 @@ import BuildingView from './BuildingView.jsx'
 import RankingView from './RankingView.jsx'
 import TrendView from './TrendView.jsx'
 import OptionView from './OptionView.jsx'
+import MapView from './MapView.jsx'
 
 const TABS = [
   { id: 'building', label: '건물 인기' },
+  { id: 'map', label: '🗺️ 지도' },
   { id: 'ranking', label: '🏆 랭킹' },
   { id: 'trend', label: '지역 트렌드' },
   { id: 'option', label: '옵션 영향' },
@@ -57,6 +59,7 @@ export default function App() {
         </div>
 
         {view === 'building' && <BuildingView filters={f} runSeq={runSeq} />}
+        {view === 'map' && <MapView filters={f} />}
         {view === 'ranking' && <RankingView />}
         {view === 'trend' && <TrendView filters={f} runSeq={runSeq} />}
         {view === 'option' && <OptionView filters={f} runSeq={runSeq} />}
