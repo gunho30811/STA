@@ -44,10 +44,14 @@ UA = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
       'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
 # 브라우저 앱이 API마다 함께 보내는 익명 식별자(abid). 실행당 1개 발급해 세션 내내 고정.
 ABID = str(uuid.uuid4())
-PROPERTY_TYPES = ['OFFICETEL', 'APARTMENT', 'VILLA', 'HOUSE', 'STORE', 'OFFICE']
+# 삼삼엠투 API가 실제로 받는 propertyTypes 코드 6종(2026-07 실측).
+# 주의: 목록 API가 응답에 싣는 room['propertyType'] 값은 아래 한글 라벨(BTYPE_KO)이며,
+#       필터 쿼리(propertyTypes=)에는 반드시 이 영문 코드를 써야 한다. 둘이 다르다.
+#       (과거 HOUSE/STORE/OFFICE는 죽은 코드라 0건만 반환 → 단독/원룸/상가주택을 통째로 누락했었음.)
+PROPERTY_TYPES = ['OFFICETEL', 'APARTMENT', 'VILLA', 'DETACHED', 'STUDIO', 'MIXED_USE']
 BTYPE_KO = {
-    'OFFICETEL': '오피스텔', 'APARTMENT': '아파트', 'VILLA': '빌라',
-    'HOUSE': '주택', 'STORE': '상가', 'OFFICE': '사무실',
+    'OFFICETEL': '오피스텔', 'APARTMENT': '아파트', 'VILLA': '연립빌라',
+    'DETACHED': '단독주택', 'STUDIO': '원룸건물', 'MIXED_USE': '상가주택',
 }
 BATCH = 50
 REQ_SLEEP = 0.5
