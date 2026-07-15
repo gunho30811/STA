@@ -32,6 +32,18 @@ WEEKS = 4.345        # 월 → 주 환산
 AREA_PCT = 0.15      # 면적 허용 오차 ±15%
 CONV_RATE = 0.06     # 전월세 전환율(연). 환산월세 = 월세 + 보증금(만원) × CONV_RATE / 12
 
+# 삼삼 건물유형(한글) → 매칭 허용 네이버 building_type_code 집합.
+# 종류별 매칭: 같은 유형끼리만 붙여(예: 삼삼 원룸건물 ↔ 네이버 원룸) 비슷한 위치·층·평수로 시세 비교.
+# (예전엔 네이버 오피스텔만 써서 비오피스텔 삼삼 매물이 순위에서 빠졌음.)
+SAM_TO_NAV = {
+    '오피스텔': {'OPST'},
+    '아파트': {'APT'},
+    '연립빌라': {'VL'},
+    '단독주택': {'DDDGG'},          # 단독/다가구
+    '원룸건물': {'OR'},             # 원룸
+    '상가주택': {'SG', 'DDDGG'},    # 상가 + 단독/다가구(상가주택 성격 혼재)로 완화
+}
+
 
 # ── 공통 유틸 ──────────────────────────────────────────────────────────────────
 def norm(s):
@@ -86,17 +98,16 @@ def load_sam():
 
 def load_nav():
     conn = db.connect()
-    # 삼삼은 오피스텔/원룸 단기임대 중심 → 네이버도 오피스텔(OPST)만 사용해
-    # 아파트/상가 등 엉뚱한 타입과의 오매칭을 막는다. (building_type_code 컬럼 없던 구 데이터는
-    # NULL 이므로 'OPST' 필터에서 제외됨 — 재크롤 후 채워짐.)
+    # 종류별 매칭: 네이버 전 유형을 로드하고 매칭 단계에서 삼삼 유형과 같은 유형끼리만 붙인다
+    # (SAM_TO_NAV). building_type_code 가 NULL 인 구 데이터는 유형 판별 불가라 제외.
     rows = [dict(r) for r in conn.execute(
         "SELECT article_no, url, building_name, area_exclusive_m2,"
         " rent_monthly, deposit, maintenance_monthly, floor_current,"
         " agent_phone, agent_office,"
-        " lat, lng, dong"
+        " lat, lng, dong, building_type_code"
         " FROM naver_listings"
         " WHERE rent_monthly BETWEEN 5 AND 2000 AND lat IS NOT NULL"
-        " AND building_type_code = 'OPST'"
+        " AND building_type_code IS NOT NULL"
     ).fetchall()]
     conn.close()
     return rows
@@ -129,6 +140,10 @@ def strict_match(s, nidx, fine):
     건물명이 있으면 동 내 이름 매칭 우선.
     없으면 GPS 15m 이내만 허용 (인접 건물 오매칭 방지).
     """
+    # 같은 유형끼리만 매칭. 삼삼 유형이 매핑에 없으면 매칭 안 함.
+    allowed = SAM_TO_NAV.get(s['building_type'])
+    if not allowed:
+        return [], []
     slat, slng = float(s['lat']), float(s['lng'])
     s_m2 = float(s['area_m2'] or (s['area_pyeong'] or 0) * 3.305785)
     sb = norm(s['building_name'])
@@ -137,6 +152,8 @@ def strict_match(s, nidx, fine):
 
     if sb and len(sb) >= 3:
         for nv in nidx.get(s['dong'], []):
+            if nv.get('building_type_code') not in allowed:
+                continue
             if nv['_n'] == sb or (len(sb) >= 4 and (sb in nv['_n'] or nv['_n'] in sb)):
                 if dist(slat, slng, nv['lat'], nv['lng']) <= 500:
                     cands[id(nv)] = nv
@@ -145,6 +162,8 @@ def strict_match(s, nidx, fine):
         for dla in (-0.001, 0, 0.001):
             for dlo in (-0.001, 0, 0.001):
                 for nv in fine.get((round(ca + dla, 3), round(co + dlo, 3)), []):
+                    if nv.get('building_type_code') not in allowed:
+                        continue
                     if dist(slat, slng, nv['lat'], nv['lng']) <= 15:
                         cands[id(nv)] = nv
 
@@ -303,11 +322,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--max-deposit', type=int, default=None,
                     help='네이버 매칭 시 이 보증금(만원) 이하만 사용(선택). 기본은 환산월세로 정규화하므로 미적용.')
+    ap.add_argument('--no-db', action='store_true',
+                    help='net_profit 테이블 적재를 건너뛰고 CSV만 생성(테스트용).')
     args = ap.parse_args()
 
     sam = load_sam()
     nav = load_nav()
-    print(f"삼삼: {len(sam)}건 / 네이버(OPST): {len(nav)}건")
+    print(f"삼삼: {len(sam)}건 / 네이버(전유형): {len(nav)}건")
     if args.max_deposit is not None:
         print(f"보증금 하드 필터: ≤ {args.max_deposit}만원")
 
@@ -316,6 +337,16 @@ def main():
     print(f"통합 매칭: {len(rows)}건 → {OUT}")
     print("건물유형:", Counter(r['btype'] for r in rows).most_common())
     print("방수:", Counter(r['rooms'] for r in rows).most_common())
+
+    # 웹(profit_app/samsam_app)은 net_profit 테이블만 읽는다. CSV는 레거시 백업일 뿐이라
+    # 방금 결과를 바로 DB 테이블에도 적재해 DB→DB 로 끝낸다(자동 크롤 시에도 사이트가 갱신됨).
+    if not args.no_db:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        try:
+            import export_net_profit
+            export_net_profit.main()
+        except Exception as e:
+            print(f"net_profit 테이블 적재 스킵: {repr(e)[:120]}")
 
 
 if __name__ == '__main__':
