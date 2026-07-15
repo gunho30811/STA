@@ -12,6 +12,7 @@ export default function TrendView({ filters, runSeq }) {
     const p = new URLSearchParams()
     ;(filters.sidos || []).forEach((s) => p.append('sido', s))
     if (filters.sigungu) p.set('sigungu', filters.sigungu)
+    if (filters.btype) p.set('building_type', filters.btype)   // 건물유형별 지역 예약률
     setTrd(await getJSON('api/trend?' + p.toString()))
   }, [filters])
 
@@ -36,7 +37,7 @@ export default function TrendView({ filters, runSeq }) {
   return (
     <div className="panel">
       <h2 className="sec">지역(동) 예약률 트렌드 📈 — 매주 스냅샷으로 인기 오르는/내리는 동네 추적</h2>
-      <p className="hint"><b>최신예약률</b>·<b>전주대비 Δ</b>(▲상승, ▼하락) + 주차별 값. 위 시/도·시군구 필터 적용.</p>
+      <p className="hint"><b>최신예약률</b>·<b>전주대비 Δ</b>(▲상승, ▼하락) + 주차별 값. 위 <b>시/도·시군구·건물유형</b> 필터 적용 → 유형별 지역 예약률.</p>
       <div style={{ margin: '4px 0 10px', display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', fontSize: 12.5 }}>
         <span>최소 매물수 <input type="number" value={minn} style={{ width: 64, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6 }} onChange={(e) => setMinn(e.target.value)} />개 이상</span>
         <span className="mut" style={{ fontSize: 11.5 }}>1달/2달/3달 예약률 · 평균순수익(보증금1000·렌트운영) · 예약률 20%↑ 동만 · 헤더 클릭 정렬</span>

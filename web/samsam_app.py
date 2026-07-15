@@ -449,6 +449,36 @@ def api_listings():
     return jsonify({"total": len(items), "items": items, "optionName": ko(option)})
 
 
+# ── 역세권 분류 ──────────────────────────────────────────────────────────────
+# 더블/트리플 = 매물 500m 내 서로 다른 역 개수(2개=더블, 3개↑=트리플).
+# 공항철도·신분당선 = 500m 내 역이 해당 노선 역이면 그 역세권(역명은 '역' 접미사 뗀 기준).
+_SHINBUNDANG = {"신사", "논현", "신논현", "강남", "양재", "양재시민의숲", "청계산입구",
+                "판교", "정자", "미금", "동천", "수지구청", "성복", "상현", "광교중앙", "광교"}
+_AIRPORT = {"서울", "공덕", "홍대입구", "디지털미디어시티", "마곡나루", "김포공항", "계양",
+            "검암", "청라국제도시", "영종", "운서", "공항화물청사",
+            "인천공항1터미널", "인천공항2터미널"}
+
+
+def _base_station(st):
+    st = (st or "").strip()
+    return st[:-1] if st.endswith("역") else st
+
+
+def subway_zones(station_names):
+    """500m 내 역명 리스트 → 역세권 태그 리스트(더블/트리플/신분당선/공항철도)."""
+    uniq = {_base_station(s) for s in (station_names or []) if s}
+    tags = []
+    if len(uniq) >= 3:
+        tags.append("트리플역세권")
+    elif len(uniq) >= 2:
+        tags.append("더블역세권")
+    if uniq & _SHINBUNDANG:
+        tags.append("신분당선")
+    if uniq & _AIRPORT:
+        tags.append("공항철도")
+    return tags
+
+
 @app.route("/api/buildings")
 def api_buildings():
     """건물(오피스텔) 단위 인기 순위 — 한 건물에 삼삼 매물이 여러 채 있고 그게 다 잘 나가면
@@ -532,6 +562,8 @@ def api_buildings():
             "bd": {"maxRev": avg("maxRev"), "rent": avg("rent"), "mgmt": avg("mgmt"),
                    "dep": dep, "fixed": fixed} if calcs else None,
             "station": next((x["station"] for x in xs if x.get("station")), ""),
+            "stations": sorted({s for x in xs for s in (x.get("stations") or [])}),
+            "zones": subway_zones([s for x in xs for s in (x.get("stations") or [])]),
             "room_ids": [x["room_id"] for x in xs],
             "sam_url": sample.get("url", "") or "",
             "naver_url": M().get(sample["room_id"], {}).get("nUrl", "") or "",
@@ -542,6 +574,9 @@ def api_buildings():
             "nv_dep": M().get(sample["room_id"], {}).get("repDep"),
             "nv_floor": M().get(sample["room_id"], {}).get("repFloor", "") or "",
         })
+    zone = a.get("zone", "").strip()
+    if zone:   # 역세권 필터(더블역세권/트리플역세권/신분당선/공항철도)
+        out = [r for r in out if zone in r["zones"]]
     if occ_min_filter is not None:
         out = [r for r in out if r["occ_min"] >= occ_min_filter]
     if net_min_filter is not None:
@@ -572,6 +607,9 @@ def api_trend():
         where, params = [], []
         if sido_f:
             where.append("sido = ANY(%s)"); params.append(list(sido_f))
+        bt = a.get("building_type", "").strip()   # 건물유형 필터(지역 트렌드도 유형별로)
+        if bt:
+            where.append("building_type = %s"); params.append(bt)
         w = (" WHERE " + " AND ".join(where)) if where else ""
         rows = [dict(r) for r in conn.execute(
             "SELECT snapshot_date, sido, sigungu, dong, n, avg_occ_1m, avg_occ_2m, avg_occ_3m"

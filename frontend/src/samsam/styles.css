@@ -112,3 +112,14 @@ tbody tr.on td.l:first-child { background: #dbeafe; }
 .modal-foot { padding: 12px 18px 18px; display: flex; gap: 8px; }
 .modal-foot .lnk { padding: 11px 14px; font-size: 13px; flex: 1; text-align: center; }
 @media (min-width: 641px) { .modal-back { align-items: center; } .modal-card { border-radius: 16px; } }
+
+/* 역세권 필터 + 태그 */
+.zone-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 10px; }
+.zone-lbl { font-size: 12px; font-weight: 700; color: #4b5563; margin-right: 2px; }
+.zone-chip { border: 1px solid #d1d5db; background: #fff; color: #475569; padding: 5px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.zone-chip.on { background: #4321F3; border-color: #4321F3; color: #fff; }
+.mi-zones { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+.ztag { font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: #eef2ff; color: #4321F3; }
+.ztag.air { background: #ecfeff; color: #0369a1; }
+.ztag.sbd { background: #fef2f2; color: #b91c1c; }
+.md-v .ztag { margin-left: 4px; }
