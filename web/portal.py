@@ -23,7 +23,7 @@ from flask import Flask, render_template_string
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from auth import current_user, init_auth
+from auth import current_user, init_auth, latest_listing_churn, online_count
 
 portal = Flask(__name__)
 init_auth(portal)
@@ -48,10 +48,23 @@ box-shadow:0 10px 30px rgba(0,0,0,.25);transition:.15s}
 .card .ic{font-size:30px}.card h2{font-size:17px;margin:10px 0 4px;font-weight:800}
 .card p{font-size:12.5px;color:#64748b;margin:0;line-height:1.5}
 .admin{margin-top:22px}.admin a{color:#fca5a5;text-decoration:none;font-weight:700;font-size:13px}
+.online{font-size:13px;color:#94a3b8}.online b{color:#34d399;font-weight:800}
+.churn{margin-top:26px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);
+border-radius:14px;padding:18px 20px}
+.churn-h{font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:14px}
+.churn-h .churn-d{font-weight:600;color:#64748b;font-size:12px;margin-left:6px}
+.churn-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.churn-cell{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:11px;
+padding:14px;text-align:center}
+.cc-region{font-size:13px;color:#cbd5e1;font-weight:700;margin-bottom:8px}
+.cc-nums{font-size:19px;font-weight:800;letter-spacing:-.01em}
+.cc-nums .up{color:#34d399}.cc-nums .dn{color:#f87171;margin-left:8px}
+.cc-total{font-size:11.5px;color:#64748b;margin-top:6px}
 @media(max-width:640px){h1{font-size:21px}.card{padding:18px}}
 </style></head><body><div class=wrap>
 <div class=top>
   <h1>{{user.name or user.username or user.email}}님, 환영합니다 👋</h1>
+  {% if online is not none %}<div class=online>👥 현재 접속 <b id=online>{{online}}</b>명</div>{% endif %}
 </div>
 <p class=sub>부동산을 단기임대로 돌리면 얼마 버는지 · 아래에서 원하는 분석을 선택하세요</p>
 <div class=grid>
@@ -62,6 +75,21 @@ box-shadow:0 10px 30px rgba(0,0,0,.25);transition:.15s}
   <a class=card href="/gangnam/"><div class=ic>{ICON_ESTATE}</div><h2>부동산 매물</h2>
     <p>수도권(서울·경기·인천) 부동산 매물 카드/상세 탐색</p></a>
 </div>
+{% if churn %}
+<div class=churn>
+  <div class=churn-h>🔄 렌트 매물 변동 <span class=churn-d>최근 크롤 {{churn.date}}</span></div>
+  <div class=churn-grid>
+    {% for full, short in [('서울특별시','서울'),('경기도','경기'),('인천광역시','인천')] %}
+    {% set c = churn.rows.get(full, {'added':0,'removed':0,'total':0}) %}
+    <div class=churn-cell>
+      <div class=cc-region>{{short}}</div>
+      <div class=cc-nums><span class=up>+{{'{:,}'.format(c.added)}}</span><span class=dn>-{{'{:,}'.format(c.removed)}}</span></div>
+      <div class=cc-total>현재 {{'{:,}'.format(c.total)}}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
 {% if user.role == 'admin' %}<div class=admin><a href="/auth/crawl">📊 크롤링 현황</a>
   &nbsp;·&nbsp; <a href="/auth/members">👥 회원 관리 →</a></div>{% endif %}
 </div>
@@ -78,6 +106,16 @@ box-shadow:0 10px 30px rgba(0,0,0,.25);transition:.15s}
       .then(function(d){ if(d&&!d.demo){ try{localStorage.setItem(key,JSON.stringify({t:Date.now(),data:d}))}catch(e){} } })
       .catch(function(){});
   }catch(e){}
+})();
+// 접속자수 실시간 갱신(관리자에게만 #online 요소가 렌더됨)
+(function(){
+  var el=document.getElementById('online'); if(!el)return;
+  setInterval(function(){
+    fetch('/auth/api/online',{credentials:'same-origin'})
+      .then(function(r){return r.ok?r.json():null})
+      .then(function(d){if(d&&d.online!=null)el.textContent=d.online})
+      .catch(function(){});
+  },15000);
 })();
 </script>
 </body></html>"""
@@ -177,7 +215,9 @@ def home():
     if not u:
         # 미로그인: 로그인 창 대신 서비스 소개 랜딩(무슨 서비스인지 보이게 → 이탈 방지).
         return render_template_string(PUBLIC_LANDING)
-    return render_template_string(LANDING, user=u)
+    # 매물 변동은 모든 로그인 사용자에게, 접속자수는 관리자에게만.
+    online = online_count() if u["role"] == "admin" else None
+    return render_template_string(LANDING, user=u, churn=latest_listing_churn(), online=online)
 
 
 # 각 뷰어 앱(import 시 init_auth 적용됨)을 경로별로 마운트
