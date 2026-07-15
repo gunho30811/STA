@@ -15,6 +15,7 @@
 import json
 import os
 import statistics
+import time
 
 from flask import Flask, jsonify, request, send_from_directory
 
@@ -125,11 +126,17 @@ def _attach_area_occ(rows, field, out):
         r[out] = avg.get(r.get(field) or "")
 
 
-_CACHE=None
+_CACHE = None
+_CACHE_AT = 0.0
+_CACHE_TTL = 300   # 5분마다 net_profit 재로드 → 데이터 갱신이 재배포 없이도 반영됨(웜 인스턴스 stale 방지).
+
+
 def P():
-    global _CACHE
-    if _CACHE is None:
-        _CACHE=load_profit()
+    global _CACHE, _CACHE_AT
+    now = time.time()
+    if _CACHE is None or now - _CACHE_AT > _CACHE_TTL:
+        _CACHE = load_profit()
+        _CACHE_AT = now
     return _CACHE
 
 
