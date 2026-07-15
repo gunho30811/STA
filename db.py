@@ -158,12 +158,31 @@ class _Conn:
         return _Cursor(cur)
 
     def executemany(self, sql, seq):
-        cur = self._conn.cursor()
         sql = _to_pg(sql)
+        rows = list(seq)
         if _DRIVER == 'psycopg2':
-            psycopg2.extras.execute_batch(cur, sql, seq, page_size=500)
-        else:
-            cur.executemany(sql, list(seq))
+            cur = self._conn.cursor()
+            psycopg2.extras.execute_batch(cur, sql, rows, page_size=500)
+            return _Cursor(cur)
+        # pg8000 + Supabase 트랜잭션 풀러(pgbouncer): autocommit 상태로 executemany 를 돌리면
+        # 풀러가 문장 사이에 서버 연결을 갈아끼워 'unnamed prepared statement does not exist'
+        # (SQLSTATE 26000)가 난다. 배치 전체를 명시적 트랜잭션으로 감싸 한 백엔드에 고정한다.
+        self._conn.autocommit = False
+        try:
+            cur = self._conn.cursor()
+            cur.executemany(sql, rows)
+            self._conn.commit()
+        except Exception:
+            try:
+                self._conn.rollback()
+            except Exception:
+                pass
+            raise
+        finally:
+            try:
+                self._conn.autocommit = True
+            except Exception:
+                pass
         return _Cursor(cur)
 
     def commit(self):
