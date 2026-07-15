@@ -36,6 +36,10 @@ TYPE_NAMES = {
 #   nl_live = listings(실시간·전량·수도권·최근7일) LEFT JOIN naver_listings(상세 보강).
 #   목록 크롤이 listings에 넣는 즉시 사이트에 뜨고, 상세는 채워지는 대로 자동 병합된다.
 SRC = "nl_live"
+# 집계/카운트용: 조인 없는 listings-only 뷰(같은 컬럼명, 인덱스로 빠름).
+#   LEFT JOIN(naver_listings.article_no 유니크)이라 기본필터 count는 nl_live와 동일.
+#   단 상세 전용 컬럼(rooms/주소/역명, office=상세 summary) 필터가 걸리면 nl_live로 카운트.
+BASE = "nl_base"
 
 # 집계(count/DISTINCT/stats)는 40만 행 뷰 전체 스캔이라 느림 → 짧은 TTL 캐시.
 #   실시간 크롤 중이라도 몇 십 초 지연은 무방(카드 목록 자체는 캐시 없이 실시간).
@@ -207,7 +211,7 @@ def api_regions():
         conn = db.connect()
         try:
             return [list(r) for r in conn.execute(
-                f"SELECT DISTINCT {_SI_SQL}, {_GU_SQL}, dong FROM {SRC} "
+                f"SELECT DISTINCT {_SI_SQL}, {_GU_SQL}, dong FROM {BASE} "
                 "WHERE sido = %s AND dong IS NOT NULL AND dong <> '' ORDER BY 1, 2, 3",
                 [sido]).fetchall()]
         finally:
@@ -236,15 +240,19 @@ def api_stats():
     def _load():
         conn = db.connect()
         try:
-            total = conn.execute(f"SELECT COUNT(*) FROM {SRC}").fetchone()[0]
+            total = conn.execute(f"SELECT COUNT(*) FROM {BASE}").fetchone()[0]
             dong_count = conn.execute(
-                f"SELECT COUNT(DISTINCT dong) FROM {SRC} "
+                f"SELECT COUNT(DISTINCT dong) FROM {BASE} "
                 "WHERE dong IS NOT NULL AND dong <> ''").fetchone()[0]
+            # 정확한 중앙값은 40만행 정렬이라 수십 초 → listings 10% 표본으로 근사(뷰는 TABLESAMPLE 불가).
             med = conn.execute(
-                "SELECT percentile_disc(0.5) WITHIN GROUP (ORDER BY rent_monthly) "
-                f"FROM {SRC} WHERE rent_monthly > 0").fetchone()[0]
+                "SELECT percentile_disc(0.5) WITHIN GROUP (ORDER BY rent) "
+                "FROM listings TABLESAMPLE SYSTEM(10) "
+                "WHERE sido IN ('서울시','경기도','인천시') "
+                "AND crawled_at >= to_char(now() - interval '7 days','YYYY-MM-DD') "
+                "AND rent > 0").fetchone()[0]
             by_type = [(r[0], r[1]) for r in conn.execute(
-                f"SELECT building_type_code, COUNT(*) c FROM {SRC} "
+                f"SELECT building_type_code, COUNT(*) c FROM {BASE} "
                 "GROUP BY building_type_code ORDER BY c DESC").fetchall()]
         finally:
             conn.close()
@@ -255,7 +263,7 @@ def api_stats():
             "by_type": [{"code": k, "name": TYPE_NAMES.get(k, k), "count": c}
                         for k, c in by_type],
         }
-    return jsonify(_cached("stats", 60, _load))
+    return jsonify(_cached("stats", 300, _load))
 
 
 def _build_where(a):
@@ -401,10 +409,14 @@ def api_listings():
     conn = db.connect()
     try:
         if not needs_python:
-            # 총 건수(페이지네이션용)는 전체 스캔이라 느림 → 필터 시그니처별 60초 캐시.
-            total = _cached(f"cnt:{where_sql}:{params}", 60,
+            # 상세전용 필터(방수/키워드/업무용)가 없으면 조인 없는 nl_base로 카운트(빠름).
+            #   있으면 상세 컬럼이 필요하니 nl_live로 카운트.
+            enriched = bool(a.getlist("rooms")) or bool(a.get("keyword", "").strip()) or a.get("office") == "1"
+            count_src = SRC if enriched else BASE
+            # 총 건수(페이지네이션용) → 필터 시그니처별 60초 캐시.
+            total = _cached(f"cnt:{count_src}:{where_sql}:{params}", 60,
                             lambda: conn.execute(
-                                f"SELECT COUNT(*) FROM {SRC}{where_sql}", params).fetchone()[0])
+                                f"SELECT COUNT(*) FROM {count_src}{where_sql}", params).fetchone()[0])
             order = _ORDER_SQL.get(sort, "crawled_at DESC NULLS LAST")
             rows = conn.execute(
                 f"SELECT {cols} FROM {SRC}{where_sql} "

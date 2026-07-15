@@ -33,6 +33,8 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS ix_listings_sido_dong ON listings(sido,dong)",
     "CREATE INDEX IF NOT EXISTS ix_listings_dong ON listings(dong)",
     "CREATE INDEX IF NOT EXISTS ix_listings_confirmymd ON listings(confirmymd)",
+    # 집계 커버링(index-only 스캔): 무필터 count/by_type/dong distinct를 넓은 heap 대신 인덱스로.
+    "CREATE INDEX IF NOT EXISTS ix_listings_agg ON listings (sido, crawled_at, realestatetype, dong)",
 ]
 
 VIEW = f"""
@@ -60,6 +62,30 @@ WHERE l.sido IN ('서울시','경기도','인천시')
   AND l.crawled_at >= to_char(now() - interval '7 days','YYYY-MM-DD')
 """
 
+# 집계/카운트 전용: 조인 없는 listings-only(같은 컬럼명, 상세 컬럼은 NULL). index-only로 빠름.
+VIEW_BASE = f"""
+CREATE VIEW nl_base AS
+SELECT
+  l.articleno::bigint AS article_no,
+  COALESCE(NULLIF(l.buildingname,''), l.articlename) AS building_name,
+  {_BTYPE.format(c='l')} AS building_type_code,
+  l.sido, l.sigungu, l.dong, l.deposit, l.rent AS rent_monthly,
+  l.mgmt AS maintenance_monthly,
+  COALESCE(l.area_real_m2, l.area_m2) AS area_exclusive_m2,
+  NULL::int AS floor_current, NULL::int AS rooms, l.direction,
+  NULL::text AS subway_station, NULL::int AS subway_distance_m,
+  l.featuredesc AS summary, l.tags AS summary_tags,
+  l.lat, l.lon AS lng,
+  NULL::text AS jibun_address, NULL::text AS road_address,
+  CASE WHEN l.confirmymd ~ '^[0-9]{{8}}$'
+       THEN to_char(to_date(l.confirmymd,'YYYYMMDD'),'YYYY-MM-DD') END AS confirmed_at,
+  l.crawled_at,
+  NULLIF(l.confirmymd,'') AS confirmed_sort
+FROM listings l
+WHERE l.sido IN ('서울시','경기도','인천시')
+  AND l.crawled_at >= to_char(now() - interval '7 days','YYYY-MM-DD')
+"""
+
 
 def main():
     conn = db.connect()
@@ -69,9 +95,11 @@ def main():
     # 컬럼 순서가 바뀌면 CREATE OR REPLACE 가 거부되므로 DROP 후 재생성.
     conn.execute("DROP VIEW IF EXISTS nl_live"); conn.commit()
     conn.execute(VIEW.replace("CREATE OR REPLACE VIEW", "CREATE VIEW")); conn.commit()
-    conn.execute("ANALYZE listings"); conn.commit()
+    conn.execute("DROP VIEW IF EXISTS nl_base"); conn.commit()
+    conn.execute(VIEW_BASE); conn.commit()
+    conn.execute("VACUUM ANALYZE listings"); conn.commit()
     n = conn.execute("SELECT COUNT(*) FROM nl_live").fetchone()[0]
-    print(f"nl_live 생성 완료 — 현재 {n:,}건")
+    print(f"nl_live/nl_base 생성 완료 — 현재 {n:,}건")
     conn.close()
 
 
