@@ -42,7 +42,12 @@ tbody tr.on { background: #dbeafe; }
 .pill { font-size: 11px; background: #f1f5f9; color: #475569; padding: 2px 7px; border-radius: 6px; margin: 1px; display: inline-block; }
 .pill.miss { background: #fee2e2; color: #b91c1c; text-decoration: line-through; }
 .lnk { display: inline-block; padding: 3px 8px; border-radius: 5px; text-decoration: none; font-size: 11px; color: #fff; background: #ff5a5f; }
-.scroll { overflow: auto; max-height: 60vh; }
+.scroll { overflow: auto; max-height: 60vh; -webkit-overflow-scrolling: touch; }
+/* 가로 스크롤 시 첫 컬럼(이름) 고정 → 지표 보러 오른쪽으로 밀어도 어느 건물/옵션인지 유지 */
+.scroll th.l:first-child, .scroll td.l:first-child { position: sticky; left: 0; z-index: 1; background: #fff; }
+.scroll th.l:first-child { z-index: 3; background: #f9fafb; }
+tbody tr:hover td.l:first-child { background: #eff6ff; }
+tbody tr.on td.l:first-child { background: #dbeafe; }
 .badge2 { font-size: 11px; font-weight: 800; color: #fff; background: #ff5a5f; border-radius: 6px; padding: 2px 8px; }
 .flex { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .toggle button { border: 1px solid #d1d5db; background: #fff; color: #475569; padding: 6px 13px; font-size: 12px; cursor: pointer; font-weight: 700; }
@@ -67,10 +72,17 @@ tbody tr.on { background: #dbeafe; }
   .cards { gap: 8px; }
   .card { min-width: 0; flex: 1 1 44%; padding: 10px 12px; }
   .card .val { font-size: 19px; }
+  /* 시/도 칩: 작게 해 5줄→3줄 정도로 세로 공간 절약 */
+  .filters { gap: 10px; }
+  .chips { gap: 5px; }
+  .chips label { padding: 5px 9px; font-size: 12px; }
+  .fg select { min-width: 0; }
   /* 표는 컬럼이 많아 가로 스크롤 유지하되 폰트·패딩 축소로 한 화면에 더 많이 */
   table { font-size: 11px; }
   th, td { padding: 6px 6px; }
-  .hint { font-size: 11px; }
-  /* 안내문 속 인라인 입력들이 넘치지 않게 줄바꿈 허용 */
-  .hint input, .hint select { margin: 2px 0; }
+  /* 첫 컬럼(이름) 고정 시 스크롤되는 다음 컬럼이 비쳐 보이지 않게 그림자로 경계 */
+  .scroll td.l:first-child, .scroll th.l:first-child { box-shadow: 2px 0 4px -2px rgba(0,0,0,.12); }
+  /* 안내문 속 인라인 입력들 — 터치 쉽게 간격/최소폭 확보하고 줄바꿈 허용 */
+  .hint { font-size: 11px; line-height: 2; }
+  .hint input, .hint select { margin: 3px 2px; padding: 6px 8px; font-size: 13px; }
 }
