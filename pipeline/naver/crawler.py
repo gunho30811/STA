@@ -47,6 +47,7 @@ TYPES = {
     "OR": "원룸",
     "DDDGG": "단독/다가구",
     "SG": "상가",
+    "JWJT": "전원주택",
 }
 
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -326,6 +327,12 @@ def main():
         p = []
         if args.sido:
             q += " AND sido LIKE ?"; p.append(f"%{args.sido}%")
+        else:
+            # regions 테이블엔 비수도권(crawl_nonseoul.py)도 섞여 있음.
+            # --sido 미지정 시 ROOTS(수도권: 서울/경기/인천)만 대상으로 제한.
+            root_names = [n for n, _ in ROOTS]
+            q += " AND sido IN (%s)" % ",".join("?" * len(root_names))
+            p.extend(root_names)
         if args.gu:
             q += " AND sigungu LIKE ?"; p.append(f"%{args.gu}%")
         dongs_db = [tuple(r) for r in conn.execute(q + " ORDER BY sido,sigungu,dong", p)]
