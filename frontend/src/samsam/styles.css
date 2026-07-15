@@ -85,4 +85,30 @@ tbody tr.on td.l:first-child { background: #dbeafe; }
   /* 안내문 속 인라인 입력들 — 터치 쉽게 간격/최소폭 확보하고 줄바꿈 허용 */
   .hint { font-size: 11px; line-height: 2; }
   .hint input, .hint select { margin: 3px 2px; padding: 6px 8px; font-size: 13px; }
+  /* 모바일: 가로 스크롤 표 대신 카드 리스트 */
+  .desk-only { display: none; }
+  .mob-only { display: block; }
 }
+
+/* 모바일 카드 리스트 (PC에선 숨김) + 상세 모달 */
+.mob-only { display: none; }
+.mob-list { display: flex; flex-direction: column; gap: 8px; }
+.mob-item { text-align: left; width: 100%; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 13px; cursor: pointer; font: inherit; }
+.mob-item:active { background: #f3f4f6; }
+.mi-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.mi-name { font-weight: 800; font-size: 14px; color: #111827; }
+.mi-occ { font-weight: 800; font-size: 15px; white-space: nowrap; }
+.mi-sub { font-size: 12px; color: #475569; margin-top: 4px; }
+.modal-back { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: flex; align-items: flex-end; justify-content: center; z-index: 1000; }
+.modal-card { background: #fff; width: 100%; max-width: 520px; border-radius: 16px 16px 0 0; max-height: 86vh; display: flex; flex-direction: column; box-shadow: 0 -8px 40px rgba(0,0,0,.3); }
+.modal-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 16px 18px 10px; border-bottom: 1px solid #eef0f2; }
+.modal-title { font-size: 17px; font-weight: 800; color: #111827; }
+.modal-sub { font-size: 12.5px; color: #64748b; margin-top: 3px; }
+.modal-x { border: none; background: #f1f5f9; border-radius: 8px; width: 32px; height: 32px; font-size: 15px; cursor: pointer; color: #475569; flex: 0 0 auto; }
+.modal-body { padding: 6px 18px; overflow-y: auto; }
+.md-row { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid #f4f5f7; font-size: 14px; }
+.md-k { color: #6b7280; flex: 0 0 auto; }
+.md-v { text-align: right; }
+.modal-foot { padding: 12px 18px 18px; display: flex; gap: 8px; }
+.modal-foot .lnk { padding: 11px 14px; font-size: 13px; flex: 1; text-align: center; }
+@media (min-width: 641px) { .modal-back { align-items: center; } .modal-card { border-radius: 16px; } }
