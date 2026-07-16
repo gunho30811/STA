@@ -443,6 +443,15 @@ def init_db(force=False):
         bldg        TEXT,   naverUrl TEXT,  samUrl  TEXT,   monthOcc TEXT,
         phone       TEXT,   office  TEXT,   repRent REAL,   repDep  REAL,   repFloor TEXT
     )""")
+    # 미리 계산해둔 무거운 결과 캐시(대시보드 인사이트·추천 후보 등)를 JSON 문자열로 저장.
+    # 웹은 요청 때 재계산(20초+) 대신 이 테이블에서 즉시 읽는다 → 콜드스타트에도 빠름.
+    # 갱신은 pipeline/refresh_insights.py(크롤 후·크론)가 담당.
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS kv_cache (
+        k           TEXT PRIMARY KEY,
+        data        TEXT,
+        updated_at  TEXT
+    )""")
     # 회원/로그인. 관리자는 username, 일반회원은 email로 로그인. 비번은 해시 저장.
     # (이름이 Supabase 예약 auth.users 와 헷갈려 public.members 로 명명)
     conn.execute("""

@@ -12,6 +12,8 @@
 Vercel: api/index.py 가 application(WSGI) 을 가져다 씀.
 쿠키 path=/ 라 한 번 로그인하면 모든 마운트에서 공유된다.
 """
+import datetime as dt
+import json
 import math
 import os
 import sys
@@ -214,29 +216,55 @@ def _unclaimed_spots(conn):
     return cands
 
 
+def _compute_insights(conn):
+    """무거운 계산(20초+) — 공장·신도시 예약률 + 공급부족 스팟 + 미개척 지역.
+    요청 경로에서 직접 부르지 말 것. refresh_insights.py(크롤 후·크론)가 호출해 DB에 저장한다."""
+    rows = [(r[0], r[1], r[2], r[3]) for r in conn.execute(
+        "SELECT lat, lng, booked_days_1m, blocked_days_1m FROM samsam_listings"
+        " WHERE lat IS NOT NULL").fetchall()]
+    factories = []
+    for name, la, ln in FACTORIES:
+        n, occ = _spot_stats(rows, la, ln, 3.0)
+        factories.append({"name": name, "n": n, "occ": occ})
+    newtowns = []
+    for name, la, ln in NEWTOWNS:
+        n, occ = _spot_stats(rows, la, ln, 1.5)
+        sts = subway.stations_within(la, ln, 1200)[:3]   # 중심 1.2km 내 역 최대 3개
+        newtowns.append({"name": name, "n": n, "occ": occ, "stations": sts})
+    spots = _supply_shortage_spots(conn)
+    unclaimed = _unclaimed_spots(conn)
+    return {"factories": factories, "newtowns": newtowns, "spots": spots, "unclaimed": unclaimed}
+
+
 def dashboard_insights():
-    """공급부족 스팟 + 공장·신도시 예약률(10분 캐시). 실패 시 None(섹션 생략)."""
+    """대시보드 인사이트 — 미리 계산해 DB(kv_cache)에 저장된 결과를 즉시 읽는다.
+    프로세스 메모리 5분 캐시로 DB 왕복도 줄인다. DB에 없으면(최초) 그때만 계산해 저장(느림 1회).
+    나이 무관하게 반환 — 데이터는 하루 1~2회 크롤이라 실시간성 불필요. 실패 시 None(섹션 생략)."""
     now = time.time()
-    if _INS_CACHE["data"] is not None and now - _INS_CACHE["t"] < 600:
+    if _INS_CACHE["data"] is not None and now - _INS_CACHE["t"] < 300:
         return _INS_CACHE["data"]
     try:
         conn = db.connect()
-        rows = [(r[0], r[1], r[2], r[3]) for r in conn.execute(
-            "SELECT lat, lng, booked_days_1m, blocked_days_1m FROM samsam_listings"
-            " WHERE lat IS NOT NULL").fetchall()]
-        factories = []
-        for name, la, ln in FACTORIES:
-            n, occ = _spot_stats(rows, la, ln, 3.0)
-            factories.append({"name": name, "n": n, "occ": occ})
-        newtowns = []
-        for name, la, ln in NEWTOWNS:
-            n, occ = _spot_stats(rows, la, ln, 1.5)
-            sts = subway.stations_within(la, ln, 1200)[:3]   # 중심 1.2km 내 역 최대 3개
-            newtowns.append({"name": name, "n": n, "occ": occ, "stations": sts})
-        spots = _supply_shortage_spots(conn)
-        unclaimed = _unclaimed_spots(conn)
+        try:
+            row = conn.execute("SELECT data FROM kv_cache WHERE k = %s",
+                               ("dashboard_insights",)).fetchone()
+        except Exception:
+            row = None
+        if row and row[0]:
+            data = json.loads(row[0])
+        else:
+            # 캐시 미스(최초 배포 등) — 이번 한 번만 계산해 저장. 이후는 DB 히트.
+            data = _compute_insights(conn)
+            try:
+                conn.execute(
+                    "INSERT INTO kv_cache(k,data,updated_at) VALUES(%s,%s,%s)"
+                    " ON CONFLICT (k) DO UPDATE SET data=EXCLUDED.data,updated_at=EXCLUDED.updated_at",
+                    ("dashboard_insights", json.dumps(data, ensure_ascii=False),
+                     dt.datetime.now().isoformat(timespec="seconds")))
+                conn.commit()
+            except Exception:
+                pass
         conn.close()
-        data = {"factories": factories, "newtowns": newtowns, "spots": spots, "unclaimed": unclaimed}
         _INS_CACHE.update(t=now, data=data)
         return data
     except Exception:

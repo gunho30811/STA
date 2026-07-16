@@ -766,7 +766,21 @@ def api_recommend():
 
     conn = db.connect()
     try:
-        cands = _RECO["cands"] if cache_fresh else _reco_candidates(conn)
+        if cache_fresh:
+            cands = _RECO["cands"]
+        else:
+            # 미리 계산해둔 후보(refresh_insights.py → kv_cache)를 우선 사용 → 20초 재계산 회피.
+            # 없으면(최초) 그때만 직접 계산. 나이 무관(데이터는 하루 1~2회 크롤).
+            cands = None
+            try:
+                row = conn.execute("SELECT data FROM kv_cache WHERE k = %s",
+                                   ("reco_candidates",)).fetchone()
+                if row and row[0]:
+                    cands = json.loads(row[0])
+            except Exception:
+                cands = None
+            if cands is None:
+                cands = _reco_candidates(conn)
     except Exception as e:
         conn.close()
         return jsonify({"error": str(e)[:100], "spots": []})

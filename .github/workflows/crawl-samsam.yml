@@ -72,6 +72,10 @@ jobs:
         run: python pipeline/integrate/build_integrated.py
         continue-on-error: true   # 네이버 데이터 없으면 스킵
 
+      - name: 대시보드·추천 캐시 갱신 (kv_cache — 웹 20초 재계산 제거)
+        run: python pipeline/refresh_insights.py
+        continue-on-error: true
+
       - name: 최종 변경분 커밋 (main 직접 push)
         run: |
           # 크롤 스텝이 리프레시 도중 lab/samsam_listings.jsonl 은 이미 점진 커밋했고,
