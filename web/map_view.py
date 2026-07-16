@@ -80,7 +80,7 @@ border:3px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.35);line
     <span class=chip data-t="상가주택">상가주택</span>
   </div>
   <div class=row>
-    <label class="tog on" id=t_circles><span class=dot style="background:#059669"></span>동별 예약률</label>
+    <label class="tog on" id=t_circles><span class=dot style="background:#059669"></span>동별 예약률(전체 기준)</label>
     <label class="tog on" id=t_rent><span class=dot style="background:#4321F3"></span>렌트</label>
     <label class="tog on" id=t_naver><span class=dot style="background:#14b8a6"></span>부동산</label>
   </div>
@@ -124,16 +124,18 @@ function applyFilter(){
   })
   rentShown=fs.length
   idx=new Supercluster({radius:56,maxZoom:17,minPoints:2}).load(fs)
-  // 동 원: sigungu+dong 그룹 → 중앙값 좌표(불량 좌표 내성) + 평균 예약률
+  // 동 원(지역 수요 지표)은 매물 필터와 무관하게 항상 '전체' 기준 — 예약률 50%↑ 필터를 걸면
+  // 남은 매물 평균이라 모든 동이 높아 보이는 선택 편향 방지. 유형 칩만 세그먼트로 반영.
+  var fsCirc = filt.btype ? FEATS.filter(function(f){return f.properties.btype===filt.btype}) : FEATS
   var g={}
-  fs.forEach(function(f){
+  fsCirc.forEach(function(f){
     var p=f.properties, k=p.sigungu+'|'+p.dong
     if(!g[k]) g[k]={lats:[],lngs:[],occ:0,n:0,dong:p.dong}
     g[k].lats.push(p.lat); g[k].lngs.push(p.lng); g[k].occ+=(p.occ||0); g[k].n++
   })
   CIRCLES=[]
   Object.keys(g).forEach(function(k){
-    var v=g[k]; if(v.n<3) return
+    var v=g[k]   // 매물 1개뿐인 동도 표기(요청: 동이면 다 보이게). 표본 수(·n)로 신뢰도 판단.
     CIRCLES.push([median(v.lats),median(v.lngs),Math.round(v.occ/v.n*10)/10,v.n,v.dong,k])
   })
   shownRent.forEach(function(ly){rentLayer.removeLayer(ly)}); shownRent.clear()
