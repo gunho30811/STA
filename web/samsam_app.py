@@ -666,6 +666,10 @@ def api_recommend():
     import math
     import poi as poi_mod
     pois = poi_mod.load_poi()
+    try:
+        import workers as workers_mod   # 행정동 종사자수(SGIS) — 있으면 점수 반영
+    except Exception:
+        workers_mod = None
 
     conn = db.connect()
     # ① 동별 네이버 집계: 대표좌표(중앙값)·월세회전율(최근7일 신규/활성)·주거 소형 매물 시세
@@ -707,18 +711,24 @@ def api_recommend():
                 ev.append((kind, name, int(dist * 1000), w))
         turnover = (d["new7"] / d["active"] * 100) if d["active"] else 0
         score += min(turnover, 40) * 0.15   # 회전율 보너스(최대 6점)
+        # 종사자수 보너스(출장 수요 직접 지표) — 좌표 기반(행정동↔법정동 이름 불일치 회피),
+        # 대표좌표 1.2km 내 행정동 종사자수 합. 5만명에서 상한, 최대 4점.
+        workers = workers_mod.workers_near(la, ln, 1.2) if workers_mod else 0
+        if workers:
+            score += min(workers / 50000, 1.0) * 4.0
         ev.sort(key=lambda e: -e[3])
-        return round(score, 1), round(turnover, 1), ev[:3]
+        return round(score, 1), round(turnover, 1), workers, ev[:3]
 
     cands = []
     for key, d in dong.items():
         samn = sam.get(d["dong"], 0)
         if samn > 3:            # 삼삼 공급 충분 → 추천 대상 아님
             continue
-        score, turnover, ev = demand_score(d)
+        score, turnover, workers, ev = demand_score(d)
         if score < 4:           # 수요 근거 약하면 제외
             continue
         cands.append({**d, "n_samsam": samn, "score": score, "turnover": turnover,
+                      "workers": workers,
                       "poi": [{"kind": k, "name": n, "dist_m": m} for k, n, m, _ in ev]})
     cands.sort(key=lambda c: -c["score"])
     cands = cands[:40]
