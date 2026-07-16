@@ -117,6 +117,37 @@ def _supply_shortage_spots(conn):
     return cands
 
 
+def _unclaimed_spots(conn):
+    """미개척 지역 — 네이버 월세 회전율(=수요 신호, 삼삼 없이도 계산 가능)은 높은데
+    삼삼(단기임대) 공급이 거의 없는 동. 삼삼 예약률 기반 스팟이 놓치는, '삼삼이 아직
+    발 안 디딘' 지역을 잡아낸다(Phase 1 — 외부 데이터 연계 전 자체 데이터 버전).
+
+    회전율 = 최근 7일 신규 등록(confirmYmd) / 활성 매물 수. 등록이 빨리 채워질수록
+    월세 수요가 활발하다는 신호(매물이 안 나가면 신규 등록만 계속 쌓여 오히려 활성 재고가
+    불어나므로, 회전율은 '재고 대비 신규 유입 속도'로 시장 활력의 근사치)."""
+    rows = conn.execute(
+        "SELECT sigungu, dong,"
+        " COUNT(*) FILTER (WHERE confirmymd IS NOT NULL) AS active,"
+        " COUNT(*) FILTER (WHERE confirmymd::text >= to_char(now()-interval '7 days','YYYYMMDD')) AS new7"
+        " FROM listings WHERE sido IN ('서울특별시','경기도','인천광역시') AND dong IS NOT NULL"
+        " GROUP BY sigungu, dong HAVING COUNT(*) FILTER (WHERE confirmymd IS NOT NULL) >= 30"
+    ).fetchall()
+    dong_names = list({r[1] for r in rows})
+    sam = dict(conn.execute(
+        "SELECT dong, COUNT(*) FROM samsam_listings"
+        " WHERE sido IN ('서울특별시','경기도','인천광역시') AND dong = ANY(%s) GROUP BY dong",
+        (dong_names,)).fetchall()) if dong_names else {}
+    cands = []
+    for sg, d, active, new7 in rows:
+        turnover = new7 / active if active else 0
+        samn = sam.get(d, 0)
+        if turnover >= 0.15 and samn <= 2:
+            cands.append({"sigungu": sg or "", "dong": d or "", "turnover": round(turnover * 100, 1),
+                          "active": active, "new7": new7, "n_samsam": samn})
+    cands.sort(key=lambda x: -x["turnover"])
+    return cands[:SPOT_TOP]
+
+
 def dashboard_insights():
     """공급부족 스팟 + 공장·신도시 예약률(10분 캐시). 실패 시 None(섹션 생략)."""
     now = time.time()
@@ -137,8 +168,9 @@ def dashboard_insights():
             sts = subway.stations_within(la, ln, 1200)[:3]   # 중심 1.2km 내 역 최대 3개
             newtowns.append({"name": name, "n": n, "occ": occ, "stations": sts})
         spots = _supply_shortage_spots(conn)
+        unclaimed = _unclaimed_spots(conn)
         conn.close()
-        data = {"factories": factories, "newtowns": newtowns, "spots": spots}
+        data = {"factories": factories, "newtowns": newtowns, "spots": spots, "unclaimed": unclaimed}
         _INS_CACHE.update(t=now, data=data)
         return data
     except Exception:
@@ -232,6 +264,21 @@ padding:14px;text-align:center}
     {% endfor %}
   </div>
   <div class=spot-note>예약률=수요 · 렌트 매물수=경쟁(적을수록 기회) · 부동산 매물수=진입 가능한 월세 물건 · 카드 클릭 → 수익 계산기</div>
+</div>
+{% endif %}
+{% if ins.unclaimed %}
+<div class="churn spot-panel" style="border-color:rgba(56,189,248,.35);background:rgba(56,189,248,.05)">
+  <div class=churn-h>🎯 미개척 지역 <span class=churn-d>월세는 빨리 나가는데(회전율↑) 렌트(단기임대)가 아직 없는 동네</span></div>
+  <div class=ins-grid>
+    {% for u in ins.unclaimed %}
+    <div class=ins-cell>
+      <div class=ins-name>{{u.sigungu}} <b>{{u.dong}}</b></div>
+      <div class="ins-occ hi">{{u.turnover}}%</div>
+      <div class=ins-sub>월세 회전율(최근7일 신규 {{u.new7}}/재고 {{u.active}}) · 렌트 매물 {{u.n_samsam}}개뿐</div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class=spot-note>회전율=최근7일 신규등록÷활성매물(월세 수요 신호, 삼삼 데이터 없이 계산) · 렌트 매물 2개 이하만 · 아직 아무도 안 뛰어든 곳일 수 있음</div>
 </div>
 {% endif %}
 <div class=churn>
