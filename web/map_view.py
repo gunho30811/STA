@@ -42,6 +42,10 @@ padding:3px 8px;font-size:11px;font-weight:700;text-align:center;line-height:1.2
 box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .occ-badge b{font-size:13px}.occ-n{font-weight:500;color:#94a3b8;font-size:10px}
 .pin{width:16px;height:16px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.poi{display:flex;align-items:center;gap:3px;background:rgba(255,255,255,.95);border:1.5px solid #f59e0b;border-radius:999px;
+padding:2px 8px 2px 4px;font-size:11px;font-weight:800;color:#92400e;white-space:nowrap;box-shadow:0 1px 5px rgba(0,0,0,.3);
+transform:translate(-50%,-50%)}
+.poi.h{border-color:#dc2626;color:#991b1b}.poi.u{border-color:#2563eb;color:#1e40af}.poi.i{border-color:#7c3aed;color:#5b21b6}
 .pin.nv{width:13px;height:13px;background:#14b8a6}
 .clus{display:flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;font-weight:800;
 border:3px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.35);line-height:1.1;text-align:center;cursor:pointer}
@@ -83,6 +87,7 @@ border:3px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.35);line
     <label class="tog on" id=t_circles><span class=dot style="background:#059669"></span>동별 예약률(전체 기준)</label>
     <label class="tog on" id=t_rent><span class=dot style="background:#4321F3"></span>렌트</label>
     <label class="tog on" id=t_naver><span class=dot style="background:#14b8a6"></span>부동산</label>
+    <label class="tog on" id=t_poi><span class=dot style="background:#f59e0b"></span>수요시설 🏥🎓🏭</label>
   </div>
 </div>
 </div>
@@ -107,8 +112,9 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,att
 var rentLayer=L.layerGroup().addTo(map)
 var circleLayer=L.layerGroup().addTo(map)
 var navLayer=L.layerGroup().addTo(map)
-var show={circles:true,rent:true,naver:true}
-var FEATS=[], STATIONS=[], idx=null, CIRCLES=[], rentShown=0
+var poiLayer=L.layerGroup().addTo(map)
+var show={circles:true,rent:true,naver:true,poi:true}
+var FEATS=[], STATIONS=[], POIS=[], idx=null, CIRCLES=[], rentShown=0
 var filt={btype:'',week:0,occ:0,net:0}
 var shownRent=new Map(), shownCirc=new Map()
 
@@ -235,6 +241,25 @@ function renderCircles(){
   diffRender(circleLayer, shownCirc, wanted)
 }
 
+// ── 수요시설 POI: 왜 이 동네에 수요가 있나(병원 통원·대학 계절학기·산단 출장) ──
+var shownPoi=new Map()
+var POI_ICON={hospital:'🏥',university:'🎓',industrial:'🏭'}
+var POI_CLS={hospital:'h',university:'u',industrial:'i'}
+function renderPois(){
+  var wanted=new Map()
+  if(show.poi && map.getZoom()>=12){
+    var b=map.getBounds().pad(0.1)
+    POIS.forEach(function(p){
+      if(!b.contains([p[2],p[3]])) return
+      wanted.set(p[0]+'|'+p[1], function(){
+        return L.marker([p[2],p[3]],{zIndexOffset:500,icon:L.divIcon({className:'',iconSize:null,
+          html:'<div class="poi '+POI_CLS[p[0]]+'">'+POI_ICON[p[0]]+' '+p[1]+'</div>'})})
+      })
+    })
+  }
+  diffRender(poiLayer, shownPoi, wanted)
+}
+
 // ── 부동산(네이버): 줌 15+ bbox 조회, 유형 필터 반영 ──
 var navTimer=null, navSeq=0
 function loadNaver(){
@@ -286,10 +311,11 @@ document.getElementById('q').addEventListener('keydown',function(e){if(e.key==='
 // ── 초기 1회 로드 ──
 fetch('/samsam/api/map_all',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
   STATIONS=d.stations||[]
+  POIS=d.pois||[]
   FEATS=(d.rent||[]).filter(function(a){return a[1]>=33&&a[1]<=39.5&&a[2]>=124&&a[2]<=132})
     .map(function(a){return {type:'Feature',geometry:{type:'Point',coordinates:[a[2],a[1]]},
       properties:{id:a[0],lat:a[1],lng:a[2],occ:a[3],week:a[4],pyeong:a[5],btype:a[6],name:a[7],sigungu:a[8],dong:a[9],net:a[10]}}})
-  applyFilter()
+  applyFilter(); renderPois()
 }).catch(function(){document.getElementById('stat').textContent='로드 실패 — 새로고침 해주세요'})
 
 // 이동 중 스로틀 갱신 + 끝나면 확정, 네이버 디바운스
@@ -299,7 +325,7 @@ map.on('move',function(){
   mvTimer=setTimeout(function(){mvTimer=null;renderRent();renderCircles()},120)
 })
 map.on('moveend zoomend',function(){
-  renderRent(); renderCircles()
+  renderRent(); renderCircles(); renderPois()
   clearTimeout(navTimer); navTimer=setTimeout(loadNaver,400)
 })
 
@@ -316,11 +342,12 @@ document.querySelectorAll('#chips .chip').forEach(function(ch){
     clearTimeout(tm); tm=setTimeout(function(){filt[k]=parseFloat(el.value)||0; applyFilter()},400)
   })
 })
-;['circles','rent','naver'].forEach(function(k){
+;['circles','rent','naver','poi'].forEach(function(k){
   document.getElementById('t_'+k).addEventListener('click',function(){
     show[k]=!show[k]; this.classList.toggle('on',show[k])
     if(k==='circles') renderCircles()
     else if(k==='rent') renderRent()
+    else if(k==='poi') renderPois()
     else loadNaver()
   })
 })

@@ -633,7 +633,13 @@ def api_map_all():
         stations = [[n, round(y, 5), round(x, 5)] for n, y, x in subway._load()]
     except Exception:
         stations = []
-    body = json.dumps({"rent": rent, "circles": circles, "stations": stations},
+    # 수요시설 POI(병원·대학·산단) — '왜 이 동네에 수요가 있나'의 근거 레이어
+    try:
+        import poi as poi_mod
+        pois = [[k, n, round(y, 5), round(x, 5)] for k, n, y, x in poi_mod.load_poi()]
+    except Exception:
+        pois = []
+    body = json.dumps({"rent": rent, "circles": circles, "stations": stations, "pois": pois},
                       ensure_ascii=False, separators=(",", ":"))
     _MAPALL.update(t=now, body=body)
     return app.response_class(body, mimetype="application/json")

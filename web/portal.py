@@ -27,6 +27,7 @@ from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 import db
+import poi as poi_mod
 import subway
 from auth import current_user, init_auth, latest_listing_churn, online_count
 
@@ -108,12 +109,27 @@ def _supply_shortage_spots(conn):
     except Exception:
         pass
 
+    # 동 대표 좌표(중앙값 — 불량 좌표 내성) → 근처 수요시설(왜 수요가 있나의 근거)
+    coords = {}
+    for sg, d, la, ln in conn.execute(
+            "SELECT sigungu, dong, lat, lng FROM samsam_listings"
+            " WHERE dong = ANY(%s) AND lat BETWEEN 33 AND 39.5 AND lng BETWEEN 124 AND 132",
+            (dong_names,)).fetchall():
+        coords.setdefault((sg or "", d or ""), []).append((la, ln))
+
     for c in cands:
         key = (c["sigungu"], c["dong"])
         g = prof.get(key)
         c["net"] = round(g[1] / g[2], 1) if g and g[2] else None          # 평균 월순수익(만원)
         c["margin"] = round(g[1] / g[0] * 100, 1) if g and g[0] > 0 else None  # 영업이익률(%)
         c["n_naver"] = nav.get(key, 0)
+        pts = coords.get(key) or []
+        if pts:
+            lats = sorted(p[0] for p in pts); lngs = sorted(p[1] for p in pts)
+            m = len(pts) // 2
+            c["poi"] = poi_mod.nearby(lats[m], lngs[m], 2.5, 2)
+        else:
+            c["poi"] = []
     return cands
 
 
@@ -145,7 +161,26 @@ def _unclaimed_spots(conn):
             cands.append({"sigungu": sg or "", "dong": d or "", "turnover": round(turnover * 100, 1),
                           "active": active, "new7": new7, "n_samsam": samn})
     cands.sort(key=lambda x: -x["turnover"])
-    return cands[:SPOT_TOP]
+    cands = cands[:SPOT_TOP]
+
+    # 삼삼 데이터가 없는 동네라 '왜 수요가 있나'의 근거가 특히 중요 → 네이버 매물 좌표로 근처 수요시설.
+    if cands:
+        top_dongs = [c["dong"] for c in cands]
+        coords = {}
+        for sg, d, la, ln in conn.execute(
+                "SELECT sigungu, dong, lat, lon FROM listings"
+                " WHERE dong = ANY(%s) AND lat BETWEEN 33 AND 39.5 AND lon BETWEEN 124 AND 132",
+                (top_dongs,)).fetchall():
+            coords.setdefault((sg or "", d or ""), []).append((la, ln))
+        for c in cands:
+            pts = coords.get((c["sigungu"], c["dong"])) or []
+            if pts:
+                lats = sorted(p[0] for p in pts); lngs = sorted(p[1] for p in pts)
+                m = len(pts) // 2
+                c["poi"] = poi_mod.nearby(lats[m], lngs[m], 3.0, 2)
+            else:
+                c["poi"] = []
+    return cands
 
 
 def dashboard_insights():
@@ -218,6 +253,7 @@ padding:14px;text-align:center}
 .spot-cell{display:block;text-decoration:none;transition:.12s}
 .spot-cell:hover{transform:translateY(-2px);border-color:rgba(251,146,60,.5)}
 .spot-note{font-size:11px;color:#64748b;margin-top:10px}
+.poi-ev{color:#fbbf24;font-size:10.5px;font-weight:700}
 @media(max-width:640px){h1{font-size:21px}.card{padding:18px}}
 </style></head><body><div class=wrap>
 <div class=top>
@@ -259,7 +295,8 @@ padding:14px;text-align:center}
       <div class=ins-name>{{s.sigungu}} <b>{{s.dong}}</b></div>
       <div class="ins-occ {{occcls(s.occ)}}">{{s.occ}}%</div>
       <div class=ins-sub>렌트 {{s.n_rent}}개 vs 부동산 {{'{:,}'.format(s.n_naver)}}개
-        {% if s.net is not none %}<br>월순수익 <b style="color:{{'#34d399' if s.net>=0 else '#f87171'}}">{{s.net}}만</b>{% if s.margin is not none %} · 이익률 {{s.margin}}%{% endif %}{% else %}<br><span style="color:#475569">수익성 매칭 없음</span>{% endif %}</div>
+        {% if s.net is not none %}<br>월순수익 <b style="color:{{'#34d399' if s.net>=0 else '#f87171'}}">{{s.net}}만</b>{% if s.margin is not none %} · 이익률 {{s.margin}}%{% endif %}{% else %}<br><span style="color:#475569">수익성 매칭 없음</span>{% endif %}
+        {% if s.poi %}<br><span class=poi-ev>{% for p in s.poi %}{{ {'hospital':'🏥','university':'🎓','industrial':'🏭'}[p.kind] }}{{p.name}} {{(p.dist_m/1000)|round(1)}}km {% endfor %}</span>{% endif %}</div>
     </a>
     {% endfor %}
   </div>
@@ -274,7 +311,8 @@ padding:14px;text-align:center}
     <div class=ins-cell>
       <div class=ins-name>{{u.sigungu}} <b>{{u.dong}}</b></div>
       <div class="ins-occ hi">{{u.turnover}}%</div>
-      <div class=ins-sub>월세 회전율(최근7일 신규 {{u.new7}}/재고 {{u.active}}) · 렌트 매물 {{u.n_samsam}}개뿐</div>
+      <div class=ins-sub>월세 회전율(최근7일 신규 {{u.new7}}/재고 {{u.active}}) · 렌트 매물 {{u.n_samsam}}개뿐
+        {% if u.poi %}<br><span class=poi-ev>{% for p in u.poi %}{{ {'hospital':'🏥','university':'🎓','industrial':'🏭'}[p.kind] }}{{p.name}} {{(p.dist_m/1000)|round(1)}}km {% endfor %}</span>{% endif %}</div>
     </div>
     {% endfor %}
   </div>
