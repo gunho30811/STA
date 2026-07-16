@@ -133,6 +133,10 @@ def main():
     buf, done = [], 0
     try:
         for i, (no, region) in enumerate(todo, 1):
+            if getattr(crawler, "STOP", False):   # GUI 즉시 중지
+                print(f"[{now()}] ⏹ 중지됨 — 상세 중단 (누적 {done}건)")
+                save(buf); buf = []
+                break
             try:
                 row = fetch_row(nl, no, region)
             except Exception as e:

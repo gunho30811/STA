@@ -68,6 +68,9 @@ TRADE_TYPES = {
     "A1": "매매",
 }
 
+# 협조적 즉시 중지 플래그 — GUI 등에서 True 로 세팅하면 잡 루프가 다음 잡에서 곧바로 멈춘다.
+STOP = False
+
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
@@ -315,6 +318,8 @@ def crawl_dong(nl, cortarNo, sido, sigungu, dong, max_pages=60, real_estate_type
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", rows)
         conn.commit()
         total += len(rows)
+        if STOP:                                    # 즉시 중지(페이지 사이)
+            break
         if limit is not None and total >= limit:   # 원하는 개수 채우면 종료
             break
         if not j.get("isMoreData"):
@@ -399,9 +404,14 @@ def main():
                 for cno, sido, sigungu, dong, lat, lon in dongs
                 for code in type_codes for trade in trade_codes]
 
+        global STOP
+        STOP = False   # 새 실행마다 초기화
         grand = 0
         collected = {}   # (종류,거래)별 누적 — --max-per-type 예산 관리
         for i, (cno, sido, sigungu, dong, code, trade) in enumerate(jobs, 1):
+            if STOP:
+                print(f"[{now()}] ⏹ 중지됨 — 크롤 중단 (누적 {grand}건)")
+                break
             limit = None
             if args.max_per_type:
                 got = collected.get((code, trade), 0)

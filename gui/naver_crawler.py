@@ -119,6 +119,27 @@ def _ensure_chromium():
         print(f"[GUI] ⚠ 크롬 자동설치 오류: {e}")
 
 
+def _export_csv(dbpath, folder):
+    """로컬 naver.db 의 listings 를 CSV(엑셀용, UTF-8 BOM)로 내보낸다. (경로, 건수) 반환."""
+    import csv
+    import sqlite3
+    out = os.path.join(folder, 'naver_매물.csv')
+    conn = sqlite3.connect(dbpath)
+    try:
+        cur = conn.execute("SELECT * FROM listings ORDER BY sido, sigungu, dong, realEstateType, tradeType")
+        cols = [d[0] for d in cur.description]
+        n = 0
+        with open(out, 'w', newline='', encoding='utf-8-sig') as f:
+            w = csv.writer(f)
+            w.writerow(cols)
+            for row in cur:
+                w.writerow(row)
+                n += 1
+    finally:
+        conn.close()
+    return out, n
+
+
 def run_pipeline(opts, log_q, stop_flag):
     """워커 스레드: env 세팅 → crawler(목록) → [상세] → [export]. 로그는 log_q 로."""
     _add_paths()
@@ -149,10 +170,10 @@ def run_pipeline(opts, log_q, stop_flag):
                 '--sidos', ','.join(opts['sidos']),
                 '--types', ','.join(opts['types']),
                 '--trade-types', ','.join(opts['trades'])]
-        if opts['test']:
+        if opts.get('sample'):
             argv += ['--max-per-type', str(opts.get('test_count', 10))]
         print(f"[GUI] 목록 크롤 시작 — 지역 {opts['sidos']} / 거래 {opts['trades']} / 종류 {len(opts['types'])}개"
-              + (f"  (테스트: 각 종류 {opts.get('test_count', 10)}개)" if opts['test'] else ""))
+              + (f"  (각 종류 {opts.get('test_count', 10)}개씩)" if opts.get('sample') else "  (전체)"))
         if stop_flag.is_set():
             return
         sys.argv = argv
@@ -193,6 +214,14 @@ def run_pipeline(opts, log_q, stop_flag):
                 exp.main()
             except Exception as e:
                 print(f"[GUI] export 스킵({e})")
+
+        # 5) CSV 저장(로컬 모드) — 엑셀에서 바로 열림
+        if opts['mode'] == 'local' and opts.get('csv'):
+            try:
+                out, n = _export_csv(os.environ['SAMSAM_SQLITE_PATH'], opts['folder'])
+                print(f"[GUI] 📄 CSV 저장: {out}  ({n:,}건)")
+            except Exception as e:
+                print(f"[GUI] CSV 저장 실패: {e}")
 
         print("[GUI] ✅ 전체 완료")
     except Exception:
@@ -347,21 +376,29 @@ def launch_gui():
                     variable=mode_var, command=sync_mode).pack(side='left', padx=12)
     sync_mode()
 
+    # ── 수집량 ──
+    qf = ttk.LabelFrame(root, text='수집량', padding=8)
+    qf.pack(fill='x', padx=10, pady=4)
+    limit_mode = tk.StringVar(value=cfg.get('limit_mode', 'all'))
+    ttk.Radiobutton(qf, text='전체 (선택한 지역·종류 다)', value='all',
+                    variable=limit_mode).pack(side='left')
+    ttk.Radiobutton(qf, text='각 종류', value='sample', variable=limit_mode).pack(side='left', padx=(16, 2))
+    test_count = ttk.Spinbox(qf, from_=1, to=1000000, width=8)
+    test_count.set(str(cfg.get('test_count', 10)))
+    test_count.pack(side='left')
+    ttk.Label(qf, text='개씩만 (빠른 샘플)').pack(side='left', padx=(2, 0))
+
     # ── 옵션 ──
-    of = ttk.Frame(root, padding=(10, 4))
+    of = ttk.Frame(root, padding=(10, 2))
     of.pack(fill='x')
-    test_var = tk.BooleanVar(value=False)
     detail_var = tk.BooleanVar(value=cfg.get('detail', False))
+    csv_var = tk.BooleanVar(value=cfg.get('csv', True))
     export_var = tk.BooleanVar(value=cfg.get('export', False))
     save_var = tk.BooleanVar(value=True)
-    ttk.Checkbutton(of, text='테스트 (각 종류', variable=test_var).pack(side='left')
-    test_count = ttk.Spinbox(of, from_=1, to=1000000, width=7)
-    test_count.set(str(cfg.get('test_count', 10)))
-    test_count.pack(side='left', padx=(2, 0))
-    ttk.Label(of, text='개만)').pack(side='left', padx=(2, 8))
+    ttk.Checkbutton(of, text='CSV로 저장 (엑셀)', variable=csv_var).pack(side='left')
     ttk.Checkbutton(of, text='상세정보도 수집 (느림)', variable=detail_var).pack(side='left', padx=10)
     ttk.Checkbutton(of, text='JSONL export', variable=export_var).pack(side='left')
-    ttk.Checkbutton(of, text='이 PC에 설정 저장', variable=save_var).pack(side='left', padx=10)
+    ttk.Checkbutton(of, text='설정 저장', variable=save_var).pack(side='left', padx=10)
 
     bf = ttk.Frame(root, padding=10)
     bf.pack(fill='x')
@@ -415,12 +452,14 @@ def launch_gui():
         try:
             tcount = max(1, int(test_count.get()))
         except (ValueError, tk.TclError):
-            tcount = 3
+            tcount = 10
+        lmode = limit_mode.get()
         if save_var.get():
             try:
                 with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
                     json.dump({'sidos': sidos, 'trades': trades, 'types': types, 'mode': mode,
                                'folder': folder, 'database_url': db_url, 'test_count': tcount,
+                               'limit_mode': lmode, 'csv': csv_var.get(),
                                'detail': detail_var.get(), 'export': export_var.get()},
                               f, ensure_ascii=False, indent=2)
             except Exception as e:
@@ -428,7 +467,8 @@ def launch_gui():
 
         opts = {'sidos': sidos, 'trades': trades, 'types': types, 'mode': mode,
                 'folder': folder, 'database_url': db_url, 'test_count': tcount,
-                'test': test_var.get(), 'detail': detail_var.get(), 'export': export_var.get()}
+                'sample': (lmode == 'sample'), 'csv': csv_var.get(),
+                'detail': detail_var.get(), 'export': export_var.get()}
         log.delete('1.0', 'end')
         stop_flag.clear()
         btn_start.config(state='disabled'); btn_stop.config(state='normal')
@@ -439,8 +479,11 @@ def launch_gui():
 
     def stop():
         stop_flag.set()
-        status.config(text='중지 요청 — 현재 배치까지 마치고 멈춥니다')
-        append('\n[중지 요청됨 — 진행 중인 요청을 마치면 멈춥니다]\n')
+        mod = sys.modules.get('crawler')   # 크롤 잡 루프가 다음 잡에서 즉시 멈추게 플래그 세팅
+        if mod is not None:
+            mod.STOP = True
+        status.config(text='중지 중… (곧 멈춤)')
+        append('\n[⏹ 중지 — 즉시 멈춥니다]\n')
 
     btn_start.config(command=start)
     btn_stop.config(command=stop)
