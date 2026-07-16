@@ -762,6 +762,7 @@ def _nav_html():
       <a href="/profit/">수익성</a>
       <a href="/samsam/">렌트 분석</a>
       <a href="/samsam/?view=map">지도</a>
+      <a href="/calc">계산기</a>
       <a href="/gangnam/">부동산매물</a>
       <a href="/samsam/chat/">통합채팅</a>
       {admin}

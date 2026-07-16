@@ -61,8 +61,64 @@ def _spot_stats(rows, lat, lng, km):
     return len(occs), (round(sum(occs) / len(occs) * 100, 1) if occs else None)
 
 
+# 공급부족 스팟 기준 — 이 서비스의 핵심 신호.
+# 수요高(예약률↑) + 경쟁低(렌트 매물 적음) + 진입가능(네이버 월세 물건 존재) 동네를 찾는다.
+SPOT_MIN_OCC = 55     # 예약률 하한(%)
+SPOT_MIN_RENT = 5     # 렌트 매물 표본 하한(신뢰도)
+SPOT_MAX_RENT = 40    # 렌트 매물 상한(이보다 많으면 이미 경쟁 시장)
+SPOT_TOP = 8
+
+
+def _supply_shortage_spots(conn):
+    """동 단위 공급부족 스팟 TOP N — 예약률·렌트/네이버 매물수·평균 월순수익·영업이익률."""
+    # ① 동별 렌트 수요/공급
+    dongs = conn.execute(
+        "SELECT sigungu, dong, COUNT(*) n,"
+        " AVG(LEAST(1.0, COALESCE(booked_days_1m,0)::float"
+        "     / GREATEST(31-COALESCE(blocked_days_1m,0),1)))*100 occ"
+        " FROM samsam_listings WHERE sido IN ('서울특별시','경기도','인천광역시')"
+        " GROUP BY sigungu, dong HAVING COUNT(*) >= %s", (SPOT_MIN_RENT,)).fetchall()
+    cands = [{"sigungu": r[0] or "", "dong": r[1] or "", "n_rent": r[2], "occ": round(r[3], 1)}
+             for r in dongs if r[3] >= SPOT_MIN_OCC and r[2] <= SPOT_MAX_RENT]
+    cands.sort(key=lambda x: -x["occ"])
+    cands = cands[:SPOT_TOP]
+    if not cands:
+        return []
+    dong_names = list({c["dong"] for c in cands})
+
+    # ② 동별 수익성(net_profit 매칭분): 실현매출=최대매출×예약률, 순수익=실현−네이버월총, 이익률=순/실현
+    prof = {}
+    for sg, d, bk, bl, mx, nt in conn.execute(
+            "SELECT sigungu, dong, bk, bl, maxrev, ntotal FROM net_profit"
+            " WHERE ntotal IS NOT NULL AND maxrev IS NOT NULL AND dong = ANY(%s)",
+            (dong_names,)).fetchall():
+        occ = min(1.0, (bk or 0) / max(31 - (bl or 0), 1))
+        rev = (mx or 0) * occ
+        g = prof.setdefault((sg or "", d or ""), [0.0, 0.0, 0])
+        g[0] += rev; g[1] += rev - (nt or 0); g[2] += 1
+
+    # ③ 동별 네이버 월세 물건 수(진입 가능한 매물)
+    nav = {}
+    try:
+        for sg, d, n in conn.execute(
+                "SELECT sigungu, dong, COUNT(*) FROM nl_live"
+                " WHERE rent_monthly IS NOT NULL AND dong = ANY(%s) GROUP BY sigungu, dong",
+                (dong_names,)).fetchall():
+            nav[(sg or "", d or "")] = n
+    except Exception:
+        pass
+
+    for c in cands:
+        key = (c["sigungu"], c["dong"])
+        g = prof.get(key)
+        c["net"] = round(g[1] / g[2], 1) if g and g[2] else None          # 평균 월순수익(만원)
+        c["margin"] = round(g[1] / g[0] * 100, 1) if g and g[0] > 0 else None  # 영업이익률(%)
+        c["n_naver"] = nav.get(key, 0)
+    return cands
+
+
 def dashboard_insights():
-    """공장·신도시 스팟별 예약률(10분 캐시). 실패 시 None(대시보드는 그냥 섹션 생략)."""
+    """공급부족 스팟 + 공장·신도시 예약률(10분 캐시). 실패 시 None(섹션 생략)."""
     now = time.time()
     if _INS_CACHE["data"] is not None and now - _INS_CACHE["t"] < 600:
         return _INS_CACHE["data"]
@@ -71,7 +127,6 @@ def dashboard_insights():
         rows = [(r[0], r[1], r[2], r[3]) for r in conn.execute(
             "SELECT lat, lng, booked_days_1m, blocked_days_1m FROM samsam_listings"
             " WHERE lat IS NOT NULL").fetchall()]
-        conn.close()
         factories = []
         for name, la, ln in FACTORIES:
             n, occ = _spot_stats(rows, la, ln, 3.0)
@@ -81,7 +136,9 @@ def dashboard_insights():
             n, occ = _spot_stats(rows, la, ln, 1.5)
             sts = subway.stations_within(la, ln, 1200)[:3]   # 중심 1.2km 내 역 최대 3개
             newtowns.append({"name": name, "n": n, "occ": occ, "stations": sts})
-        data = {"factories": factories, "newtowns": newtowns}
+        spots = _supply_shortage_spots(conn)
+        conn.close()
+        data = {"factories": factories, "newtowns": newtowns, "spots": spots}
         _INS_CACHE.update(t=now, data=data)
         return data
     except Exception:
@@ -125,6 +182,10 @@ padding:14px;text-align:center}
 .ins-occ{font-size:20px;font-weight:800;margin-top:5px}
 .ins-occ.hi{color:#34d399}.ins-occ.mid{color:#fbbf24}.ins-occ.lo{color:#f87171}.ins-occ.na{color:#64748b;font-size:14px}
 .ins-sub{font-size:11px;color:#64748b;margin-top:4px;line-height:1.5}
+.spot-panel{border-color:rgba(251,146,60,.35);background:rgba(251,146,60,.05)}
+.spot-cell{display:block;text-decoration:none;transition:.12s}
+.spot-cell:hover{transform:translateY(-2px);border-color:rgba(251,146,60,.5)}
+.spot-note{font-size:11px;color:#64748b;margin-top:10px}
 @media(max-width:640px){h1{font-size:21px}.card{padding:18px}}
 </style></head><body><div class=wrap>
 <div class=top>
@@ -157,6 +218,22 @@ padding:14px;text-align:center}
 {% endif %}
 {% if ins %}
 {% macro occcls(o) %}{{ 'na' if o is none else ('hi' if o>=50 else ('mid' if o>=30 else 'lo')) }}{% endmacro %}
+{% if ins.spots %}
+<div class="churn spot-panel">
+  <div class=churn-h>🔥 공급부족 스팟 <span class=churn-d>수요는 높은데(예약률 {{55}}%↑) 렌트 매물이 적은 동네 — 진입 기회</span></div>
+  <div class=ins-grid>
+    {% for s in ins.spots %}
+    <a class="ins-cell spot-cell" href="/calc?dong={{s.dong}}{% if s.net is not none %}&net={{s.net}}{% endif %}">
+      <div class=ins-name>{{s.sigungu}} <b>{{s.dong}}</b></div>
+      <div class="ins-occ {{occcls(s.occ)}}">{{s.occ}}%</div>
+      <div class=ins-sub>렌트 {{s.n_rent}}개 vs 부동산 {{'{:,}'.format(s.n_naver)}}개
+        {% if s.net is not none %}<br>월순수익 <b style="color:{{'#34d399' if s.net>=0 else '#f87171'}}">{{s.net}}만</b>{% if s.margin is not none %} · 이익률 {{s.margin}}%{% endif %}{% else %}<br><span style="color:#475569">수익성 매칭 없음</span>{% endif %}</div>
+    </a>
+    {% endfor %}
+  </div>
+  <div class=spot-note>예약률=수요 · 렌트 매물수=경쟁(적을수록 기회) · 부동산 매물수=진입 가능한 월세 물건 · 카드 클릭 → 수익 계산기</div>
+</div>
+{% endif %}
 <div class=churn>
   <div class=churn-h>🏭 반도체 공장 인근 렌트 예약률 <span class=churn-d>반경 3km · 최근 1달</span></div>
   <div class=ins-grid>
@@ -299,6 +376,117 @@ for _k, _v in {"ICON_PROFIT": ICON_PROFIT, "ICON_RENT": ICON_RENT,
                "ICON_ESTATE": ICON_ESTATE}.items():
     LANDING = LANDING.replace("{" + _k + "}", _v)
     PUBLIC_LANDING = PUBLIC_LANDING.replace("{" + _k + "}", _v)
+
+
+# ── 수익 계산기(/calc) — 사용자의 엑셀('천사의 도시') 로직 이식 ──────────────────
+# 연원가 주간화(÷52) + 소모품 → 주 임대원가, 주매출 대비 순익·손익주·영업이익률,
+# 공실률 시나리오별 연/월 순수익. 전부 클라이언트 JS로 실시간 계산.
+CALC_PAGE = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
+<meta name=viewport content="width=device-width,initial-scale=1"><title>rendit · 수익 계산기</title>
+<link rel=stylesheet href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard-dynamic-subset.css">
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
+background:linear-gradient(140deg,#0f172a,#1e293b);min-height:100vh;color:#e2e8f0;padding:20px 14px 60px}
+.wrap{max-width:900px;margin:0 auto}
+h1{font-size:20px;font-weight:800;margin:4px 0 2px}
+.sub{color:#94a3b8;font-size:12.5px;margin:0 0 18px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:700px){.cols{grid-template-columns:1fr}}
+.box{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:16px 18px}
+.box h2{font-size:13.5px;font-weight:800;margin:0 0 12px;color:#cbd5e1}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:7px 0}
+.row label{font-size:12.5px;color:#94a3b8}
+.row input{width:110px;padding:8px 10px;border:1px solid #334155;border-radius:8px;background:#0f172a;
+color:#e2e8f0;font-size:14px;text-align:right;font-weight:700}
+.row .unit{font-size:11px;color:#64748b;width:34px}
+.out .row{border-bottom:1px solid rgba(255,255,255,.05);padding:7px 0;margin:0}
+.out b{font-size:15px}
+.pos{color:#34d399}.neg{color:#f87171}.big{font-size:18px!important}
+.vac{margin-top:14px}
+.vac table{width:100%;border-collapse:collapse;font-size:12.5px}
+.vac th,.vac td{padding:7px 6px;text-align:right;border-bottom:1px solid rgba(255,255,255,.06)}
+.vac th{color:#94a3b8;font-weight:700}.vac td:first-child,.vac th:first-child{text-align:left}
+.back{display:inline-block;margin-bottom:14px;color:#93c5fd;text-decoration:none;font-size:13px;font-weight:700}
+.kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.kpi>div{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px;text-align:center}
+.kpi .l{font-size:11px;color:#64748b}.kpi .v{font-size:17px;font-weight:800;margin-top:3px}
+</style></head><body><div class=wrap>
+<a class=back href="/">← 대시보드</a>
+<h1>🧮 단기임대 수익 계산기{% if dong %} — {{dong}}{% endif %}</h1>
+<p class=sub>임차(내가 내는 비용)와 임대(투숙객에게 받는 돈)를 넣으면 주간 순익·손익주·영업이익률·공실률별 시나리오를 계산합니다. 연↔주 환산은 ÷52.</p>
+<div class=cols>
+  <div class=box><h2>💸 임차 원가 (내가 내는 돈)</h2>
+    <div class=row><label>월 임차료</label><div><input id=i_rent type=number value=85><span class=unit>만원</span></div></div>
+    <div class=row><label>보증금</label><div><input id=i_dep type=number value=1000><span class=unit>만원</span></div></div>
+    <div class=row><label>보증금 이자율(연)</label><div><input id=i_deprate type=number value=5 step=0.5><span class=unit>%</span></div></div>
+    <div class=row><label>월 관리비</label><div><input id=i_mgmt type=number value=30><span class=unit>만원</span></div></div>
+    <div class=row><label>월 통신비</label><div><input id=i_net type=number value=3.3 step=0.1><span class=unit>만원</span></div></div>
+    <div class=row><label>주당 청소 소모품</label><div><input id=i_clean type=number value=1000 step=100><span class=unit>원</span></div></div>
+    <div class=row><label>주당 임대 소모품</label><div><input id=i_supply type=number value=1000 step=100><span class=unit>원</span></div></div>
+  </div>
+  <div class=box><h2>💰 임대 매출 (투숙객에게 받는 돈)</h2>
+    <div class=row><label>주 임대료</label><div><input id=i_wrent type=number value=31><span class=unit>만원</span></div></div>
+    <div class=row><label>주 관리비(청소비 등)</label><div><input id=i_wmgmt type=number value=12><span class=unit>만원</span></div></div>
+    <div class=kpi>
+      <div><div class=l>주 매출</div><div class=v id=o_wrev>-</div></div>
+      <div><div class=l>주 임대원가</div><div class=v id=o_wcost>-</div></div>
+      <div><div class=l>주 순익</div><div class=v id=o_wnet>-</div></div>
+    </div>
+    <div class=kpi>
+      <div><div class=l>손익주</div><div class=v id=o_be>-</div></div>
+      <div><div class=l>영업이익률</div><div class=v id=o_margin>-</div></div>
+      <div><div class=l>연 임차원가</div><div class=v id=o_ycost>-</div></div>
+    </div>
+  </div>
+</div>
+<div class="box vac"><h2>📉 공실률 시나리오 (연 매출 × (1−공실률) − 연 임차원가)</h2>
+  <table><thead><tr><th>공실률</th><th>연 매출</th><th>연 순수익</th><th>월 순수익</th></tr></thead>
+  <tbody id=o_vac></tbody></table>
+</div>
+<script>
+function won(x){return '₩'+Math.round(x).toLocaleString()}
+function man(x){return (Math.round(x*10)/10).toLocaleString()+'만'}
+function calc(){
+  var v=function(id){return parseFloat(document.getElementById(id).value)||0}
+  var rentY=v('i_rent')*10000*12, depFee=v('i_dep')*10000*(v('i_deprate')/100),
+      mgmtY=v('i_mgmt')*10000*12, netY=v('i_net')*10000*12
+  var leaseY=rentY+depFee+mgmtY+netY            // 연 임차원가(소모품 제외)
+  var leaseW=leaseY/52
+  var supplyW=v('i_clean')+v('i_supply')
+  var costW=leaseW+supplyW                       // 주 임대원가
+  var costY=leaseY+supplyW*52
+  var revW=(v('i_wrent')+v('i_wmgmt'))*10000, revY=revW*52
+  var netW=revW-costW
+  var be=revW>0?(costY/12)/revW:0                // 손익주=월원가/주매출
+  var margin=revW>0?(revW-leaseW)/revW*100:0     // 영업이익률(소모품 제외 원가 기준)
+  var set=function(id,txt,cls){var e=document.getElementById(id);e.textContent=txt;
+    e.className='v'+(cls?' '+cls:'')}
+  set('o_wrev',won(revW)); set('o_wcost',won(costW))
+  set('o_wnet',won(netW),netW>=0?'pos':'neg')
+  set('o_be',be?be.toFixed(2)+'주':'-'); set('o_margin',margin.toFixed(1)+'%',margin>=0?'pos':'neg')
+  set('o_ycost',won(costY))
+  var tb=document.getElementById('o_vac'),h=''
+  ;[0,10,15,20,30].forEach(function(p){
+    var ry=revY*(1-p/100), ny=ry-leaseY, cls=ny>=0?'pos':'neg'
+    h+='<tr><td>'+p+'%</td><td>'+won(ry)+'</td><td class='+cls+'><b>'+won(ny)+'</b></td>'+
+       '<td class='+cls+'>'+won(ny/12)+'</td></tr>'
+  })
+  tb.innerHTML=h
+}
+document.querySelectorAll('input').forEach(function(e){e.addEventListener('input',calc)})
+calc()
+</script>
+</div></body></html>"""
+
+
+@portal.route("/calc")
+def calc():
+    u = current_user()
+    if not u:
+        from flask import redirect as _rd
+        return _rd("/auth/login?next=/calc")
+    from flask import request as _rq
+    return render_template_string(CALC_PAGE, dong=_rq.args.get("dong", ""))
 
 
 @portal.route("/")
