@@ -697,6 +697,20 @@ def api_recommend():
         "SELECT dong, COUNT(*) FROM samsam_listings"
         " WHERE sido IN ('서울특별시','경기도','인천광역시') GROUP BY dong").fetchall())
 
+    # ②-b 소비력 프록시 — 동별 아파트 보증금 중앙값(만원). 부촌일수록↑ = 단기임대 요금 방어력.
+    #     소득/소비 공식통계가 없어 우리 DB의 아파트 시세로 근사(대치10억·반포9억 vs 가산5.5천).
+    wealth = {}
+    try:
+        for sg, d, med in conn.execute(
+                "SELECT sigungu, dong, percentile_cont(0.5) WITHIN GROUP (ORDER BY deposit)"
+                " FROM listings WHERE sido IN ('서울특별시','경기도','인천광역시')"
+                "   AND realestatetype = '아파트' AND deposit > 0"
+                " GROUP BY sigungu, dong HAVING COUNT(*) >= 10").fetchall():
+            if med:
+                wealth[(sg, d)] = int(med)
+    except Exception:
+        pass
+
     # ③ 각 동 수요점수 = 근처 2km POI 가중합(거리 감쇠) + 회전율 보너스
     def demand_score(d):
         la, ln = d["lat"], d["lon"]
@@ -716,19 +730,24 @@ def api_recommend():
         workers = workers_mod.workers_near(la, ln, 1.2) if workers_mod else 0
         if workers:
             score += min(workers / 50000, 1.0) * 4.0
+        # 소비력 보너스 — 아파트 보증금 중앙값. 3억(30000만)에서 상한, 최대 3점.
+        # 부촌은 단기임대 요금을 높게 받아도 수요가 버티므로 가점.
+        wdep = wealth.get((d["sigungu"], d["dong"]), 0)
+        if wdep:
+            score += min(wdep / 30000, 1.0) * 3.0
         ev.sort(key=lambda e: -e[3])
-        return round(score, 1), round(turnover, 1), workers, ev[:3]
+        return round(score, 1), round(turnover, 1), workers, wdep, ev[:3]
 
     cands = []
     for key, d in dong.items():
         samn = sam.get(d["dong"], 0)
         if samn > 3:            # 삼삼 공급 충분 → 추천 대상 아님
             continue
-        score, turnover, workers, ev = demand_score(d)
+        score, turnover, workers, wdep, ev = demand_score(d)
         if score < 4:           # 수요 근거 약하면 제외
             continue
         cands.append({**d, "n_samsam": samn, "score": score, "turnover": turnover,
-                      "workers": workers,
+                      "workers": workers, "wealth": wdep,
                       "poi": [{"kind": k, "name": n, "dist_m": m} for k, n, m, _ in ev]})
     cands.sort(key=lambda c: -c["score"])
     cands = cands[:40]

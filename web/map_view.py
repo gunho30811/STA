@@ -329,7 +329,8 @@ function openReco(s){
     return ic+' '+p.name+' '+(p.dist_m/1000).toFixed(1)+'km' }).join(' · ')
   var h='<div style="padding:10px 8px;font-size:12.5px;color:#475569;border-bottom:1px solid #eef0f2">'+
     '단기임대 <b>'+s.n_samsam+'개뿐</b> · 월세 회전율 <b>'+s.turnover+'%</b>'+
-    (s.workers ? ' · 종사자 <b>'+s.workers.toLocaleString()+'명</b>' : '')+'<br>'+
+    (s.workers ? ' · 종사자 <b>'+s.workers.toLocaleString()+'명</b>' : '')+
+    (s.wealth ? ' · 소비력 <b>아파트보증금 '+(s.wealth>=10000?(s.wealth/10000).toFixed(1)+'억':s.wealth+'만')+'</b>' : '')+'<br>'+
     '<span style="color:#ca8a04;font-weight:700">'+poi+'</span></div>'+
     '<div style="padding:8px;font-size:12px;color:#64748b">여기서 시작할 만한 부동산 매물 '+s.listings.length+'건 ↓</div>'
   s.listings.forEach(function(m){
