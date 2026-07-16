@@ -59,6 +59,7 @@ SELECT
 FROM listings l
 LEFT JOIN naver_listings n ON n.article_no = l.articleno::bigint
 WHERE l.sido IN ('서울시','경기도','인천시')
+  AND l.tradetype = '월세'
   AND l.crawled_at >= to_char(now() - interval '7 days','YYYY-MM-DD')
 """
 
@@ -83,6 +84,7 @@ SELECT
   NULLIF(l.confirmymd,'') AS confirmed_sort
 FROM listings l
 WHERE l.sido IN ('서울시','경기도','인천시')
+  AND l.tradetype = '월세'
   AND l.crawled_at >= to_char(now() - interval '7 days','YYYY-MM-DD')
 """
 

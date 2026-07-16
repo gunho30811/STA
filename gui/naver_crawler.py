@@ -1,0 +1,405 @@
+# -*- coding: utf-8 -*-
+"""
+네이버 부동산 크롤러 — GUI (.exe 배포용). 삼삼 크롤러와 별개의 독립 프로그램.
+
+버튼 하나로 로컬 PC에서 네이버부동산(new.land.naver.com) 매물을 크롤해
+로컬 폴더(naver.db, SQLite)에 누적하거나 Supabase에 적재한다. 로그인 불필요
+(Playwright로 공개 페이지 접근).
+
+선택 항목:
+  - 지역(수도권): 서울시 / 경기도 / 인천시 (복수 선택)
+  - 거래유형: 월세 / 전세 / 매매 (복수 선택)
+  - 매물종류: 아파트/오피스텔/빌라/원룸/단독다가구/상가/전원주택 (복수 선택)
+  - 저장 위치: 로컬 폴더(naver.db) 또는 Supabase(DB URL)
+  - 테스트(동 N개만) · 상세정보도 수집(느림) · JSONL export
+
+동작: crawler.py(목록) → [선택]crawl_detail.py(상세) → [선택]export_jsonl.py
+진행 로그가 창에 실시간으로 흐른다.
+
+개발 실행:  python gui/naver_crawler.py
+자체 점검:  python gui/naver_crawler.py --selftest
+"""
+import importlib.util
+import json
+import os
+import queue
+import sys
+import threading
+import traceback
+
+
+def resource_base():
+    if getattr(sys, 'frozen', False):
+        return sys._MEIPASS
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def app_dir():
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+BASE = resource_base()
+CONFIG_PATH = os.path.join(app_dir(), 'naver_crawler_config.json')
+
+SIDOS = ['서울시', '경기도', '인천시']
+# 화면 라벨 → 네이버 realEstateType 코드
+PROPERTY_TYPES = [
+    ('아파트', 'APT'), ('오피스텔', 'OPST'), ('빌라', 'VL'), ('원룸', 'OR'),
+    ('단독/다가구', 'DDDGG'), ('상가', 'SG'), ('전원주택', 'JWJT'),
+]
+# 화면 라벨 → 네이버 tradeType 코드
+TRADE_TYPES = [('월세', 'B2'), ('전세', 'B1'), ('매매', 'A1')]
+
+
+def _add_paths():
+    for p in (BASE, os.path.join(BASE, 'common'), os.path.join(BASE, 'pipeline', 'naver')):
+        if p not in sys.path:
+            sys.path.insert(0, p)
+
+
+def _load_from_file(name, relpath):
+    """레포 트리의 .py 를 실제 경로에서 모듈로 로드(sys.modules 등록)."""
+    path = os.path.join(BASE, relpath)
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class QueueWriter:
+    def __init__(self, q):
+        self.q = q
+
+    def write(self, s):
+        if s:
+            self.q.put(s)
+
+    def flush(self):
+        pass
+
+    def reconfigure(self, *a, **k):
+        pass
+
+
+def run_pipeline(opts, log_q, stop_flag):
+    """워커 스레드: env 세팅 → crawler(목록) → [상세] → [export]. 로그는 log_q 로."""
+    _add_paths()
+    for m in ('db', 'crawler', 'crawl_detail', 'detail_map', 'export_jsonl', 'subway'):
+        sys.modules.pop(m, None)
+
+    old_out, old_err = sys.stdout, sys.stderr
+    sys.stdout = sys.stderr = QueueWriter(log_q)
+    try:
+        # 1) 저장 백엔드
+        if opts['mode'] == 'local':
+            os.environ['SAMSAM_SQLITE_PATH'] = os.path.join(opts['folder'], 'naver.db')
+            db = _load_from_file('db', os.path.join('common', 'naver_local_db.py'))
+            print(f"[GUI] 저장 위치: 로컬 폴더 → {os.environ['SAMSAM_SQLITE_PATH']}")
+            db.init_db()
+        else:
+            url = opts['database_url'].strip()
+            # pg8000+풀러(6543 트랜잭션모드)에서 prepared statement 깨짐 방지: 세션모드(5432)로.
+            os.environ['DATABASE_URL'] = url.replace(':6543/', ':5432/')
+            db = _load_from_file('db', 'db.py')
+            print("[GUI] 저장 위치: Supabase(DB URL, 세션모드)")
+            db.init_db()
+
+        # 2) 목록 크롤
+        crawler = _load_from_file('crawler', os.path.join('pipeline', 'naver', 'crawler.py'))
+        argv = ['crawler',
+                '--sidos', ','.join(opts['sidos']),
+                '--types', ','.join(opts['types']),
+                '--trade-types', ','.join(opts['trades'])]
+        if opts['test']:
+            argv += ['--limit-dongs', '3']
+        print(f"[GUI] 목록 크롤 시작 — 지역 {opts['sidos']} / 거래 {opts['trades']} / 종류 {len(opts['types'])}개"
+              + ("  (테스트: 동 3개)" if opts['test'] else ""))
+        if stop_flag.is_set():
+            return
+        sys.argv = argv
+        crawler.main()
+
+        if stop_flag.is_set():
+            print("[GUI] 중지 요청 — 상세/export 생략")
+            return
+
+        # 3) 상세(선택) — subway/detail_map 의존
+        if opts['detail']:
+            print("[GUI] ── 상세정보 수집 ──")
+            subway = _load_from_file('subway', os.path.join('common', 'subway.py'))
+            if getattr(sys, 'frozen', False):
+                subway._DATA = os.path.join(BASE, 'data', 'subway_stations.csv')
+            _load_from_file('detail_map', os.path.join('pipeline', 'naver', 'detail_map.py'))
+            cd = _load_from_file('crawl_detail', os.path.join('pipeline', 'naver', 'crawl_detail.py'))
+            sys.argv = ['crawl_detail', '--sidos', ','.join(opts['sidos'])]
+            try:
+                cd.main()
+            except Exception as e:
+                print(f"[GUI] 상세 스킵({e})")
+
+        # 4) export(선택)
+        if opts['export']:
+            print("[GUI] ── JSONL export ──")
+            exp = _load_from_file('export_jsonl', os.path.join('pipeline', 'naver', 'export_jsonl.py'))
+            if opts['mode'] == 'local':
+                exp.LAB = opts['folder']
+            elif getattr(sys, 'frozen', False):
+                exp.LAB = os.path.join(app_dir(), 'lab')
+            try:
+                os.makedirs(exp.LAB, exist_ok=True)
+            except Exception:
+                pass
+            sys.argv = ['export_jsonl']
+            try:
+                exp.main()
+            except Exception as e:
+                print(f"[GUI] export 스킵({e})")
+
+        print("[GUI] ✅ 전체 완료")
+    except Exception:
+        print("[GUI] ❌ 오류:\n" + traceback.format_exc())
+    finally:
+        sys.stdout, sys.stderr = old_out, old_err
+        log_q.put(('__DONE__',))
+
+
+def selftest():
+    _add_paths()
+    os.environ.setdefault('DATABASE_URL', 'postg://selftest')
+    os.environ.setdefault('SAMSAM_SQLITE_PATH', os.path.join(app_dir(), '_selftest_naver.db'))
+    lines, ok = [], True
+    for name, rel in [('subway', 'common/subway.py'),
+                      ('local_db', 'common/local_db.py'),
+                      ('db', 'common/naver_local_db.py'),
+                      ('crawler', 'pipeline/naver/crawler.py'),
+                      ('detail_map', 'pipeline/naver/detail_map.py'),
+                      ('crawl_detail', 'pipeline/naver/crawl_detail.py'),
+                      ('export_jsonl', 'pipeline/naver/export_jsonl.py')]:
+        try:
+            _load_from_file(name, rel)
+            lines.append(f"  OK  {rel}")
+        except Exception as e:
+            ok = False
+            lines.append(f"  FAIL {rel}: {e}")
+    # 로컬 SQLite 스키마 생성까지 확인
+    try:
+        sys.modules['db'].init_db()
+        lines.append("  OK  naver_local_db.init_db()")
+    except Exception as e:
+        ok = False
+        lines.append(f"  FAIL init_db: {e}")
+    for mod in ('tkinter', 'sqlite3', 'playwright.sync_api'):
+        try:
+            __import__(mod)
+            lines.append(f"  OK  import {mod}")
+        except Exception as e:
+            ok = False
+            lines.append(f"  FAIL import {mod}: {e}")
+    lines.append("SELFTEST " + ("PASS" if ok else "FAIL"))
+    text = "\n".join(lines)
+    print(text)
+    try:
+        with open(os.path.join(app_dir(), 'selftest_result.txt'), 'w', encoding='utf-8') as f:
+            f.write(text + "\n")
+    except Exception:
+        pass
+    return 0 if ok else 1
+
+
+def launch_gui():
+    import tkinter as tk
+    from tkinter import ttk, scrolledtext, messagebox, filedialog
+
+    cfg = {}
+    if os.path.exists(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH, encoding='utf-8') as f:
+                cfg = json.load(f)
+        except Exception:
+            cfg = {}
+
+    root = tk.Tk()
+    root.title('네이버 부동산 크롤러')
+    root.geometry('780x680')
+
+    log_q = queue.Queue()
+    stop_flag = threading.Event()
+    worker = {'thread': None}
+
+    # ── 지역(수도권 복수) ──
+    rf = ttk.LabelFrame(root, text='지역 (복수 선택)', padding=8)
+    rf.pack(fill='x', padx=10, pady=(10, 4))
+    saved_sidos = set(cfg.get('sidos', SIDOS))
+    sido_vars = {}
+    for i, s in enumerate(SIDOS):
+        v = tk.BooleanVar(value=(s in saved_sidos))
+        ttk.Checkbutton(rf, text=s, variable=v).grid(row=0, column=i, padx=10)
+        sido_vars[s] = v
+
+    # ── 거래유형(복수) ──
+    trf = ttk.LabelFrame(root, text='거래유형 (복수 선택)', padding=8)
+    trf.pack(fill='x', padx=10, pady=4)
+    saved_trades = set(cfg.get('trades', ['B2']))
+    trade_vars = {}
+    for i, (label, code) in enumerate(TRADE_TYPES):
+        v = tk.BooleanVar(value=(code in saved_trades))
+        ttk.Checkbutton(trf, text=label, variable=v).grid(row=0, column=i, padx=10)
+        trade_vars[code] = v
+
+    # ── 매물종류(복수) ──
+    tf = ttk.LabelFrame(root, text='매물 종류 (복수 선택)', padding=8)
+    tf.pack(fill='x', padx=10, pady=4)
+    saved_types = set(cfg.get('types', [c for _, c in PROPERTY_TYPES]))
+    type_vars = {}
+    for i, (label, code) in enumerate(PROPERTY_TYPES):
+        v = tk.BooleanVar(value=(code in saved_types))
+        ttk.Checkbutton(tf, text=label, variable=v).grid(row=0, column=i, padx=6)
+        type_vars[code] = v
+
+    # ── 저장 위치 ──
+    sf = ttk.LabelFrame(root, text='저장 위치', padding=8)
+    sf.pack(fill='x', padx=10, pady=4)
+    mode_var = tk.StringVar(value=cfg.get('mode', 'local'))
+    mrow = ttk.Frame(sf)
+    mrow.grid(row=0, column=0, columnspan=3, sticky='w')
+    e_db = ttk.Entry(sf, width=64)
+    e_db.insert(0, cfg.get('database_url', ''))
+    e_folder = ttk.Entry(sf, width=52)
+    e_folder.insert(0, cfg.get('folder', ''))
+    lbl_db = ttk.Label(sf, text='DB URL', width=10)
+    lbl_folder = ttk.Label(sf, text='저장 폴더', width=10)
+
+    def browse():
+        d = filedialog.askdirectory(title='데이터를 쌓을 폴더 선택')
+        if d:
+            e_folder.delete(0, 'end'); e_folder.insert(0, d)
+
+    btn_browse = ttk.Button(sf, text='찾아보기', command=browse)
+
+    def sync_mode():
+        if mode_var.get() == 'local':
+            lbl_db.grid_remove(); e_db.grid_remove()
+            lbl_folder.grid(row=1, column=0, sticky='w', pady=2)
+            e_folder.grid(row=1, column=1, sticky='we', pady=2)
+            btn_browse.grid(row=1, column=2, padx=4)
+        else:
+            lbl_folder.grid_remove(); e_folder.grid_remove(); btn_browse.grid_remove()
+            lbl_db.grid(row=1, column=0, sticky='w', pady=2)
+            e_db.grid(row=1, column=1, columnspan=2, sticky='we', pady=2)
+
+    ttk.Radiobutton(mrow, text='로컬 폴더 (이 PC에 naver.db 로 쌓기)', value='local',
+                    variable=mode_var, command=sync_mode).pack(side='left')
+    ttk.Radiobutton(mrow, text='Supabase (DB URL)', value='supabase',
+                    variable=mode_var, command=sync_mode).pack(side='left', padx=12)
+    sync_mode()
+
+    # ── 옵션 ──
+    of = ttk.Frame(root, padding=(10, 4))
+    of.pack(fill='x')
+    test_var = tk.BooleanVar(value=False)
+    detail_var = tk.BooleanVar(value=cfg.get('detail', False))
+    export_var = tk.BooleanVar(value=cfg.get('export', False))
+    save_var = tk.BooleanVar(value=True)
+    ttk.Checkbutton(of, text='테스트 (동 3개만)', variable=test_var).pack(side='left')
+    ttk.Checkbutton(of, text='상세정보도 수집 (느림)', variable=detail_var).pack(side='left', padx=10)
+    ttk.Checkbutton(of, text='JSONL export', variable=export_var).pack(side='left')
+    ttk.Checkbutton(of, text='이 PC에 설정 저장', variable=save_var).pack(side='left', padx=10)
+
+    bf = ttk.Frame(root, padding=10)
+    bf.pack(fill='x')
+    btn_start = ttk.Button(bf, text='크롤 시작')
+    btn_start.pack(side='left')
+    btn_stop = ttk.Button(bf, text='중지', state='disabled')
+    btn_stop.pack(side='left', padx=8)
+    status = ttk.Label(bf, text='대기 중')
+    status.pack(side='left', padx=12)
+
+    log = scrolledtext.ScrolledText(root, height=16, font=('Consolas', 9))
+    log.pack(fill='both', expand=True, padx=10, pady=(0, 10))
+
+    def append(s):
+        log.insert('end', s); log.see('end')
+
+    def poll_queue():
+        try:
+            while True:
+                item = log_q.get_nowait()
+                if isinstance(item, tuple) and item and item[0] == '__DONE__':
+                    btn_start.config(state='normal'); btn_stop.config(state='disabled')
+                    status.config(text='완료' if not stop_flag.is_set() else '중지됨')
+                    worker['thread'] = None
+                else:
+                    append(item)
+        except queue.Empty:
+            pass
+        root.after(150, poll_queue)
+
+    def start():
+        sidos = [s for s, v in sido_vars.items() if v.get()]
+        trades = [c for c, v in trade_vars.items() if v.get()]
+        types = [c for c, v in type_vars.items() if v.get()]
+        mode = mode_var.get()
+        folder = e_folder.get().strip()
+        db_url = e_db.get().strip()
+        if not sidos:
+            messagebox.showwarning('입력 필요', '지역을 하나 이상 선택하세요.'); return
+        if not trades:
+            messagebox.showwarning('입력 필요', '거래유형을 하나 이상 선택하세요.'); return
+        if not types:
+            messagebox.showwarning('입력 필요', '매물 종류를 하나 이상 선택하세요.'); return
+        if mode == 'supabase' and not db_url:
+            messagebox.showwarning('입력 필요', 'Supabase 모드는 DB URL이 필요합니다.'); return
+        if mode == 'local':
+            if not folder:
+                messagebox.showwarning('입력 필요', '데이터를 쌓을 폴더를 선택하세요.'); return
+            if not os.path.isdir(folder):
+                messagebox.showwarning('폴더 없음', f'폴더가 존재하지 않습니다:\n{folder}'); return
+        if save_var.get():
+            try:
+                with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+                    json.dump({'sidos': sidos, 'trades': trades, 'types': types, 'mode': mode,
+                               'folder': folder, 'database_url': db_url,
+                               'detail': detail_var.get(), 'export': export_var.get()},
+                              f, ensure_ascii=False, indent=2)
+            except Exception as e:
+                append(f"[설정 저장 실패: {e}]\n")
+
+        opts = {'sidos': sidos, 'trades': trades, 'types': types, 'mode': mode,
+                'folder': folder, 'database_url': db_url,
+                'test': test_var.get(), 'detail': detail_var.get(), 'export': export_var.get()}
+        log.delete('1.0', 'end')
+        stop_flag.clear()
+        btn_start.config(state='disabled'); btn_stop.config(state='normal')
+        status.config(text='크롤 중…')
+        t = threading.Thread(target=run_pipeline, args=(opts, log_q, stop_flag), daemon=True)
+        worker['thread'] = t
+        t.start()
+
+    def stop():
+        stop_flag.set()
+        status.config(text='중지 요청 — 현재 배치까지 마치고 멈춥니다')
+        append('\n[중지 요청됨 — 진행 중인 요청을 마치면 멈춥니다]\n')
+
+    btn_start.config(command=start)
+    btn_stop.config(command=stop)
+
+    def on_close():
+        if worker['thread'] and worker['thread'].is_alive():
+            if not messagebox.askyesno('종료', '크롤이 진행 중입니다. 정말 종료할까요?'):
+                return
+        root.destroy()
+
+    root.protocol('WM_DELETE_WINDOW', on_close)
+    append('지역·거래유형·매물종류를 고르고 [크롤 시작]을 누르세요.\n'
+           '네이버부동산은 로그인 없이 크롤합니다. 첫 실행 시 지역 트리 탐색에 몇 분 걸립니다.\n\n')
+    root.after(150, poll_queue)
+    root.mainloop()
+
+
+if __name__ == '__main__':
+    if '--selftest' in sys.argv:
+        sys.exit(selftest())
+    launch_gui()
