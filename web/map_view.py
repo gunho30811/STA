@@ -48,6 +48,7 @@ transform:translate(-50%,-50%)}
 .poi.h{border-color:#dc2626;color:#991b1b}.poi.u{border-color:#2563eb;color:#1e40af}.poi.i{border-color:#7c3aed;color:#5b21b6}
 .poi.a{border-color:#059669;color:#065f46}.poi.t{border-color:#0891b2;color:#155e75}
 .poi.g{border-color:#db2777;color:#9d174d}
+.poi.tsp{border-color:#f9a8d4;color:#be185d;font-size:10px;padding:1px 6px 1px 3px;opacity:.9}
 .pin.nv{width:13px;height:13px;background:#14b8a6}
 .clus{display:flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;font-weight:800;
 border:3px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.35);line-height:1.1;text-align:center;cursor:pointer}
@@ -245,17 +246,20 @@ function renderCircles(){
 
 // ── 수요시설 POI: 왜 이 동네에 수요가 있나(병원 통원·대학 계절학기·산단 출장) ──
 var shownPoi=new Map()
-var POI_ICON={hospital:'🏥',university:'🎓',industrial:'🏭',academy:'📚',transport:'🚄',tour:'🗼'}
-var POI_CLS={hospital:'h',university:'u',industrial:'i',academy:'a',transport:'t',tour:'g'}
+var POI_ICON={hospital:'🏥',university:'🎓',industrial:'🏭',academy:'📚',transport:'🚄',tour:'🗼',tourspot:'🗼'}
+var POI_CLS={hospital:'h',university:'u',industrial:'i',academy:'a',transport:'t',tour:'g',tourspot:'g'}
 function renderPois(){
   var wanted=new Map()
   if(show.poi && map.getZoom()>=12){
-    var b=map.getBounds().pad(0.1)
+    var b=map.getBounds().pad(0.1), z=map.getZoom()
     POIS.forEach(function(p){
+      // 개별 관광지(tourspot)는 너무 많아 줌 15+ 에서만. 나머지 수요시설은 줌 12+.
+      if(p[0]==='tourspot' && z<15) return
       if(!b.contains([p[2],p[3]])) return
       wanted.set(p[0]+'|'+p[1], function(){
+        var op = p[0]==='tourspot' ? 'poi tsp' : 'poi '+POI_CLS[p[0]]
         return L.marker([p[2],p[3]],{zIndexOffset:500,icon:L.divIcon({className:'',iconSize:null,
-          html:'<div class="poi '+POI_CLS[p[0]]+'">'+POI_ICON[p[0]]+' '+p[1]+'</div>'})})
+          html:'<div class="'+op+'">'+POI_ICON[p[0]]+' '+p[1]+'</div>'})})
       })
     })
   }
