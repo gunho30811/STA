@@ -49,6 +49,10 @@ transform:translate(-50%,-50%)}
 .poi.a{border-color:#059669;color:#065f46}.poi.t{border-color:#0891b2;color:#155e75}
 .poi.g{border-color:#db2777;color:#9d174d}
 .poi.tsp{border-color:#f9a8d4;color:#be185d;font-size:10px;padding:1px 6px 1px 3px;opacity:.9}
+.reco-badge{transform:translate(-50%,-50%);background:#fef9c3;border:2px solid #ca8a04;border-radius:12px;
+padding:4px 10px;font-size:12px;font-weight:800;color:#854d0e;text-align:center;line-height:1.25;white-space:nowrap;
+box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer}
+.reco-badge b{font-size:15px;color:#a16207}.reco-n{font-weight:600;color:#a16207;font-size:10px}
 .pin.nv{width:13px;height:13px;background:#14b8a6}
 .clus{display:flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;font-weight:800;
 border:3px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.35);line-height:1.1;text-align:center;cursor:pointer}
@@ -91,6 +95,7 @@ border:3px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.35);line
     <label class="tog on" id=t_rent><span class=dot style="background:#4321F3"></span>렌트</label>
     <label class="tog on" id=t_naver><span class=dot style="background:#14b8a6"></span>부동산</label>
     <label class="tog on" id=t_poi><span class=dot style="background:#f59e0b"></span>수요시설 🏥🎓🏭📚🚄🗼</label>
+    <label class="tog" id=t_reco><span class=dot style="background:#eab308"></span>⭐ 추천 스팟만</label>
   </div>
 </div>
 </div>
@@ -266,6 +271,53 @@ function renderPois(){
   diffRender(poiLayer, shownPoi, wanted)
 }
 
+// ── ⭐ 추천 스팟: 수요근거는 많은데 단기임대 공급 없는 동 + 근처 부동산 매물 ──
+var recoLayer=L.layerGroup().addTo(map)
+var RECO=null, recoOn=false
+function loadReco(){
+  recoLayer.clearLayers()
+  if(!recoOn) return
+  if(RECO){ drawReco(); return }
+  document.getElementById('stat').textContent='추천 스팟 분석 중…'
+  fetch('/samsam/api/recommend',{credentials:'same-origin'}).then(function(r){return r.json()})
+    .then(function(d){ RECO=d.spots||[]; drawReco(); document.getElementById('stat').textContent='⭐ 추천 스팟 '+RECO.length+'곳 (수요근거 많은데 단기임대 없는 동)' })
+    .catch(function(){ document.getElementById('stat').textContent='추천 로드 실패' })
+}
+function drawReco(){
+  recoLayer.clearLayers()
+  if(!recoOn||!RECO) return
+  // 점수 정규화 → 원 크기·강조
+  var maxS=Math.max.apply(null, RECO.map(function(s){return s.score})) || 1
+  RECO.forEach(function(s){
+    var r=340+Math.round(s.score/maxS*320)
+    L.circle([s.lat,s.lon],{radius:r,color:'#ca8a04',weight:2,fillColor:'#facc15',fillOpacity:.22}).addTo(recoLayer)
+    var mk=L.marker([s.lat,s.lon],{icon:L.divIcon({className:'',iconSize:null,
+      html:'<div class="reco-badge">⭐ '+s.dong+'<br><b>'+s.score+'점</b><span class=reco-n> 매물'+s.listings.length+'</span></div>'})})
+    mk.on('click',function(){ openReco(s) }); mk.addTo(recoLayer)
+  })
+}
+function openReco(s){
+  var t=document.getElementById('mtitle'), b=document.getElementById('mbody')
+  t.textContent='⭐ '+s.sigungu+' '+s.dong+' — 추천 '+s.score+'점'
+  var poi=(s.poi||[]).map(function(p){
+    var ic={hospital:'🏥',university:'🎓',industrial:'🏭',academy:'📚',transport:'🚄',tour:'🗼'}[p.kind]||'📍'
+    return ic+' '+p.name+' '+(p.dist_m/1000).toFixed(1)+'km' }).join(' · ')
+  var h='<div style="padding:10px 8px;font-size:12.5px;color:#475569;border-bottom:1px solid #eef0f2">'+
+    '단기임대 <b>'+s.n_samsam+'개뿐</b> · 월세 회전율 <b>'+s.turnover+'%</b><br>'+
+    '<span style="color:#ca8a04;font-weight:700">'+poi+'</span></div>'+
+    '<div style="padding:8px;font-size:12px;color:#64748b">여기서 시작할 만한 부동산 매물 '+s.listings.length+'건 ↓</div>'
+  s.listings.forEach(function(m){
+    h+='<a class=item href="'+m.url+'" target=_blank rel=noreferrer>'+
+      '<div><div class=it-name>'+(m.name||'(이름없음)')+'</div>'+
+      '<div class=it-sub>월세 '+(m.rent!=null?m.rent:'-')+'만 / 보증금 '+(m.dep!=null?m.dep.toLocaleString():'-')+'만'+
+      (m.m2?' · '+m.m2+'㎡':'')+(m.floor!=null?' · '+m.floor+'층':'')+'</div></div>'+
+      '<div class=it-go>매물 보기 →</div></a>'
+  })
+  if(!s.listings.length) h+='<div style="padding:14px;color:#94a3b8">근처 조건 맞는 부동산 매물이 아직 없어요.</div>'
+  b.innerHTML=h
+  document.getElementById('modal').style.display='flex'
+}
+
 // ── 부동산(네이버): 줌 15+ bbox 조회, 유형 필터 반영 ──
 var navTimer=null, navSeq=0
 function loadNaver(){
@@ -356,6 +408,17 @@ document.querySelectorAll('#chips .chip').forEach(function(ch){
     else if(k==='poi') renderPois()
     else loadNaver()
   })
+})
+// ⭐ 추천만 보기: 켜면 렌트/원/부동산 숨기고 추천 스팟만, 끄면 원복
+document.getElementById('t_reco').addEventListener('click',function(){
+  recoOn=!recoOn; this.classList.toggle('on',recoOn)
+  if(recoOn){
+    map.removeLayer(rentLayer); map.removeLayer(circleLayer); map.removeLayer(navLayer)
+    loadReco()
+  }else{
+    map.addLayer(rentLayer); map.addLayer(circleLayer); map.addLayer(navLayer)
+    recoLayer.clearLayers(); setStat()
+  }
 })
 </script>
 </body></html>"""

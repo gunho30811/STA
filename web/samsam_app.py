@@ -645,6 +645,109 @@ def api_map_all():
     return app.response_class(body, mimetype="application/json")
 
 
+# 추천 스팟 캐시(30분) — 699동 × POI 매칭은 무거워 매 요청 재계산 금지.
+_RECO = {"t": 0.0, "body": None}
+# 수요근거 POI 가중치(단기임대 수요 기여도). 거리 가까울수록·개수 많을수록 점수↑.
+_POI_WEIGHT = {"hospital": 3.0, "industrial": 3.0, "university": 2.0,
+               "tour": 2.5, "academy": 1.5, "transport": 1.0, "tourspot": 0.2}
+
+
+@app.route("/api/recommend")
+def api_recommend():
+    """추천 스팟 — 수요 근거(POI·월세 회전율)는 많은데 단기임대(삼삼) 공급이 없는 동.
+    각 추천 동에 근처 부동산(네이버) 매물을 매칭해 '여기 이 매물로 시작하라'까지 제시.
+
+    무겁게 1회 계산 후 30분 캐시. 클라이언트는 map 처럼 1회 로드해 동그라미로 표시.
+    """
+    now = time.time()
+    if _RECO["body"] is not None and now - _RECO["t"] < 1800:
+        return app.response_class(_RECO["body"], mimetype="application/json")
+
+    import math
+    import poi as poi_mod
+    pois = poi_mod.load_poi()
+
+    conn = db.connect()
+    # ① 동별 네이버 집계: 대표좌표(중앙값)·월세회전율(최근7일 신규/활성)·주거 소형 매물 시세
+    dong = {}
+    try:
+        rows = conn.execute(
+            "SELECT sigungu, dong,"
+            " COUNT(*) FILTER (WHERE confirmymd IS NOT NULL) AS active,"
+            " COUNT(*) FILTER (WHERE confirmymd::text >= to_char(now()-interval '7 days','YYYYMMDD')) AS new7,"
+            " percentile_cont(0.5) WITHIN GROUP (ORDER BY lat) AS clat,"
+            " percentile_cont(0.5) WITHIN GROUP (ORDER BY lon) AS clon"
+            " FROM listings WHERE sido IN ('서울특별시','경기도','인천광역시')"
+            "   AND dong IS NOT NULL AND lat BETWEEN 33 AND 39.5 AND lon BETWEEN 124 AND 132"
+            " GROUP BY sigungu, dong HAVING COUNT(*) FILTER (WHERE confirmymd IS NOT NULL) >= 20"
+        ).fetchall()
+        for r in rows:
+            dong[(r[0], r[1])] = {"sigungu": r[0], "dong": r[1], "active": r[2],
+                                  "new7": r[3], "lat": float(r[4]), "lon": float(r[5])}
+    except Exception as e:
+        conn.close()
+        return jsonify({"error": str(e)[:100], "spots": []})
+
+    # ② 삼삼 공급(동별 매물 수) — 공급이 많으면 이미 경쟁 시장이라 제외 대상
+    sam = dict(conn.execute(
+        "SELECT dong, COUNT(*) FROM samsam_listings"
+        " WHERE sido IN ('서울특별시','경기도','인천광역시') GROUP BY dong").fetchall())
+
+    # ③ 각 동 수요점수 = 근처 2km POI 가중합(거리 감쇠) + 회전율 보너스
+    def demand_score(d):
+        la, ln = d["lat"], d["lon"]
+        score, ev = 0.0, []
+        for kind, name, y, x in pois:
+            dist = math.hypot((la - y) * 111, (ln - x) * 88.8)  # km 근사
+            if dist > 2.0:
+                continue
+            w = _POI_WEIGHT.get(kind, 0.5) * max(0.0, 1 - dist / 2.0)  # 2km에서 0
+            score += w
+            if kind != "tourspot":
+                ev.append((kind, name, int(dist * 1000), w))
+        turnover = (d["new7"] / d["active"] * 100) if d["active"] else 0
+        score += min(turnover, 40) * 0.15   # 회전율 보너스(최대 6점)
+        ev.sort(key=lambda e: -e[3])
+        return round(score, 1), round(turnover, 1), ev[:3]
+
+    cands = []
+    for key, d in dong.items():
+        samn = sam.get(d["dong"], 0)
+        if samn > 3:            # 삼삼 공급 충분 → 추천 대상 아님
+            continue
+        score, turnover, ev = demand_score(d)
+        if score < 4:           # 수요 근거 약하면 제외
+            continue
+        cands.append({**d, "n_samsam": samn, "score": score, "turnover": turnover,
+                      "poi": [{"kind": k, "name": n, "dist_m": m} for k, n, m, _ in ev]})
+    cands.sort(key=lambda c: -c["score"])
+    cands = cands[:40]
+
+    # ④ 각 추천 동에 근처 부동산 매물 매칭(주거 소형, 대표좌표 1.5km, 순수익 잠재 높은 순)
+    for c in cands:
+        try:
+            ms = conn.execute(
+                "SELECT article_no, building_name, rent_monthly, deposit, area_exclusive_m2,"
+                " floor_current, lat, lng FROM naver_listings"
+                " WHERE lat BETWEEN %s AND %s AND lng BETWEEN %s AND %s"
+                "   AND rent_monthly BETWEEN 20 AND 200"
+                "   AND building_type_code IN ('OPST','OR','VL','APT')"
+                " ORDER BY rent_monthly ASC LIMIT 3",
+                (c["lat"] - 0.014, c["lat"] + 0.014, c["lon"] - 0.017, c["lon"] + 0.017)).fetchall()
+            c["listings"] = [{
+                "id": m[0], "name": m[1] or "", "rent": m[2], "dep": m[3],
+                "m2": m[4], "floor": m[5], "lat": m[6], "lng": m[7],
+                "url": f"https://new.land.naver.com/offices?articleNo={m[0]}",
+            } for m in ms]
+        except Exception:
+            c["listings"] = []
+    conn.close()
+
+    body = json.dumps({"spots": cands}, ensure_ascii=False, separators=(",", ":"))
+    _RECO.update(t=now, body=body)
+    return app.response_class(body, mimetype="application/json")
+
+
 @app.route("/api/map")
 def api_map():
     """지도 검색 — bbox(뷰포트) 안의 렌트(삼삼)·부동산(네이버) 매물 + 동별 예약률 원.
