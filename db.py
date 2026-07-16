@@ -576,6 +576,9 @@ def init_db(force=False):
         "CREATE INDEX IF NOT EXISTS ix_sco_status ON samsam_chat_outbox(status)",
         "CREATE INDEX IF NOT EXISTS ix_vp_last_seen ON visitor_pings(last_seen)",
         "CREATE INDEX IF NOT EXISTS ix_churn_date ON samsam_churn(crawl_date)",
+        # 지도 bbox 조회용 좌표 인덱스(/samsam/api/map — 없으면 425k 풀스캔으로 팬/줌마다 수 초).
+        "CREATE INDEX IF NOT EXISTS ix_listings_latlon ON listings(lat, lon)",
+        "CREATE INDEX IF NOT EXISTS ix_nl_latlng ON naver_listings(lat, lng)",
     ]:
         conn.execute(idx)
     conn.commit()

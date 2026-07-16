@@ -593,6 +593,42 @@ def api_buildings():
     return jsonify({"total": len(out), "items": out})
 
 
+# /api/map?all=1 응답 캐시(5분) — 22k 매물 배열 직렬화를 매 요청 반복하지 않게.
+_MAPALL = {"t": 0.0, "body": None}
+
+
+@app.route("/api/map_all")
+def api_map_all():
+    """지도 초기 1회 로드용 — 전체 렌트 매물(콤팩트 배열) + 전 동별 예약률 원.
+
+    이후 팬/줌은 네트워크 없이 클라이언트에서 처리(클러스터·원 재계산).
+    rent: [id, lat, lng, occ%, week만, pyeong, btype, name, sigungu, dong]
+    circles: [lat, lng, occ%, n, dong]
+    """
+    now = time.time()
+    if _MAPALL["body"] is not None and now - _MAPALL["t"] < 300:
+        return app.response_class(_MAPALL["body"], mimetype="application/json")
+    rent, agg = [], {}
+    for r in L():
+        la, ln = r.get("lat"), r.get("lng")
+        if la is None or ln is None:
+            continue
+        occ = round((r.get("occ") or 0) * 100, 1)
+        rent.append([r["room_id"], round(la, 5), round(ln, 5), occ,
+                     r.get("sam_week_man"), r.get("area_pyeong"),
+                     r.get("building_type") or "", r.get("name") or r.get("building_name") or "",
+                     r.get("sigungu") or "", r.get("dong") or ""])
+        key = (r.get("sigungu") or "", r.get("dong") or "")
+        g = agg.setdefault(key, [0.0, 0.0, 0.0, 0])
+        g[0] += la; g[1] += ln; g[2] += occ; g[3] += 1
+    circles = [[round(g[0] / g[3], 6), round(g[1] / g[3], 6), round(g[2] / g[3], 1), g[3], d]
+               for (sg, d), g in agg.items() if g[3] >= 3]
+    body = json.dumps({"rent": rent, "circles": circles}, ensure_ascii=False,
+                      separators=(",", ":"))
+    _MAPALL.update(t=now, body=body)
+    return app.response_class(body, mimetype="application/json")
+
+
 @app.route("/api/map")
 def api_map():
     """지도 검색 — bbox(뷰포트) 안의 렌트(삼삼)·부동산(네이버) 매물 + 동별 예약률 원.
@@ -656,13 +692,15 @@ def api_map():
             for _ in range(2):
                 try:
                     conn = db.connect()
+                    # nl_live(뷰 조인+정렬)는 bbox당 수 초 걸림 → 상세 테이블 직접 + (lat,lng) 인덱스
+                    # (ix_nl_latlng) + 정렬 제거로 ~0.5s. 지도는 '그 화면에 뭐가 있나'라 정렬 불필요.
                     rows = conn.execute(
                         "SELECT article_no, building_name, building_type_code, deposit, rent_monthly,"
                         " area_exclusive_m2, floor_current, lat, lng"
-                        " FROM nl_live"
+                        " FROM naver_listings"
                         " WHERE lat BETWEEN %s AND %s AND lng BETWEEN %s AND %s"
-                        "   AND rent_monthly IS NOT NULL"
-                        " ORDER BY crawled_at DESC NULLS LAST LIMIT 1000",
+                        "   AND rent_monthly BETWEEN 1 AND 5000"
+                        " LIMIT 1000",
                         (b["min_lat"], b["max_lat"], b["min_lng"], b["max_lng"])).fetchall()
                     conn.close()
                     last_err = None
