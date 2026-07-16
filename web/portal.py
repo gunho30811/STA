@@ -12,21 +12,80 @@
 Vercel: api/index.py 가 application(WSGI) 을 가져다 씀.
 쿠키 path=/ 라 한 번 로그인하면 모든 마운트에서 공유된다.
 """
+import math
 import os
 import sys
+import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.join(ROOT, "common"))   # subway(역 좌표) 유틸
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # web/
 
 from flask import Flask, render_template_string
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+import db
+import subway
 from auth import current_user, init_auth, latest_listing_churn, online_count
 
 portal = Flask(__name__)
 init_auth(portal)
+
+# ── 대시보드 인사이트: 반도체 공장 인근 · 1기 신도시 렌트 예약률 ──────────────────
+# 공장 반경 3km(1km 안은 공단이라 매물이 없음 → 통근 주거권), 신도시 반경 1.5km.
+FACTORIES = [   # (표시명, lat, lng)
+    ("삼성 평택캠퍼스", 37.0075, 127.0620),
+    ("삼성 기흥캠퍼스", 37.2405, 127.0533),
+    ("삼성 화성캠퍼스", 37.2216, 127.0116),
+    ("SK하이닉스 이천", 37.2733, 127.5116),
+    ("SK하이닉스 청주", 36.6435, 127.4890),
+]
+NEWTOWNS = [    # 1기 신도시 중심 좌표
+    ("분당", 37.3849, 127.1230),
+    ("일산", 37.6588, 126.7730),
+    ("평촌", 37.3898, 126.9506),
+    ("산본", 37.3583, 126.9330),
+    ("중동", 37.5046, 126.7630),
+]
+_INS_CACHE = {"t": 0.0, "data": None}
+
+
+def _spot_stats(rows, lat, lng, km):
+    """rows(lat,lng,bk,bl) 중 반경 km 내 매물수·평균 예약률(%)."""
+    occs = []
+    for la, ln, bk, bl in rows:
+        if math.hypot((la - lat) * 111, (ln - lng) * 88.8) <= km:
+            occs.append(min(1.0, (bk or 0) / max(31 - (bl or 0), 1)))
+    return len(occs), (round(sum(occs) / len(occs) * 100, 1) if occs else None)
+
+
+def dashboard_insights():
+    """공장·신도시 스팟별 예약률(10분 캐시). 실패 시 None(대시보드는 그냥 섹션 생략)."""
+    now = time.time()
+    if _INS_CACHE["data"] is not None and now - _INS_CACHE["t"] < 600:
+        return _INS_CACHE["data"]
+    try:
+        conn = db.connect()
+        rows = [(r[0], r[1], r[2], r[3]) for r in conn.execute(
+            "SELECT lat, lng, booked_days_1m, blocked_days_1m FROM samsam_listings"
+            " WHERE lat IS NOT NULL").fetchall()]
+        conn.close()
+        factories = []
+        for name, la, ln in FACTORIES:
+            n, occ = _spot_stats(rows, la, ln, 3.0)
+            factories.append({"name": name, "n": n, "occ": occ})
+        newtowns = []
+        for name, la, ln in NEWTOWNS:
+            n, occ = _spot_stats(rows, la, ln, 1.5)
+            sts = subway.stations_within(la, ln, 1200)[:3]   # 중심 1.2km 내 역 최대 3개
+            newtowns.append({"name": name, "n": n, "occ": occ, "stations": sts})
+        data = {"factories": factories, "newtowns": newtowns}
+        _INS_CACHE.update(t=now, data=data)
+        return data
+    except Exception:
+        return None
 
 LANDING = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
 <meta name=viewport content="width=device-width,initial-scale=1"><title>rendit · 단기임대 분석</title>
@@ -60,6 +119,12 @@ padding:14px;text-align:center}
 .cc-nums{font-size:19px;font-weight:800;letter-spacing:-.01em}
 .cc-nums .up{color:#34d399}.cc-nums .dn{color:#f87171;margin-left:8px}
 .cc-total{font-size:11.5px;color:#64748b;margin-top:6px}
+.ins-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.ins-cell{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:12px 13px}
+.ins-name{font-size:12.5px;color:#cbd5e1;font-weight:700}
+.ins-occ{font-size:20px;font-weight:800;margin-top:5px}
+.ins-occ.hi{color:#34d399}.ins-occ.mid{color:#fbbf24}.ins-occ.lo{color:#f87171}.ins-occ.na{color:#64748b;font-size:14px}
+.ins-sub{font-size:11px;color:#64748b;margin-top:4px;line-height:1.5}
 @media(max-width:640px){h1{font-size:21px}.card{padding:18px}}
 </style></head><body><div class=wrap>
 <div class=top>
@@ -85,6 +150,33 @@ padding:14px;text-align:center}
       <div class=cc-region>{{short}}</div>
       <div class=cc-nums><span class=up>+{{'{:,}'.format(c.added)}}</span><span class=dn>-{{'{:,}'.format(c.removed)}}</span></div>
       <div class=cc-total>현재 {{'{:,}'.format(c.total)}}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% if ins %}
+{% macro occcls(o) %}{{ 'na' if o is none else ('hi' if o>=50 else ('mid' if o>=30 else 'lo')) }}{% endmacro %}
+<div class=churn>
+  <div class=churn-h>🏭 반도체 공장 인근 렌트 예약률 <span class=churn-d>반경 3km · 최근 1달</span></div>
+  <div class=ins-grid>
+    {% for f in ins.factories %}
+    <div class=ins-cell>
+      <div class=ins-name>{{f.name}}</div>
+      <div class="ins-occ {{occcls(f.occ)}}">{{'%.1f'|format(f.occ) ~ '%' if f.occ is not none else '매물없음'}}</div>
+      <div class=ins-sub>렌트 매물 {{f.n}}건</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+<div class=churn>
+  <div class=churn-h>🏙️ 1기 신도시 렌트 예약률 <span class=churn-d>중심 반경 1.5km · 인근 역</span></div>
+  <div class=ins-grid>
+    {% for t in ins.newtowns %}
+    <div class=ins-cell>
+      <div class=ins-name>{{t.name}}</div>
+      <div class="ins-occ {{occcls(t.occ)}}">{{'%.1f'|format(t.occ) ~ '%' if t.occ is not none else '매물없음'}}</div>
+      <div class=ins-sub>🚇 {{t.stations|join(' · ') if t.stations else '-'}}<br>렌트 매물 {{t.n}}건</div>
     </div>
     {% endfor %}
   </div>
@@ -215,9 +307,10 @@ def home():
     if not u:
         # 미로그인: 로그인 창 대신 서비스 소개 랜딩(무슨 서비스인지 보이게 → 이탈 방지).
         return render_template_string(PUBLIC_LANDING)
-    # 매물 변동은 모든 로그인 사용자에게, 접속자수는 관리자에게만.
+    # 매물 변동·인사이트는 모든 로그인 사용자에게, 접속자수는 관리자에게만.
     online = online_count() if u["role"] == "admin" else None
-    return render_template_string(LANDING, user=u, churn=latest_listing_churn(), online=online)
+    return render_template_string(LANDING, user=u, churn=latest_listing_churn(),
+                                  online=online, ins=dashboard_insights())
 
 
 # 각 뷰어 앱(import 시 init_auth 적용됨)을 경로별로 마운트

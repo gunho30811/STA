@@ -20,7 +20,9 @@ const DEFAULT_F = { sidos: [], sigungu: '', dong: '', btype: '', pmin: '', pmax:
 export default function App() {
   const [facets, setFacets] = useState(null)
   const [f, setF] = useState(DEFAULT_F)
-  const [view, setView] = useState('building')
+  // 딥링크: /samsam/?view=map 처럼 탭을 직접 열 수 있게(네브바 '지도' 메뉴 등).
+  const initView = new URLSearchParams(window.location.search).get('view')
+  const [view, setView] = useState(TABS.some((t) => t.id === initView) ? initView : 'building')
   const [runSeq, setRunSeq] = useState(0)
 
   useEffect(() => { getJSON('api/facets').then(setFacets).catch(() => {}) }, [])
