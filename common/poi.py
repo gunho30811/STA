@@ -9,6 +9,7 @@
   - academy    학원가             → 재수·시험준비·방학 단기 체류(기러기 학부모 포함)
   - transport  KTX역·공항·터미널   → 지방/해외 유입 관문(단기 체류 수요의 길목)
   - tour       관광 밀집지역        → 외국인·관광객 몰림 = 게스트하우스/단기숙박 수요
+  - tourspot   개별 관광지          → 지도 고배율 표시용(근거 집계에선 제외, 수가 많아서)
 
 데이터: data/poi.csv (kind,name,lat,lon). subway_stations.csv 와 같은 정적 CSV 패턴.
 
@@ -25,9 +26,9 @@ _DATA = os.path.join(
 _POI = None
 
 KIND_KO = {"hospital": "병원", "university": "대학", "industrial": "산단",
-           "academy": "학원가", "transport": "교통", "tour": "관광"}
+           "academy": "학원가", "transport": "교통", "tour": "관광", "tourspot": "관광지"}
 KIND_ICON = {"hospital": "🏥", "university": "🎓", "industrial": "🏭",
-             "academy": "📚", "transport": "🚄", "tour": "🗼"}
+             "academy": "📚", "transport": "🚄", "tour": "🗼", "tourspot": "🗼"}
 
 
 def load_poi():
@@ -56,6 +57,8 @@ def nearby(lat, lng, km=2.0, limit=3):
         return []
     out = []
     for kind, name, y, x in load_poi():
+        if kind == "tourspot":   # 개별 관광지는 근거 집계에서 제외(수가 많아 노이즈)
+            continue
         d = _haversine_m(lat, lng, y, x)
         if d <= km * 1000:
             out.append({"kind": kind, "name": name, "dist_m": int(d)})

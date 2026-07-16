@@ -110,7 +110,7 @@ def cluster(points, min_count):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry", action="store_true")
-    ap.add_argument("--min", type=int, default=8, help="격자당 관광지 최소 개수")
+    ap.add_argument("--min", type=int, default=5, help="격자당 관광지 최소 개수")
     args = ap.parse_args()
 
     key = os.environ.get("DATA_GO_KR_KEY")
@@ -125,25 +125,34 @@ def main():
     print(f"관광지 총 {len(allpts)}곳 → 밀집 격자 집계")
 
     spots = cluster(allpts, args.min)
-    rows = [("tour", nm, y, x) for nm, y, x, n in spots]
-    print(f"관광 밀집지역 {len(rows)}곳:")
-    for nm, y, x, n in spots[:20]:
+    hot = [("tour", nm, y, x) for nm, y, x, n in spots]
+    print(f"관광 밀집지역(tour) {len(hot)}곳:")
+    for nm, y, x, n in spots[:25]:
         print(f"   {nm}: 관광지 {n}곳 ({y},{x})")
+    # 개별 관광지(tourspot) — 지도 고배율에서만 표시. 이름 중복 제거.
+    seen, individual = set(), []
+    for title, y, x in allpts:
+        if title and title not in seen:
+            seen.add(title)
+            individual.append(("tourspot", title, round(y, 6), round(x, 6)))
+    print(f"개별 관광지(tourspot) {len(individual)}곳")
 
     if args.dry:
         return
     keep = []
     if os.path.exists(OUT):
         with open(OUT, encoding="utf-8") as f:
-            keep = [r for r in csv.DictReader(f) if r["kind"] != "tour"]
+            keep = [r for r in csv.DictReader(f) if r["kind"] not in ("tour", "tourspot")]
     with open(OUT, "w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
         w.writerow(["kind", "name", "lat", "lon"])
         for r in keep:
             w.writerow([r["kind"], r["name"], r["lat"], r["lon"]])
-        for kind, nm, y, x in rows:
+        for kind, nm, y, x in hot:
             w.writerow([kind, nm, y, x])
-    print(f"저장: {OUT} (tour {len(rows)} + 기타 {len(keep)})")
+        for kind, nm, y, x in individual:
+            w.writerow([kind, nm, y, x])
+    print(f"저장: {OUT} (tour {len(hot)} + tourspot {len(individual)} + 기타 {len(keep)})")
 
 
 if __name__ == "__main__":
