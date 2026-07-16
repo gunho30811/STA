@@ -712,8 +712,10 @@ def init_auth(app, demo_endpoints=None):
     @app.before_request
     def _guard():
         ep = request.endpoint or ""
-        # 현재 접속자 핑: 로그인 세션의 실제 페이지/데이터 요청마다 최근 활동시각 갱신(정적파일 제외).
-        if session.get("uid") and ep != "static":
+        # 현재 접속자 핑: 로그인 세션의 실제 페이지/데이터 요청마다 최근 활동시각 갱신.
+        # 제외: 정적파일 + 접속자수 폴링(api_online) 자체 — 폴링을 활동으로 치면 탭만 열어둬도
+        # 영원히 '접속중'으로 남아 누적 집계처럼 불어난다(실시간이 아니라던 피드백의 원인).
+        if session.get("uid") and ep not in ("static", "auth.api_online"):
             _ping_visitor()
         # chat_api_cron_poll: 외부 크론 서비스가 세션 없이 호출 — 자체 CRON_SECRET 검증으로 대체 보호.
         # home: 공개 랜딩(미로그인도 서비스 소개를 보게 — 로그인 창부터 뜨지 않도록).
