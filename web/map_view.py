@@ -87,6 +87,7 @@ border:3px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.35);line
     <span class=num>주당≥<input id=f_week type=number placeholder=0>만</span>
     <span class=num>순수익≥<input id=f_net type=number placeholder=0>만</span>
     <span class=num>예약률≥<input id=f_occ type=number placeholder=0>%</span>
+    <span class=num title="⭐ 추천 스팟 매물에 적용">보증금≤<input id=f_dep type=number placeholder=0>만</span>
     <span class=stat id=stat>렌트 매물 불러오는 중…</span>
   </div>
   <div class=row id=chips>
@@ -138,7 +139,7 @@ var poiLayer=L.layerGroup().addTo(map)
 var show={circles:true,rent:false,naver:false}
 var poiShow={hospital:false,university:false,industrial:false,academy:false,transport:false,tour:false}
 var FEATS=[], STATIONS=[], POIS=[], idx=null, CIRCLES=[], rentShown=0
-var filt={btype:'',week:0,occ:0,net:0}
+var filt={btype:'',week:0,occ:0,net:0,dep:0}
 var shownRent=new Map(), shownCirc=new Map()
 
 // ── 필터 적용: 인덱스 재구축(22k ~100ms) + 동 원 재계산(중앙값 좌표) ──
@@ -298,13 +299,22 @@ function renderPois(){
 
 // ── ⭐ 추천 스팟: 수요근거는 많은데 단기임대 공급 없는 동 + 근처 부동산 매물 ──
 var recoLayer=L.layerGroup().addTo(map)
-var RECO=null, recoOn=false
+var RECO=null, recoOn=false, recoKey=null
+// 추천 매물 매칭에 적용할 필터 → 쿼리스트링(유형 칩·보증금 상한). 수요점수는 서버에서 캐시 재사용.
+function recoParams(){
+  var p=new URLSearchParams()
+  if(filt.btype && NAV_TYPE[filt.btype]) p.set('btype', NAV_TYPE[filt.btype])
+  if(filt.dep) p.set('max_dep', filt.dep)
+  return p.toString()
+}
 function loadReco(){
   recoLayer.clearLayers()
   if(!recoOn) return
-  if(RECO){ drawReco(); return }
+  var key=recoParams()
+  if(RECO && key===recoKey){ drawReco(); return }   // 같은 조건이면 재요청 없이 재사용
+  recoKey=key
   document.getElementById('stat').textContent='추천 스팟 분석 중…'
-  fetch('/samsam/api/recommend',{credentials:'same-origin'}).then(function(r){return r.json()})
+  fetch('/samsam/api/recommend'+(key?'?'+key:''),{credentials:'same-origin'}).then(function(r){return r.json()})
     .then(function(d){ RECO=d.spots||[]; drawReco(); document.getElementById('stat').textContent='⭐ 추천 스팟 '+RECO.length+'곳 (수요근거 많은데 단기임대 없는 동)' })
     .catch(function(){ document.getElementById('stat').textContent='추천 로드 실패' })
 }
@@ -419,7 +429,7 @@ map.on('moveend zoomend',function(){
 document.querySelectorAll('#chips .chip').forEach(function(ch){
   ch.addEventListener('click',function(){
     document.querySelectorAll('#chips .chip').forEach(function(x){x.classList.remove('on')})
-    ch.classList.add('on'); filt.btype=ch.dataset.t||''; applyFilter()
+    ch.classList.add('on'); filt.btype=ch.dataset.t||''; applyFilter(); if(recoOn) loadReco()
   })
 })
 ;['week','occ','net'].forEach(function(k){
@@ -428,6 +438,13 @@ document.querySelectorAll('#chips .chip').forEach(function(ch){
     clearTimeout(tm); tm=setTimeout(function(){filt[k]=parseFloat(el.value)||0; applyFilter()},400)
   })
 })
+// 보증금 상한 — ⭐ 추천 스팟 매물 매칭에만 적용(수요점수 무관, 서버 캐시 재사용).
+;(function(){
+  var el=document.getElementById('f_dep'), tm=null
+  el.addEventListener('input',function(){
+    clearTimeout(tm); tm=setTimeout(function(){ filt.dep=parseFloat(el.value)||0; if(recoOn) loadReco() },400)
+  })
+})()
 ;['circles','rent','naver'].forEach(function(k){
   document.getElementById('t_'+k).addEventListener('click',function(){
     show[k]=!show[k]; this.classList.toggle('on',show[k])
