@@ -43,7 +43,52 @@ def app_dir():
 
 
 BASE = resource_base()
-CONFIG_PATH = os.path.join(app_dir(), 'naver_crawler_config.json')
+
+
+def _state_dir():
+    """앱 상태(마지막 설정 위치·자체점검 결과) 저장 폴더 — 바탕화면 대신 %LOCALAPPDATA%."""
+    base = os.environ.get('LOCALAPPDATA') or os.path.join(os.path.expanduser('~'), 'AppData', 'Local')
+    d = os.path.join(base, 'NaverCrawler')
+    try:
+        os.makedirs(d, exist_ok=True)
+    except Exception:
+        pass
+    return d
+
+
+# 마지막으로 쓴 설정파일 위치를 여기에 기억(다음 실행이 그 위치에서 자동 로드).
+POINTER_PATH = os.path.join(_state_dir(), 'last.json')
+DEFAULT_CONFIG = os.path.join(_state_dir(), 'config.json')
+
+
+def _load_config():
+    """설정 로드 — 포인터가 가리키는 위치(사용자가 고른 데이터 폴더) 우선, 없으면 AppData 기본."""
+    path = DEFAULT_CONFIG
+    try:
+        with open(POINTER_PATH, encoding='utf-8') as f:
+            p = json.load(f).get('config_path')
+        if p and os.path.exists(p):
+            path = p
+    except Exception:
+        pass
+    try:
+        with open(path, encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_config(cfg, folder, mode):
+    """설정 저장 — 로컬 폴더를 골랐으면 그 폴더에(사용자 지정), 아니면 AppData 기본. 위치는 포인터에 기록."""
+    path = os.path.join(folder, 'naver_crawler_config.json') if (mode == 'local' and folder) else DEFAULT_CONFIG
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+    try:
+        with open(POINTER_PATH, 'w', encoding='utf-8') as f:
+            json.dump({'config_path': path}, f)
+    except Exception:
+        pass
+    return path
 
 # 전국 시/도 (crawler.ALL_ROOTS 와 동일 이름). 기본은 수도권만 체크.
 SIDOS = ['서울시', '경기도', '인천시', '부산시', '대전시', '대구시', '울산시', '세종시',
@@ -267,7 +312,7 @@ def selftest():
     text = "\n".join(lines)
     print(text)
     try:
-        with open(os.path.join(app_dir(), 'selftest_result.txt'), 'w', encoding='utf-8') as f:
+        with open(os.path.join(_state_dir(), 'selftest_result.txt'), 'w', encoding='utf-8') as f:
             f.write(text + "\n")
     except Exception:
         pass
@@ -278,13 +323,7 @@ def launch_gui():
     import tkinter as tk
     from tkinter import ttk, scrolledtext, messagebox, filedialog
 
-    cfg = {}
-    if os.path.exists(CONFIG_PATH):
-        try:
-            with open(CONFIG_PATH, encoding='utf-8') as f:
-                cfg = json.load(f)
-        except Exception:
-            cfg = {}
+    cfg = _load_config()
 
     root = tk.Tk()
     root.title('네이버 부동산 크롤러')
@@ -456,12 +495,13 @@ def launch_gui():
         lmode = limit_mode.get()
         if save_var.get():
             try:
-                with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
-                    json.dump({'sidos': sidos, 'trades': trades, 'types': types, 'mode': mode,
-                               'folder': folder, 'database_url': db_url, 'test_count': tcount,
-                               'limit_mode': lmode, 'csv': csv_var.get(),
-                               'detail': detail_var.get(), 'export': export_var.get()},
-                              f, ensure_ascii=False, indent=2)
+                path = _save_config(
+                    {'sidos': sidos, 'trades': trades, 'types': types, 'mode': mode,
+                     'folder': folder, 'database_url': db_url, 'test_count': tcount,
+                     'limit_mode': lmode, 'csv': csv_var.get(),
+                     'detail': detail_var.get(), 'export': export_var.get()},
+                    folder, mode)
+                append(f"[설정 저장: {path}]\n")
             except Exception as e:
                 append(f"[설정 저장 실패: {e}]\n")
 
@@ -515,7 +555,7 @@ def browsertest():
         r = "BROWSERTEST FAIL: " + repr(e)[:300]
     print(r)
     try:
-        with open(os.path.join(app_dir(), 'browsertest_result.txt'), 'w', encoding='utf-8') as f:
+        with open(os.path.join(_state_dir(), 'browsertest_result.txt'), 'w', encoding='utf-8') as f:
             f.write(r + "\n")
     except Exception:
         pass
