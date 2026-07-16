@@ -752,23 +752,30 @@ def api_recommend():
     cands.sort(key=lambda c: -c["score"])
     cands = cands[:40]
 
-    # ④ 각 추천 동에 근처 부동산 매물 매칭(주거 소형, 대표좌표 1.5km, 순수익 잠재 높은 순)
+    # ④ 각 추천 동에 근처 부동산 매물 매칭(주거 소형, 대표좌표 1.5km, 싼 월세 순).
+    #    반지하/반지층은 단기임대에 부적합해 제외. COUNT(*) OVER()로 조건 맞는 전체 매물 수도 같이 반환.
+    RECO_LISTING_LIMIT = 30          # 모달은 스크롤되므로 상위 N건까지 노출(기존 3 → 확대)
     for c in cands:
         try:
             ms = conn.execute(
                 "SELECT article_no, building_name, rent_monthly, deposit, area_exclusive_m2,"
-                " floor_current, lat, lng FROM naver_listings"
+                " floor_current, lat, lng, COUNT(*) OVER() AS total FROM naver_listings"
                 " WHERE lat BETWEEN %s AND %s AND lng BETWEEN %s AND %s"
                 "   AND rent_monthly BETWEEN 20 AND 200"
                 "   AND building_type_code IN ('OPST','OR','VL','APT')"
-                " ORDER BY rent_monthly ASC LIMIT 3",
-                (c["lat"] - 0.014, c["lat"] + 0.014, c["lon"] - 0.017, c["lon"] + 0.017)).fetchall()
+                "   AND COALESCE(summary, '') NOT LIKE %s AND COALESCE(summary, '') NOT LIKE %s"
+                "   AND COALESCE(summary_tags, '') NOT LIKE %s AND COALESCE(summary_tags, '') NOT LIKE %s"
+                " ORDER BY rent_monthly ASC LIMIT %s",
+                (c["lat"] - 0.014, c["lat"] + 0.014, c["lon"] - 0.017, c["lon"] + 0.017,
+                 "%반지하%", "%반지층%", "%반지하%", "%반지층%", RECO_LISTING_LIMIT)).fetchall()
+            c["n_listings"] = ms[0][8] if ms else 0    # 조건 맞는 부동산 매물 전체 개수
             c["listings"] = [{
                 "id": m[0], "name": m[1] or "", "rent": m[2], "dep": m[3],
                 "m2": m[4], "floor": m[5], "lat": m[6], "lng": m[7],
                 "url": f"https://new.land.naver.com/offices?articleNo={m[0]}",
             } for m in ms]
         except Exception:
+            c["n_listings"] = 0
             c["listings"] = []
     conn.close()
 
