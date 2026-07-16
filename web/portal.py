@@ -130,7 +130,36 @@ def _supply_shortage_spots(conn):
             c["poi"] = poi_mod.nearby(lats[m], lngs[m], 2.5, 2)
         else:
             c["poi"] = []
+    cost = _entry_cost(conn, dong_names)
+    for c in cands:
+        c["cost"] = cost.get((c["sigungu"], c["dong"]))
     return cands
+
+
+def _entry_cost(conn, dong_names):
+    """동별 진입 원가 — 주거용 소형(전용 20~60㎡, 월세 20~200만) 월세·보증금 중앙값.
+    '이 동네에 단기임대로 들어가려면 얼마 드나' = 스팟 판단의 마지막 조각.
+    상가·대형 평수가 섞이면 중앙값이 튀므로(월세 350만 등) 유형·면적으로 좁힌다."""
+    out = {}
+    if not dong_names:
+        return out
+    try:
+        # percentile_cont 를 두 번 쓰면 결과 컬럼명이 둘 다 'percentile_cont' 라 이름 기반 행
+        # 매핑에서 뒤 값이 앞을 덮어쓴다 → 반드시 별칭(rent_med/dep_med)으로 구분.
+        for r in conn.execute(
+                "SELECT sigungu, dong, COUNT(*) AS n,"
+                " percentile_cont(0.5) WITHIN GROUP (ORDER BY rent) AS rent_med,"
+                " percentile_cont(0.5) WITHIN GROUP (ORDER BY deposit) AS dep_med"
+                " FROM listings WHERE dong = ANY(%s)"
+                "   AND realestatetype IN ('오피스텔','원룸','빌라','아파트','단독/다가구')"
+                "   AND rent BETWEEN 20 AND 200 AND area_real_m2 BETWEEN 20 AND 60"
+                " GROUP BY sigungu, dong", (dong_names,)).fetchall():
+            sg, d, n, rent, dep = r[0], r[1], r[2], r[3], r[4]
+            if n >= 3 and rent is not None and dep is not None:
+                out[(sg or "", d or "")] = {"n": n, "rent": round(rent), "dep": round(dep)}
+    except Exception:
+        pass
+    return out
 
 
 def _unclaimed_spots(conn):
@@ -172,6 +201,7 @@ def _unclaimed_spots(conn):
                 " WHERE dong = ANY(%s) AND lat BETWEEN 33 AND 39.5 AND lon BETWEEN 124 AND 132",
                 (top_dongs,)).fetchall():
             coords.setdefault((sg or "", d or ""), []).append((la, ln))
+        cost = _entry_cost(conn, top_dongs)
         for c in cands:
             pts = coords.get((c["sigungu"], c["dong"])) or []
             if pts:
@@ -180,6 +210,7 @@ def _unclaimed_spots(conn):
                 c["poi"] = poi_mod.nearby(lats[m], lngs[m], 3.0, 2)
             else:
                 c["poi"] = []
+            c["cost"] = cost.get((c["sigungu"], c["dong"]))
     return cands
 
 
@@ -254,6 +285,7 @@ padding:14px;text-align:center}
 .spot-cell:hover{transform:translateY(-2px);border-color:rgba(251,146,60,.5)}
 .spot-note{font-size:11px;color:#64748b;margin-top:10px}
 .poi-ev{color:#fbbf24;font-size:10.5px;font-weight:700}
+.cost-ev{color:#93c5fd;font-size:10.5px;font-weight:700}
 @media(max-width:640px){h1{font-size:21px}.card{padding:18px}}
 </style></head><body><div class=wrap>
 <div class=top>
@@ -291,11 +323,12 @@ padding:14px;text-align:center}
   <div class=churn-h>🔥 공급부족 스팟 <span class=churn-d>수요는 높은데(예약률 {{55}}%↑) 렌트 매물이 적은 동네 — 진입 기회</span></div>
   <div class=ins-grid>
     {% for s in ins.spots %}
-    <a class="ins-cell spot-cell" href="/calc?dong={{s.dong}}{% if s.net is not none %}&net={{s.net}}{% endif %}">
+    <a class="ins-cell spot-cell" href="/calc?dong={{s.dong}}{% if s.cost %}&rent={{s.cost.rent}}&dep={{s.cost.dep}}{% endif %}">
       <div class=ins-name>{{s.sigungu}} <b>{{s.dong}}</b></div>
       <div class="ins-occ {{occcls(s.occ)}}">{{s.occ}}%</div>
       <div class=ins-sub>렌트 {{s.n_rent}}개 vs 부동산 {{'{:,}'.format(s.n_naver)}}개
         {% if s.net is not none %}<br>월순수익 <b style="color:{{'#34d399' if s.net>=0 else '#f87171'}}">{{s.net}}만</b>{% if s.margin is not none %} · 이익률 {{s.margin}}%{% endif %}{% else %}<br><span style="color:#475569">수익성 매칭 없음</span>{% endif %}
+        {% if s.cost %}<br><span class=cost-ev>진입 월세 {{s.cost.rent}}만/보증금 {{'{:,}'.format(s.cost.dep)}}만</span>{% endif %}
         {% if s.poi %}<br><span class=poi-ev>{% for p in s.poi %}{{ {'hospital':'🏥','university':'🎓','industrial':'🏭'}[p.kind] }}{{p.name}} {{(p.dist_m/1000)|round(1)}}km {% endfor %}</span>{% endif %}</div>
     </a>
     {% endfor %}
@@ -308,12 +341,13 @@ padding:14px;text-align:center}
   <div class=churn-h>🎯 미개척 지역 <span class=churn-d>월세는 빨리 나가는데(회전율↑) 렌트(단기임대)가 아직 없는 동네</span></div>
   <div class=ins-grid>
     {% for u in ins.unclaimed %}
-    <div class=ins-cell>
+    <a class="ins-cell spot-cell" href="/calc?dong={{u.dong}}{% if u.cost %}&rent={{u.cost.rent}}&dep={{u.cost.dep}}{% endif %}">
       <div class=ins-name>{{u.sigungu}} <b>{{u.dong}}</b></div>
       <div class="ins-occ hi">{{u.turnover}}%</div>
       <div class=ins-sub>월세 회전율(최근7일 신규 {{u.new7}}/재고 {{u.active}}) · 렌트 매물 {{u.n_samsam}}개뿐
+        {% if u.cost %}<br><span class=cost-ev>진입 월세 {{u.cost.rent}}만/보증금 {{'{:,}'.format(u.cost.dep)}}만</span>{% endif %}
         {% if u.poi %}<br><span class=poi-ev>{% for p in u.poi %}{{ {'hospital':'🏥','university':'🎓','industrial':'🏭'}[p.kind] }}{{p.name}} {{(p.dist_m/1000)|round(1)}}km {% endfor %}</span>{% endif %}</div>
-    </div>
+    </a>
     {% endfor %}
   </div>
   <div class=spot-note>회전율=최근7일 신규등록÷활성매물(월세 수요 신호, 삼삼 데이터 없이 계산) · 렌트 매물 2개 이하만 · 아직 아무도 안 뛰어든 곳일 수 있음</div>
@@ -498,11 +532,11 @@ color:#e2e8f0;font-size:14px;text-align:right;font-weight:700}
 </style></head><body><div class=wrap>
 <a class=back href="/">← 대시보드</a>
 <h1>🧮 단기임대 수익 계산기{% if dong %} — {{dong}}{% endif %}</h1>
-<p class=sub>임차(내가 내는 비용)와 임대(투숙객에게 받는 돈)를 넣으면 주간 순익·손익주·영업이익률·공실률별 시나리오를 계산합니다. 연↔주 환산은 ÷52.</p>
+<p class=sub>임차(내가 내는 비용)와 임대(투숙객에게 받는 돈)를 넣으면 주간 순익·손익주·영업이익률·공실률별 시나리오를 계산합니다. 연↔주 환산은 ÷52.{% if rent %} <b style="color:#93c5fd">{{dong}} 시세(월세 {{rent}}만·보증금 {{dep}}만)를 자동 입력했어요.</b>{% endif %}</p>
 <div class=cols>
   <div class=box><h2>💸 임차 원가 (내가 내는 돈)</h2>
-    <div class=row><label>월 임차료</label><div><input id=i_rent type=number value=85><span class=unit>만원</span></div></div>
-    <div class=row><label>보증금</label><div><input id=i_dep type=number value=1000><span class=unit>만원</span></div></div>
+    <div class=row><label>월 임차료</label><div><input id=i_rent type=number value={{rent or 85}}><span class=unit>만원</span></div></div>
+    <div class=row><label>보증금</label><div><input id=i_dep type=number value={{dep or 1000}}><span class=unit>만원</span></div></div>
     <div class=row><label>보증금 이자율(연)</label><div><input id=i_deprate type=number value=5 step=0.5><span class=unit>%</span></div></div>
     <div class=row><label>월 관리비</label><div><input id=i_mgmt type=number value=30><span class=unit>만원</span></div></div>
     <div class=row><label>월 통신비</label><div><input id=i_net type=number value=3.3 step=0.1><span class=unit>만원</span></div></div>
@@ -571,7 +605,9 @@ def calc():
         from flask import redirect as _rd
         return _rd("/auth/login?next=/calc")
     from flask import request as _rq
-    return render_template_string(CALC_PAGE, dong=_rq.args.get("dong", ""))
+    return render_template_string(CALC_PAGE, dong=_rq.args.get("dong", ""),
+                                  rent=_rq.args.get("rent", type=int),
+                                  dep=_rq.args.get("dep", type=int))
 
 
 @portal.route("/map")
