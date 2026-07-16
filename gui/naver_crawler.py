@@ -19,10 +19,12 @@
 개발 실행:  python gui/naver_crawler.py
 자체 점검:  python gui/naver_crawler.py --selftest
 """
+import glob
 import importlib.util
 import json
 import os
 import queue
+import subprocess
 import sys
 import threading
 import traceback
@@ -87,6 +89,36 @@ class QueueWriter:
         pass
 
 
+def _ensure_chromium():
+    """번들 playwright가 exe 임시폴더가 아니라 'PC에 설치된' 크롬을 쓰게 하고,
+    없으면 최초 1회 자동 다운로드. (사용자가 따로 playwright install 안 해도 되게.)"""
+    lap = os.environ.get('LOCALAPPDATA') or os.path.join(os.path.expanduser('~'), 'AppData', 'Local')
+    bpath = os.path.join(lap, 'ms-playwright')
+    os.environ['PLAYWRIGHT_BROWSERS_PATH'] = bpath   # 번들 기본값(_MEI 로컬) 대신 시스템 위치
+    hit = glob.glob(os.path.join(bpath, 'chromium_headless_shell-*', '**', 'chrome-headless-shell.exe'),
+                    recursive=True) or \
+        glob.glob(os.path.join(bpath, 'chromium-*', '**', 'chrome.exe'), recursive=True)
+    if hit:
+        print(f"[GUI] 설치된 크롬 엔진 사용: {os.path.relpath(hit[0], bpath).split(os.sep)[0]}")
+        return
+    print("[GUI] 크롬 엔진이 없어 자동 설치합니다 (최초 1회, 인터넷 필요·~150MB, 몇 분)...")
+    try:
+        from playwright._impl._driver import compute_driver_executable, get_driver_env
+        driver = compute_driver_executable()
+        cmd = (list(driver) if isinstance(driver, (list, tuple)) else [driver]) + ['install', 'chromium']
+        env = dict(get_driver_env()); env['PLAYWRIGHT_BROWSERS_PATH'] = bpath
+        proc = subprocess.Popen(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                text=True, encoding='utf-8', errors='replace')
+        for line in proc.stdout:
+            if line.strip():
+                print("  " + line.rstrip())
+        proc.wait()
+        print("[GUI] 크롬 엔진 설치 완료" if proc.returncode == 0
+              else f"[GUI] ⚠ 크롬 설치 실패(code={proc.returncode}) — 인터넷 확인 후 다시 시도")
+    except Exception as e:
+        print(f"[GUI] ⚠ 크롬 자동설치 오류: {e}")
+
+
 def run_pipeline(opts, log_q, stop_flag):
     """워커 스레드: env 세팅 → crawler(목록) → [상세] → [export]. 로그는 log_q 로."""
     _add_paths()
@@ -96,6 +128,7 @@ def run_pipeline(opts, log_q, stop_flag):
     old_out, old_err = sys.stdout, sys.stderr
     sys.stdout = sys.stderr = QueueWriter(log_q)
     try:
+        _ensure_chromium()   # PC 설치 크롬을 찾아 쓰거나, 없으면 자동 설치
         # 1) 저장 백엔드
         if opts['mode'] == 'local':
             os.environ['SAMSAM_SQLITE_PATH'] = os.path.join(opts['folder'], 'naver.db')
@@ -425,7 +458,30 @@ def launch_gui():
     root.mainloop()
 
 
+def browsertest():
+    """frozen exe에서 실제 크롬 실행까지 확인(브라우저 탐지/설치 + 헤드리스 launch)."""
+    _add_paths()
+    _ensure_chromium()
+    try:
+        from playwright.sync_api import sync_playwright
+        pw = sync_playwright().start()
+        b = pw.chromium.launch(headless=True, args=["--no-sandbox"])
+        b.close(); pw.stop()
+        r = f"BROWSERTEST PASS (path={os.environ.get('PLAYWRIGHT_BROWSERS_PATH')})"
+    except Exception as e:
+        r = "BROWSERTEST FAIL: " + repr(e)[:300]
+    print(r)
+    try:
+        with open(os.path.join(app_dir(), 'browsertest_result.txt'), 'w', encoding='utf-8') as f:
+            f.write(r + "\n")
+    except Exception:
+        pass
+    return 0 if 'PASS' in r else 1
+
+
 if __name__ == '__main__':
     if '--selftest' in sys.argv:
         sys.exit(selftest())
+    if '--browsertest' in sys.argv:
+        sys.exit(browsertest())
     launch_gui()
