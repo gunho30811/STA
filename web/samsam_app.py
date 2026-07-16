@@ -55,7 +55,8 @@ SAM_COLS = ("room_id", "url", "name", "building_type", "building_name",
             "sido", "sigungu", "dong", "area_pyeong", "rent_total_weekly",
             "booked_days_1m", "booked_days_2m", "booked_days_3m", "blocked_days_1m",
             "basic_options", "extra_options", "station_500m_names", "collected_at",
-            "lat", "lng")   # 지도(/api/map) 표시용 좌표
+            "lat", "lng",   # 지도(/api/map) 표시용 좌표
+            "parking")      # 주차 가능 여부 — 옵션 영향 분석에 '주차'로 합류
 
 # 삼삼 옵션 영문 코드 → 한글 표시명
 OPTION_KO = {
@@ -68,6 +69,7 @@ OPTION_KO = {
     "BATHTUB": "욕조", "DRYER": "건조기", "BALCONY": "발코니", "DRESSING_ROOM": "드레스룸",
     "AIR_PURIFIER": "공기청정기", "GAS_RANGE": "가스레인지", "ELECTRIC_RANGE": "전기레인지",
     "CURTAINS": "커튼", "CABLE_TV": "케이블TV", "BIDET": "비데",
+    "PARKING": "주차",   # samsam_listings.parking(불리언)에서 합류 — '주차불가 예약률' 비교용
 }
 
 
@@ -95,6 +97,8 @@ def _parse_list(v):
 def _enrich(r):
     """행에 options(set)·occ·vac·주당만원·역 파생."""
     opts = set(_parse_list(r.get("basic_options")) + _parse_list(r.get("extra_options")))
+    if r.get("parking"):
+        opts.add("PARKING")   # 주차(불리언 컬럼)를 옵션으로 합류 → '있/없' 예약률 비교 가능
     r["options"] = opts
     blocked = r.get("blocked_days_1m") or 0
     booked = r.get("booked_days_1m") or 0
