@@ -37,10 +37,10 @@ padding:3px 6px 3px 12px;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 padding:4px 10px;font-size:11.5px;font-weight:700;color:#475569;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .num input{border:none;outline:none;background:none;width:44px;font-size:13px;font-weight:800;text-align:right;color:#111827}
 .occ-badge-wrap{background:none;border:none}
-.occ-badge{transform:translate(-50%,-50%);background:rgba(255,255,255,.93);border:1.5px solid;border-radius:10px;
-padding:3px 8px;font-size:11px;font-weight:700;text-align:center;line-height:1.25;white-space:nowrap;
-box-shadow:0 1px 4px rgba(0,0,0,.2)}
-.occ-badge b{font-size:13px}.occ-n{font-weight:500;color:#94a3b8;font-size:10px}
+.occ-badge{transform:translate(-50%,-50%);background:rgba(255,255,255,.9);border:1px solid;border-radius:8px;
+padding:2px 6px;font-size:10px;font-weight:700;text-align:center;line-height:1.2;white-space:nowrap;
+box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.occ-badge b{font-size:12px}.occ-n{font-weight:500;color:#94a3b8;font-size:9px}
 .pin{width:16px;height:16px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)}
 .poi{display:flex;align-items:center;gap:3px;background:rgba(255,255,255,.95);border:1.5px solid #f59e0b;border-radius:999px;
 padding:2px 8px 2px 4px;font-size:11px;font-weight:800;color:#92400e;white-space:nowrap;box-shadow:0 1px 5px rgba(0,0,0,.3);
@@ -96,19 +96,19 @@ border:3px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.35);line
     <span class=chip data-t="상가주택">상가주택</span>
   </div>
   <div class=row>
-    <label class="tog on" id=t_circles><span class=dot style="background:#059669"></span>동별 예약률(전체 기준)</label>
-    <label class="tog on" id=t_rent><span class=dot style="background:#4321F3"></span>렌트</label>
-    <label class="tog on" id=t_naver><span class=dot style="background:#14b8a6"></span>부동산</label>
-    <label class="tog on" id=t_reco><span class=dot style="background:#eab308"></span>⭐ 추천 스팟만</label>
+    <label class="tog on" id=t_circles><span class=dot style="background:#059669"></span>동별 예약률</label>
+    <label class="tog" id=t_rent><span class=dot style="background:#4321F3"></span>렌트</label>
+    <label class="tog" id=t_naver><span class=dot style="background:#14b8a6"></span>부동산</label>
+    <label class="tog" id=t_reco><span class=dot style="background:#eab308"></span>⭐ 추천 스팟만</label>
   </div>
   <div class=row id=poirow>
     <span class=poi-lbl>수요시설</span>
-    <label class="ptog on" data-k=hospital>🏥 병원</label>
-    <label class="ptog on" data-k=university>🎓 대학</label>
-    <label class="ptog on" data-k=industrial>🏭 산단</label>
-    <label class="ptog on" data-k=academy>📚 학원</label>
-    <label class="ptog on" data-k=transport>🚄 교통</label>
-    <label class="ptog on" data-k=tour>🗼 관광</label>
+    <label class="ptog" data-k=hospital>🏥 병원</label>
+    <label class="ptog" data-k=university>🎓 대학</label>
+    <label class="ptog" data-k=industrial>🏭 산단</label>
+    <label class="ptog" data-k=academy>📚 학원</label>
+    <label class="ptog" data-k=transport>🚄 교통</label>
+    <label class="ptog" data-k=tour>🗼 관광</label>
   </div>
 </div>
 </div>
@@ -134,9 +134,9 @@ var rentLayer=L.layerGroup().addTo(map)
 var circleLayer=L.layerGroup().addTo(map)
 var navLayer=L.layerGroup().addTo(map)
 var poiLayer=L.layerGroup().addTo(map)
-var show={circles:true,rent:true,naver:true}
-// 수요시설 종류별 표시(개별 토글). tourspot 은 tour 에 종속.
-var poiShow={hospital:true,university:true,industrial:true,academy:true,transport:true,tour:true}
+// 첫인상 정리: 동 예약률만 켜고 시작. 렌트/부동산/수요시설은 사용자가 필요할 때 켠다.
+var show={circles:true,rent:false,naver:false}
+var poiShow={hospital:false,university:false,industrial:false,academy:false,transport:false,tour:false}
 var FEATS=[], STATIONS=[], POIS=[], idx=null, CIRCLES=[], rentShown=0
 var filt={btype:'',week:0,occ:0,net:0}
 var shownRent=new Map(), shownCirc=new Map()
@@ -249,12 +249,19 @@ function renderRent(){
 function renderCircles(){
   var wanted=new Map()
   if(show.circles && map.getZoom()>=CIRCLE_ZOOM){
-    var b=map.getBounds().pad(0.1)
+    var b=map.getBounds().pad(0.1), z=map.getZoom()
+    // 줌 14 미만: 글자 배지가 화면을 덮어 지저분 → 예약률 '점'만(색으로 수준 표현).
+    // 줌 14+: 동명·예약률 배지 표시(그 정도로 확대하면 화면당 동 수가 적어 안 겹침).
+    var showBadge = z>=14
     CIRCLES.forEach(function(c){
       if(!b.contains([c[0],c[1]])) return
-      wanted.set(c[5], function(){
+      wanted.set(c[5]+(showBadge?'b':'d'), function(){
+        if(!showBadge){
+          return L.circleMarker([c[0],c[1]],{radius:6,color:'#fff',weight:1,
+            fillColor:occColor(c[2]),fillOpacity:.75,interactive:false})
+        }
         var g=L.layerGroup()
-        L.circle([c[0],c[1]],{radius:420,color:occColor(c[2]),weight:1.5,fillColor:occColor(c[2]),fillOpacity:.13,interactive:false}).addTo(g)
+        L.circle([c[0],c[1]],{radius:420,color:occColor(c[2]),weight:1.2,fillColor:occColor(c[2]),fillOpacity:.10,interactive:false}).addTo(g)
         L.marker([c[0],c[1]],{interactive:false,icon:L.divIcon({className:'occ-badge-wrap',iconSize:null,
           html:'<div class="occ-badge" style="border-color:'+occColor(c[2])+';color:'+occColor(c[2])+'">'+c[4]+'<br><b>'+c[2]+'%</b><span class=occ-n>·'+c[3]+'</span></div>'})}).addTo(g)
         return g
