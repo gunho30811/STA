@@ -237,6 +237,8 @@ def build_region_tree(nl, roots, only_sido=None, only_gu=None):
                 if only_gu and len(path) == 1 and only_gu not in name:
                     # 시/도 바로 아래(구/시) 레벨에서 only_gu 필터
                     continue
+                if len(path) >= 1:   # 진행 표시(조용한 트리탐색이 멈춘 것처럼 보이지 않게)
+                    print(f"[{now()}]   탐색 중: {' '.join(path[1:] + [name])}  (동 {len(dongs)}개 발견)")
                 walk(cno, path + [name])
 
     for sido_name, root_no in roots:
@@ -258,7 +260,7 @@ def save_regions(dongs):
 
 # ----------------------------------------------------------------------------- listings
 
-def crawl_dong(nl, cortarNo, sido, sigungu, dong, max_pages=60, real_estate_type="OPST", trade_type="B2"):
+def crawl_dong(nl, cortarNo, sido, sigungu, dong, max_pages=60, real_estate_type="OPST", trade_type="B2", limit=None):
     # 진행상태 키: 월세(B2)는 기존 키 유지(OPST=cortarNo 단독, 그 외=cortarNo:타입) — 주간크롤 재개 호환.
     # 전세·매매(B1/A1)는 거래유형까지 붙여 별도 진행상태.
     if trade_type == "B2":
@@ -267,11 +269,13 @@ def crawl_dong(nl, cortarNo, sido, sigungu, dong, max_pages=60, real_estate_type
         state_key = f"{cortarNo}:{real_estate_type}:{trade_type}"
 
     conn = db.connect()
-    state = conn.execute("SELECT status FROM crawl_state WHERE cortarNo=?",
-                         (state_key,)).fetchone()
-    if state and state["status"] == "done":
-        conn.close()
-        return 0  # 이미 완료
+    # limit(샘플 모드)일 땐 done 스킵 안 함 — 소량만 뽑는 게 목적이라 진행상태와 무관.
+    if limit is None:
+        state = conn.execute("SELECT status FROM crawl_state WHERE cortarNo=?",
+                             (state_key,)).fetchone()
+        if state and state["status"] == "done":
+            conn.close()
+            return 0  # 이미 완료
 
     total = 0
     page = 1
@@ -282,6 +286,8 @@ def crawl_dong(nl, cortarNo, sido, sigungu, dong, max_pages=60, real_estate_type
         arts = j.get("articleList", [])
         if not arts:
             break
+        if limit is not None and total + len(arts) > limit:
+            arts = arts[:max(0, limit - total)]   # 필요한 만큼만(TOP N)
         rows = []
         for a in arts:
             rows.append((
@@ -309,6 +315,8 @@ def crawl_dong(nl, cortarNo, sido, sigungu, dong, max_pages=60, real_estate_type
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", rows)
         conn.commit()
         total += len(rows)
+        if limit is not None and total >= limit:   # 원하는 개수 채우면 종료
+            break
         if not j.get("isMoreData"):
             break
         page += 1
@@ -328,6 +336,8 @@ def main():
     ap.add_argument("--sidos", default="", help="콤마구분 시/도 정확매칭 복수(예: 서울시,경기도,인천시)")
     ap.add_argument("--gu", help="특정 구/시 이름 필터 (예: 강남구)")
     ap.add_argument("--limit-dongs", type=int, default=0, help="동 N개만 (테스트)")
+    ap.add_argument("--max-per-type", type=int, default=0,
+                    help="각 매물종류당 최대 N건만 수집(TOP N 샘플). 예: 10 → 아파트10·오피스텔10…")
     ap.add_argument("--show", action="store_true", help="브라우저 표시")
     ap.add_argument("--types", default="OPST",
                     help="콤마구분 realEstateType 코드(예: APT,OPST,VL,OR,DDDGG,SG,JWJT) "
@@ -390,9 +400,16 @@ def main():
                 for code in type_codes for trade in trade_codes]
 
         grand = 0
+        collected = {}   # (종류,거래)별 누적 — --max-per-type 예산 관리
         for i, (cno, sido, sigungu, dong, code, trade) in enumerate(jobs, 1):
+            limit = None
+            if args.max_per_type:
+                got = collected.get((code, trade), 0)
+                if got >= args.max_per_type:
+                    continue                       # 이 종류·거래는 이미 목표치 채움 → 남은 동 스킵
+                limit = args.max_per_type - got
             try:
-                n = crawl_dong(nl, cno, sido, sigungu, dong, real_estate_type=code, trade_type=trade)
+                n = crawl_dong(nl, cno, sido, sigungu, dong, real_estate_type=code, trade_type=trade, limit=limit)
             except Exception as e:
                 print(f"[{now()}] 동 처리 실패 {sido} {sigungu} {dong} {TYPES[code]} {TRADE_TYPES[trade]}: {repr(e)[:80]}")
                 try:
@@ -401,6 +418,8 @@ def main():
                     pass
                 continue
             grand += n
+            if args.max_per_type:
+                collected[(code, trade)] = collected.get((code, trade), 0) + n
             print(f"[{now()}] ({i}/{len(jobs)}) {sido} {sigungu} {dong} {TYPES[code]} {TRADE_TYPES[trade]}: {n}건 (누적 {grand})")
             if i % 150 == 0:        # 메모리 누적 방지: 주기적 재시작
                 nl.restart()

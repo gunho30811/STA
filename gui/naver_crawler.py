@@ -150,9 +150,9 @@ def run_pipeline(opts, log_q, stop_flag):
                 '--types', ','.join(opts['types']),
                 '--trade-types', ','.join(opts['trades'])]
         if opts['test']:
-            argv += ['--limit-dongs', str(opts.get('test_count', 3))]
+            argv += ['--max-per-type', str(opts.get('test_count', 10))]
         print(f"[GUI] 목록 크롤 시작 — 지역 {opts['sidos']} / 거래 {opts['trades']} / 종류 {len(opts['types'])}개"
-              + (f"  (테스트: 동 {opts.get('test_count', 3)}개)" if opts['test'] else ""))
+              + (f"  (테스트: 각 종류 {opts.get('test_count', 10)}개)" if opts['test'] else ""))
         if stop_flag.is_set():
             return
         sys.argv = argv
@@ -354,9 +354,9 @@ def launch_gui():
     detail_var = tk.BooleanVar(value=cfg.get('detail', False))
     export_var = tk.BooleanVar(value=cfg.get('export', False))
     save_var = tk.BooleanVar(value=True)
-    ttk.Checkbutton(of, text='테스트 (동', variable=test_var).pack(side='left')
-    test_count = ttk.Spinbox(of, from_=1, to=100000, width=6)
-    test_count.set(str(cfg.get('test_count', 3)))
+    ttk.Checkbutton(of, text='테스트 (각 종류', variable=test_var).pack(side='left')
+    test_count = ttk.Spinbox(of, from_=1, to=1000000, width=7)
+    test_count.set(str(cfg.get('test_count', 10)))
     test_count.pack(side='left', padx=(2, 0))
     ttk.Label(of, text='개만)').pack(side='left', padx=(2, 8))
     ttk.Checkbutton(of, text='상세정보도 수집 (느림)', variable=detail_var).pack(side='left', padx=10)
