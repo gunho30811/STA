@@ -611,7 +611,8 @@ def api_map_all():
     rent, agg = [], {}
     for r in L():
         la, ln = r.get("lat"), r.get("lng")
-        if la is None or ln is None:
+        # 불량 좌표(0,0 등 한국 밖) 제외 — 평균 좌표를 끌고 가 동 원이 엉뚱한 데 그려짐(역삼동 lng=0 사례).
+        if la is None or ln is None or not (33.0 <= la <= 39.5 and 124.0 <= ln <= 132.0):
             continue
         occ = round((r.get("occ") or 0) * 100, 1)
         rent.append([r["room_id"], round(la, 5), round(ln, 5), occ,
@@ -623,8 +624,14 @@ def api_map_all():
         g[0] += la; g[1] += ln; g[2] += occ; g[3] += 1
     circles = [[round(g[0] / g[3], 6), round(g[1] / g[3], 6), round(g[2] / g[3], 1), g[3], d]
                for (sg, d), g in agg.items() if g[3] >= 3]
-    body = json.dumps({"rent": rent, "circles": circles}, ensure_ascii=False,
-                      separators=(",", ":"))
+    # 역/지역 검색용 지하철역 좌표(589역, 작음)
+    try:
+        import subway
+        stations = [[n, round(y, 5), round(x, 5)] for n, y, x in subway._load()]
+    except Exception:
+        stations = []
+    body = json.dumps({"rent": rent, "circles": circles, "stations": stations},
+                      ensure_ascii=False, separators=(",", ":"))
     _MAPALL.update(t=now, body=body)
     return app.response_class(body, mimetype="application/json")
 
