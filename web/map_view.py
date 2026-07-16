@@ -317,7 +317,7 @@ function drawReco(){
     var r=340+Math.round(s.score/maxS*320)
     L.circle([s.lat,s.lon],{radius:r,color:'#ca8a04',weight:2,fillColor:'#facc15',fillOpacity:.22}).addTo(recoLayer)
     var mk=L.marker([s.lat,s.lon],{icon:L.divIcon({className:'',iconSize:null,
-      html:'<div class="reco-badge">⭐ '+s.dong+'<br><b>'+s.score+'점</b><span class=reco-n> 매물'+s.listings.length+'</span></div>'})})
+      html:'<div class="reco-badge">⭐ '+s.dong+'<br><b>'+s.score+'점</b><span class=reco-n> 매물'+(s.n_listings!=null?s.n_listings:s.listings.length)+'</span></div>'})})
     mk.on('click',function(){ openReco(s) }); mk.addTo(recoLayer)
   })
 }
@@ -332,7 +332,8 @@ function openReco(s){
     (s.workers ? ' · 종사자 <b>'+s.workers.toLocaleString()+'명</b>' : '')+
     (s.wealth ? ' · 소비력 <b>아파트보증금 '+(s.wealth>=10000?(s.wealth/10000).toFixed(1)+'억':s.wealth+'만')+'</b>' : '')+'<br>'+
     '<span style="color:#ca8a04;font-weight:700">'+poi+'</span></div>'+
-    '<div style="padding:8px;font-size:12px;color:#64748b">여기서 시작할 만한 부동산 매물 '+s.listings.length+'건 ↓</div>'
+    '<div style="padding:8px;font-size:12px;color:#64748b">여기서 시작할 만한 부동산 매물 <b>'+(s.n_listings!=null?s.n_listings:s.listings.length)+'건</b>'+
+      ((s.n_listings!=null&&s.n_listings>s.listings.length)?' <span style="color:#94a3b8">(월세 싼 순 '+s.listings.length+'건 표시)</span>':'')+' ↓</div>'
   s.listings.forEach(function(m){
     h+='<a class=item href="'+m.url+'" target=_blank rel=noreferrer>'+
       '<div><div class=it-name>'+(m.name||'(이름없음)')+'</div>'+
