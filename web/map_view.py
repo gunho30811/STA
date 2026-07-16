@@ -69,6 +69,7 @@ border:3px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.35);line
   <div class=row>
     <div class=sbox><input id=q placeholder="동 · 역 검색 (예: 역삼동, 강남역)"><button onclick="doSearch()">이동</button></div>
     <span class=num>주당≥<input id=f_week type=number placeholder=0>만</span>
+    <span class=num>순수익≥<input id=f_net type=number placeholder=0>만</span>
     <span class=num>예약률≥<input id=f_occ type=number placeholder=0>%</span>
     <span class=stat id=stat>렌트 매물 불러오는 중…</span>
   </div>
@@ -108,7 +109,7 @@ var circleLayer=L.layerGroup().addTo(map)
 var navLayer=L.layerGroup().addTo(map)
 var show={circles:true,rent:true,naver:true}
 var FEATS=[], STATIONS=[], idx=null, CIRCLES=[], rentShown=0
-var filt={btype:'',week:0,occ:0}
+var filt={btype:'',week:0,occ:0,net:0}
 var shownRent=new Map(), shownCirc=new Map()
 
 // ── 필터 적용: 인덱스 재구축(22k ~100ms) + 동 원 재계산(중앙값 좌표) ──
@@ -118,6 +119,7 @@ function applyFilter(){
     if(filt.btype && p.btype!==filt.btype) return false
     if(filt.week && !(p.week>=filt.week)) return false
     if(filt.occ && !(p.occ>=filt.occ)) return false
+    if(filt.net && !(p.net!=null && p.net>=filt.net)) return false
     return true
   })
   rentShown=fs.length
@@ -149,6 +151,7 @@ function openList(items,cls){
       h+='<a class=item href="https://web.33m2.co.kr/guest/room/'+r.id+'" target=_blank rel=noreferrer>'+
         '<div><div class=it-name>'+(r.name||'(이름없음)')+'</div>'+
         '<div class=it-sub>'+(r.btype||'')+' · '+(r.pyeong!=null?r.pyeong+'평':'-')+' · 주당 '+(r.week!=null?r.week+'만':'-')+
+        (r.net!=null?' · <b style=\"color:'+(r.net>=0?'#059669':'#dc2626')+'\">월순수익 '+r.net+'만</b>':'')+
         ' · '+(r.sigungu||'')+' '+(r.dong||'')+'</div></div>'+
         '<div style="text-align:right"><div class="it-occ '+occCls(r.occ)+'">'+(r.occ!=null?r.occ+'%':'-')+'</div>'+
         '<div class=it-go>매물 보기 →</div></div></a>'
@@ -253,7 +256,7 @@ function loadNaver(){
 }
 function setStat(navN){
   var z=map.getZoom()
-  var f=(filt.btype||'전체')+(filt.week?' · 주당'+filt.week+'만↑':'')+(filt.occ?' · 예약률'+filt.occ+'%↑':'')
+  var f=(filt.btype||'전체')+(filt.week?' · 주당'+filt.week+'만↑':'')+(filt.net?' · 순수익'+filt.net+'만↑':'')+(filt.occ?' · 예약률'+filt.occ+'%↑':'')
   var s='렌트 '+rentShown.toLocaleString()+'개 ['+f+']'
   s+= z<NAVER_ZOOM ? ' · 확대하면 부동산' : ' · 부동산 '+(navN!=null?navN:0)+'개'
   document.getElementById('stat').textContent=s
@@ -283,7 +286,7 @@ fetch('/samsam/api/map_all',{credentials:'same-origin'}).then(function(r){return
   STATIONS=d.stations||[]
   FEATS=(d.rent||[]).filter(function(a){return a[1]>=33&&a[1]<=39.5&&a[2]>=124&&a[2]<=132})
     .map(function(a){return {type:'Feature',geometry:{type:'Point',coordinates:[a[2],a[1]]},
-      properties:{id:a[0],lat:a[1],lng:a[2],occ:a[3],week:a[4],pyeong:a[5],btype:a[6],name:a[7],sigungu:a[8],dong:a[9]}}})
+      properties:{id:a[0],lat:a[1],lng:a[2],occ:a[3],week:a[4],pyeong:a[5],btype:a[6],name:a[7],sigungu:a[8],dong:a[9],net:a[10]}}})
   applyFilter()
 }).catch(function(){document.getElementById('stat').textContent='로드 실패 — 새로고침 해주세요'})
 
@@ -305,7 +308,7 @@ document.querySelectorAll('#chips .chip').forEach(function(ch){
     ch.classList.add('on'); filt.btype=ch.dataset.t||''; applyFilter()
   })
 })
-;['week','occ'].forEach(function(k){
+;['week','occ','net'].forEach(function(k){
   var el=document.getElementById('f_'+k), tm=null
   el.addEventListener('input',function(){
     clearTimeout(tm); tm=setTimeout(function(){filt[k]=parseFloat(el.value)||0; applyFilter()},400)

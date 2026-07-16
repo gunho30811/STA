@@ -602,7 +602,8 @@ def api_map_all():
     """지도 초기 1회 로드용 — 전체 렌트 매물(콤팩트 배열) + 전 동별 예약률 원.
 
     이후 팬/줌은 네트워크 없이 클라이언트에서 처리(클러스터·원 재계산).
-    rent: [id, lat, lng, occ%, week만, pyeong, btype, name, sigungu, dong]
+    rent: [id, lat, lng, occ%, week만, pyeong, btype, name, sigungu, dong, net만|null]
+      net = 기대월순수익(보증금 1000 기준, 네이버 매칭분만 — 미매칭은 null)
     circles: [lat, lng, occ%, n, dong]
     """
     now = time.time()
@@ -615,10 +616,12 @@ def api_map_all():
         if la is None or ln is None or not (33.0 <= la <= 39.5 and 124.0 <= ln <= 132.0):
             continue
         occ = round((r.get("occ") or 0) * 100, 1)
+        c = calc_at_deposit(r["room_id"], 1000, 0)   # 월순수익(보증금 1000) — 네이버 매칭분만
         rent.append([r["room_id"], round(la, 5), round(ln, 5), occ,
                      r.get("sam_week_man"), r.get("area_pyeong"),
                      r.get("building_type") or "", r.get("name") or r.get("building_name") or "",
-                     r.get("sigungu") or "", r.get("dong") or ""])
+                     r.get("sigungu") or "", r.get("dong") or "",
+                     round(c["net"], 1) if c else None])
         key = (r.get("sigungu") or "", r.get("dong") or "")
         g = agg.setdefault(key, [0.0, 0.0, 0.0, 0])
         g[0] += la; g[1] += ln; g[2] += occ; g[3] += 1
