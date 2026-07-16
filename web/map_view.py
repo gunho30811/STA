@@ -53,6 +53,11 @@ transform:translate(-50%,-50%)}
 padding:4px 10px;font-size:12px;font-weight:800;color:#854d0e;text-align:center;line-height:1.25;white-space:nowrap;
 box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer}
 .reco-badge b{font-size:15px;color:#a16207}.reco-n{font-weight:600;color:#a16207;font-size:10px}
+.poi-lbl{font-size:11.5px;font-weight:800;color:#e2e8f0;background:rgba(15,23,42,.6);padding:5px 9px;border-radius:8px}
+.ptog{display:inline-flex;align-items:center;padding:5px 10px;border:1.5px solid #cbd5e1;border-radius:999px;
+font-size:12px;font-weight:700;color:#94a3b8;background:rgba(255,255,255,.9);cursor:pointer;user-select:none;
+box-shadow:0 1px 4px rgba(0,0,0,.2);opacity:.55}
+.ptog.on{color:#111827;opacity:1;border-color:#f59e0b}
 .pin.nv{width:13px;height:13px;background:#14b8a6}
 .clus{display:flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;font-weight:800;
 border:3px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.35);line-height:1.1;text-align:center;cursor:pointer}
@@ -94,8 +99,16 @@ border:3px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.35);line
     <label class="tog on" id=t_circles><span class=dot style="background:#059669"></span>동별 예약률(전체 기준)</label>
     <label class="tog on" id=t_rent><span class=dot style="background:#4321F3"></span>렌트</label>
     <label class="tog on" id=t_naver><span class=dot style="background:#14b8a6"></span>부동산</label>
-    <label class="tog on" id=t_poi><span class=dot style="background:#f59e0b"></span>수요시설 🏥🎓🏭📚🚄🗼</label>
-    <label class="tog" id=t_reco><span class=dot style="background:#eab308"></span>⭐ 추천 스팟만</label>
+    <label class="tog on" id=t_reco><span class=dot style="background:#eab308"></span>⭐ 추천 스팟만</label>
+  </div>
+  <div class=row id=poirow>
+    <span class=poi-lbl>수요시설</span>
+    <label class="ptog on" data-k=hospital>🏥 병원</label>
+    <label class="ptog on" data-k=university>🎓 대학</label>
+    <label class="ptog on" data-k=industrial>🏭 산단</label>
+    <label class="ptog on" data-k=academy>📚 학원</label>
+    <label class="ptog on" data-k=transport>🚄 교통</label>
+    <label class="ptog on" data-k=tour>🗼 관광</label>
   </div>
 </div>
 </div>
@@ -121,7 +134,9 @@ var rentLayer=L.layerGroup().addTo(map)
 var circleLayer=L.layerGroup().addTo(map)
 var navLayer=L.layerGroup().addTo(map)
 var poiLayer=L.layerGroup().addTo(map)
-var show={circles:true,rent:true,naver:true,poi:true}
+var show={circles:true,rent:true,naver:true}
+// 수요시설 종류별 표시(개별 토글). tourspot 은 tour 에 종속.
+var poiShow={hospital:true,university:true,industrial:true,academy:true,transport:true,tour:true}
 var FEATS=[], STATIONS=[], POIS=[], idx=null, CIRCLES=[], rentShown=0
 var filt={btype:'',week:0,occ:0,net:0}
 var shownRent=new Map(), shownCirc=new Map()
@@ -255,9 +270,12 @@ var POI_ICON={hospital:'🏥',university:'🎓',industrial:'🏭',academy:'📚'
 var POI_CLS={hospital:'h',university:'u',industrial:'i',academy:'a',transport:'t',tour:'g',tourspot:'g'}
 function renderPois(){
   var wanted=new Map()
-  if(show.poi && map.getZoom()>=12){
+  if(map.getZoom()>=12){
     var b=map.getBounds().pad(0.1), z=map.getZoom()
     POIS.forEach(function(p){
+      // 종류별 토글: tourspot 은 tour 에 종속. 꺼진 종류는 스킵.
+      var grp = p[0]==='tourspot' ? 'tour' : p[0]
+      if(!poiShow[grp]) return
       // 개별 관광지(tourspot)는 너무 많아 줌 15+ 에서만. 나머지 수요시설은 줌 12+.
       if(p[0]==='tourspot' && z<15) return
       if(!b.contains([p[2],p[3]])) return
@@ -400,13 +418,18 @@ document.querySelectorAll('#chips .chip').forEach(function(ch){
     clearTimeout(tm); tm=setTimeout(function(){filt[k]=parseFloat(el.value)||0; applyFilter()},400)
   })
 })
-;['circles','rent','naver','poi'].forEach(function(k){
+;['circles','rent','naver'].forEach(function(k){
   document.getElementById('t_'+k).addEventListener('click',function(){
     show[k]=!show[k]; this.classList.toggle('on',show[k])
     if(k==='circles') renderCircles()
     else if(k==='rent') renderRent()
-    else if(k==='poi') renderPois()
     else loadNaver()
+  })
+})
+// 수요시설 종류별 토글
+document.querySelectorAll('#poirow .ptog').forEach(function(el){
+  el.addEventListener('click',function(){
+    var k=el.dataset.k; poiShow[k]=!poiShow[k]; el.classList.toggle('on',poiShow[k]); renderPois()
   })
 })
 // ⭐ 추천만 보기: 켜면 렌트/원/부동산 숨기고 추천 스팟만, 끄면 원복
