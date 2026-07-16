@@ -6,6 +6,8 @@
   - hospital   상급종합·대형병원 → 통원·간병 가족의 주단위 체류 수요
   - university 대학 캠퍼스        → 계절학기·인턴·교환학생 수요
   - industrial 산업단지·테크노밸리 → 출장·파견 인력 수요
+  - academy    학원가             → 재수·시험준비·방학 단기 체류(기러기 학부모 포함)
+  - transport  KTX역·공항·터미널   → 지방/해외 유입 관문(단기 체류 수요의 길목)
 
 데이터: data/poi.csv (kind,name,lat,lon). subway_stations.csv 와 같은 정적 CSV 패턴.
 
@@ -21,8 +23,10 @@ _DATA = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "poi.csv")
 _POI = None
 
-KIND_KO = {"hospital": "병원", "university": "대학", "industrial": "산단"}
-KIND_ICON = {"hospital": "🏥", "university": "🎓", "industrial": "🏭"}
+KIND_KO = {"hospital": "병원", "university": "대학", "industrial": "산단",
+           "academy": "학원가", "transport": "교통"}
+KIND_ICON = {"hospital": "🏥", "university": "🎓", "industrial": "🏭",
+             "academy": "📚", "transport": "🚄"}
 
 
 def load_poi():
