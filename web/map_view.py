@@ -47,6 +47,7 @@ padding:2px 8px 2px 4px;font-size:11px;font-weight:800;color:#92400e;white-space
 transform:translate(-50%,-50%)}
 .poi.h{border-color:#dc2626;color:#991b1b}.poi.u{border-color:#2563eb;color:#1e40af}.poi.i{border-color:#7c3aed;color:#5b21b6}
 .poi.a{border-color:#059669;color:#065f46}.poi.t{border-color:#0891b2;color:#155e75}
+.poi.g{border-color:#db2777;color:#9d174d}
 .pin.nv{width:13px;height:13px;background:#14b8a6}
 .clus{display:flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;font-weight:800;
 border:3px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.35);line-height:1.1;text-align:center;cursor:pointer}
@@ -88,7 +89,7 @@ border:3px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.35);line
     <label class="tog on" id=t_circles><span class=dot style="background:#059669"></span>동별 예약률(전체 기준)</label>
     <label class="tog on" id=t_rent><span class=dot style="background:#4321F3"></span>렌트</label>
     <label class="tog on" id=t_naver><span class=dot style="background:#14b8a6"></span>부동산</label>
-    <label class="tog on" id=t_poi><span class=dot style="background:#f59e0b"></span>수요시설 🏥🎓🏭📚🚄</label>
+    <label class="tog on" id=t_poi><span class=dot style="background:#f59e0b"></span>수요시설 🏥🎓🏭📚🚄🗼</label>
   </div>
 </div>
 </div>
@@ -244,8 +245,8 @@ function renderCircles(){
 
 // ── 수요시설 POI: 왜 이 동네에 수요가 있나(병원 통원·대학 계절학기·산단 출장) ──
 var shownPoi=new Map()
-var POI_ICON={hospital:'🏥',university:'🎓',industrial:'🏭',academy:'📚',transport:'🚄'}
-var POI_CLS={hospital:'h',university:'u',industrial:'i',academy:'a',transport:'t'}
+var POI_ICON={hospital:'🏥',university:'🎓',industrial:'🏭',academy:'📚',transport:'🚄',tour:'🗼'}
+var POI_CLS={hospital:'h',university:'u',industrial:'i',academy:'a',transport:'t',tour:'g'}
 function renderPois(){
   var wanted=new Map()
   if(show.poi && map.getZoom()>=12){

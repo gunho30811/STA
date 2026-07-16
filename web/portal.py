@@ -329,7 +329,7 @@ padding:14px;text-align:center}
       <div class=ins-sub>렌트 {{s.n_rent}}개 vs 부동산 {{'{:,}'.format(s.n_naver)}}개
         {% if s.net is not none %}<br>월순수익 <b style="color:{{'#34d399' if s.net>=0 else '#f87171'}}">{{s.net}}만</b>{% if s.margin is not none %} · 이익률 {{s.margin}}%{% endif %}{% else %}<br><span style="color:#475569">수익성 매칭 없음</span>{% endif %}
         {% if s.cost %}<br><span class=cost-ev>진입 월세 {{s.cost.rent}}만/보증금 {{'{:,}'.format(s.cost.dep)}}만</span>{% endif %}
-        {% if s.poi %}<br><span class=poi-ev>{% for p in s.poi %}{{ {'hospital':'🏥','university':'🎓','industrial':'🏭','academy':'📚','transport':'🚄'}.get(p.kind,'📍') }}{{p.name}} {{(p.dist_m/1000)|round(1)}}km {% endfor %}</span>{% endif %}</div>
+        {% if s.poi %}<br><span class=poi-ev>{% for p in s.poi %}{{ {'hospital':'🏥','university':'🎓','industrial':'🏭','academy':'📚','transport':'🚄','tour':'🗼'}.get(p.kind,'📍') }}{{p.name}} {{(p.dist_m/1000)|round(1)}}km {% endfor %}</span>{% endif %}</div>
     </a>
     {% endfor %}
   </div>
@@ -346,7 +346,7 @@ padding:14px;text-align:center}
       <div class="ins-occ hi">{{u.turnover}}%</div>
       <div class=ins-sub>월세 회전율(최근7일 신규 {{u.new7}}/재고 {{u.active}}) · 렌트 매물 {{u.n_samsam}}개뿐
         {% if u.cost %}<br><span class=cost-ev>진입 월세 {{u.cost.rent}}만/보증금 {{'{:,}'.format(u.cost.dep)}}만</span>{% endif %}
-        {% if u.poi %}<br><span class=poi-ev>{% for p in u.poi %}{{ {'hospital':'🏥','university':'🎓','industrial':'🏭','academy':'📚','transport':'🚄'}.get(p.kind,'📍') }}{{p.name}} {{(p.dist_m/1000)|round(1)}}km {% endfor %}</span>{% endif %}</div>
+        {% if u.poi %}<br><span class=poi-ev>{% for p in u.poi %}{{ {'hospital':'🏥','university':'🎓','industrial':'🏭','academy':'📚','transport':'🚄','tour':'🗼'}.get(p.kind,'📍') }}{{p.name}} {{(p.dist_m/1000)|round(1)}}km {% endfor %}</span>{% endif %}</div>
     </a>
     {% endfor %}
   </div>

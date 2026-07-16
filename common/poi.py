@@ -8,6 +8,7 @@
   - industrial 산업단지·테크노밸리 → 출장·파견 인력 수요
   - academy    학원가             → 재수·시험준비·방학 단기 체류(기러기 학부모 포함)
   - transport  KTX역·공항·터미널   → 지방/해외 유입 관문(단기 체류 수요의 길목)
+  - tour       관광 밀집지역        → 외국인·관광객 몰림 = 게스트하우스/단기숙박 수요
 
 데이터: data/poi.csv (kind,name,lat,lon). subway_stations.csv 와 같은 정적 CSV 패턴.
 
@@ -24,9 +25,9 @@ _DATA = os.path.join(
 _POI = None
 
 KIND_KO = {"hospital": "병원", "university": "대학", "industrial": "산단",
-           "academy": "학원가", "transport": "교통"}
+           "academy": "학원가", "transport": "교통", "tour": "관광"}
 KIND_ICON = {"hospital": "🏥", "university": "🎓", "industrial": "🏭",
-             "academy": "📚", "transport": "🚄"}
+             "academy": "📚", "transport": "🚄", "tour": "🗼"}
 
 
 def load_poi():
