@@ -1,18 +1,19 @@
 # -*- coding: utf-8 -*-
 """전용 풀스크린 지도(/map) 페이지 템플릿.
 
-성능 설계(팬/줌이 느리다는 피드백 반영):
-- 렌트 매물(전량)+동별 예약률 원은 /samsam/api/map_all 로 **최초 1회만** 로드 →
-  이후 팬/줌은 네트워크 호출 없이 클라이언트에서 클러스터·원을 재계산(즉각 반응).
-- 부동산(네이버)만 줌 15+에서 bbox 조회(/samsam/api/map, (lat,lng) 인덱스+정렬 제거로 ~0.5s).
-- 겹치는 매물은 markercluster 'n개' 버블, 클릭 시 매물 리스트 모달(렌트는 각 예약률 표시).
+성능 설계 v3 (줌 덜컥거림·배지 깜빡임 피드백 반영):
+- 렌트 클러스터링을 markercluster → **supercluster**(mapbox 엔진)로 교체:
+  22k 포인트 인덱스 1회(~150ms) 후 뷰포트마다 getClusters() ~수 ms → 줌/팬 즉각.
+- 렌더는 **diff 방식**: 화면에 이미 있는 클러스터/핀/동배지는 건드리지 않고
+  새로 보이는 것만 추가·사라진 것만 제거 → 역삼동 배지가 깜빡이던 문제 해결.
+- 데이터는 /samsam/api/map_all 최초 1회. 부동산(네이버)만 줌 15+에서 bbox 조회(~0.3s).
+- 클러스터 클릭: ≤60개면 매물 리스트 모달(각 예약률), 초과면 해당 줌으로 확대.
 """
 
 MAP_PAGE = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
 <meta name=viewport content="width=device-width,initial-scale=1"><title>rendit · 지도</title>
 <link rel=stylesheet href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard-dynamic-subset.css">
 <link rel=stylesheet href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel=stylesheet href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
 <style>
 *{box-sizing:border-box}html,body{height:100%}
 body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;display:flex;flex-direction:column;background:#0f172a}
@@ -35,7 +36,7 @@ box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .pin{width:16px;height:16px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)}
 .pin.nv{width:13px;height:13px;background:#14b8a6}
 .clus{display:flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;font-weight:800;
-border:3px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.35);line-height:1.1;text-align:center}
+border:3px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.35);line-height:1.1;text-align:center;cursor:pointer}
 .clus.rent{background:#4321F3}.clus.nv{background:#0d9488}
 .clus small{font-weight:600;font-size:9px;display:block}
 .mback{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:2000;display:flex;align-items:flex-end;justify-content:center}
@@ -67,40 +68,24 @@ border:3px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.35);line
   </div>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/supercluster@8.0.1/dist/supercluster.min.js"></script>
 <script>
 var NAVER_ZOOM=15, CIRCLE_ZOOM=11, LIST_MAX=60
 function occColor(o){return o==null?'#94a3b8':o>=60?'#059669':o>=30?'#f59e0b':'#dc2626'}
 function occCls(o){return o==null?'mut':o>=60?'good':o>=30?'midc':'bad'}
 
-var map=L.map('map',{center:[37.5665,126.978],zoom:13})
+var map=L.map('map',{center:[37.5665,126.978],zoom:13,zoomAnimation:true})
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map)
 
-function clusterIcon(cls){return function(c){
-  var n=c.getChildCount(), d=n>=1000?58:n>=100?52:n>=30?44:n>=10?38:32
-  var t=n>=1000?(Math.round(n/100)/10)+'k':n
-  return L.divIcon({html:'<div class="clus '+cls+'" style="width:'+d+'px;height:'+d+'px;font-size:13px">'+t+'<small>개</small></div>',
-    className:'', iconSize:[d,d]})
-}}
-function makeCluster(cls){
-  // animate:false — 2만+ 마커에서 줌마다 클러스터 이동 애니메이션이 수 초를 먹는 주범.
-  var g=L.markerClusterGroup({iconCreateFunction:clusterIcon(cls),showCoverageOnHover:false,
-    zoomToBoundsOnClick:false,maxClusterRadius:46,disableClusteringAtZoom:18,chunkedLoading:true,
-    animate:false,animateAddingMarkers:false})
-  g.on('clusterclick',function(e){
-    var ms=e.layer.getAllChildMarkers()
-    if(ms.length>LIST_MAX){map.setView(e.layer.getLatLng(),Math.min(map.getZoom()+2,18));return}
-    openList(ms.map(function(m){return m.__d}), cls)
-  })
-  return g
-}
-var circles=L.layerGroup().addTo(map)
-var rentC=makeCluster('rent').addTo(map)
-var navC=makeCluster('nv').addTo(map)
+var rentLayer=L.layerGroup().addTo(map)
+var circleLayer=L.layerGroup().addTo(map)
+var navLayer=L.layerGroup().addTo(map)
 var show={circles:true,rent:true,naver:true}
-var CIRCLES=[]   // 전 동 [lat,lng,occ,n,dong] — 뷰포트 내 것만 로컬 렌더
+var idx=null           // supercluster 인덱스(렌트 22k)
+var CIRCLES=[]         // 전 동 [lat,lng,occ,n,dong]
 var rentTotal=0
 
+// ── 모달 ──
 function openList(items,cls){
   var t=document.getElementById('mtitle'), b=document.getElementById('mbody'), h=''
   if(cls==='rent'){
@@ -129,71 +114,128 @@ function openList(items,cls){
 }
 function closeModal(e){document.getElementById('modal').style.display='none'}
 
-// ── 초기 1회: 전체 렌트+동별 원 로드 → 이후 팬/줌은 전부 로컬 처리 ──
-fetch('/samsam/api/map_all',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
-  CIRCLES=d.circles||[]
-  var ms=[]
-  ;(d.rent||[]).forEach(function(a){
-    var r={id:a[0],lat:a[1],lng:a[2],occ:a[3],week:a[4],pyeong:a[5],btype:a[6],name:a[7],sigungu:a[8],dong:a[9]}
-    var m=L.marker([r.lat,r.lng],{icon:L.divIcon({className:'',iconSize:[16,16],
-      html:'<div class=pin style="background:'+occColor(r.occ)+'"></div>'})})
-    m.__d=r; m.on('click',function(){openList([r],'rent')})
-    ms.push(m)
-  })
-  rentTotal=ms.length
-  rentC.addLayers(ms)   // chunkedLoading으로 2만+ 마커도 부드럽게
-  renderCircles(); setStat()
-}).catch(function(){document.getElementById('stat').textContent='로드 실패 — 새로고침 해주세요'})
-
-function renderCircles(){
-  circles.clearLayers()
-  if(!show.circles||map.getZoom()<CIRCLE_ZOOM) return
-  var b=map.getBounds()
-  CIRCLES.forEach(function(c){
-    if(!b.contains([c[0],c[1]])) return
-    L.circle([c[0],c[1]],{radius:420,color:occColor(c[2]),weight:1.5,fillColor:occColor(c[2]),fillOpacity:.13,interactive:false}).addTo(circles)
-    L.marker([c[0],c[1]],{interactive:false,icon:L.divIcon({className:'occ-badge-wrap',iconSize:null,
-      html:'<div class="occ-badge" style="border-color:'+occColor(c[2])+';color:'+occColor(c[2])+'">'+c[4]+'<br><b>'+c[2]+'%</b><span class=occ-n>·'+c[3]+'</span></div>'})}).addTo(circles)
+// ── diff 렌더 공통: key→layer 맵 유지, 새 것만 추가·없어진 것만 제거(깜빡임 방지) ──
+function diffRender(group, shownMap, wanted){   // wanted: Map(key → makeLayerFn)
+  shownMap.forEach(function(ly,key){ if(!wanted.has(key)){group.removeLayer(ly);shownMap.delete(key)} })
+  wanted.forEach(function(make,key){
+    if(shownMap.has(key)) return
+    var ly=make(); shownMap.set(key,ly); group.addLayer(ly)
   })
 }
+var shownRent=new Map(), shownCirc=new Map()
 
-// ── 부동산(네이버)만 줌 15+에서 bbox 조회 ──
+// ── 렌트: supercluster — 뷰포트에 보이는 클러스터/핀만 diff 렌더 ──
+function renderRent(){
+  if(!idx) return
+  var wanted=new Map()
+  if(show.rent){
+    var b=map.getBounds(), z=Math.round(map.getZoom())
+    var items=idx.getClusters([b.getWest()-0.02,b.getSouth()-0.02,b.getEast()+0.02,b.getNorth()+0.02], z)
+    items.forEach(function(f){
+      var lng=f.geometry.coordinates[0], lat=f.geometry.coordinates[1]
+      if(f.properties.cluster){
+        var cid=f.properties.cluster_id, n=f.properties.point_count
+        wanted.set('c'+cid+'_'+z, function(){
+          var d=n>=1000?58:n>=100?52:n>=30?44:n>=10?38:32
+          var txt=n>=1000?(Math.round(n/100)/10)+'k':n
+          var m=L.marker([lat,lng],{icon:L.divIcon({className:'',iconSize:[d,d],
+            html:'<div class="clus rent" style="width:'+d+'px;height:'+d+'px;font-size:13px">'+txt+'<small>개</small></div>'})})
+          m.on('click',function(){
+            if(n>LIST_MAX){
+              var ez=Math.min(idx.getClusterExpansionZoom(cid),18)
+              map.setView([lat,lng],ez)
+            }else{
+              openList(idx.getLeaves(cid,Infinity).map(function(l){return l.properties}),'rent')
+            }
+          })
+          return m
+        })
+      }else{
+        var r=f.properties
+        wanted.set('p'+r.id, function(){
+          var m=L.marker([lat,lng],{icon:L.divIcon({className:'',iconSize:[16,16],
+            html:'<div class=pin style="background:'+occColor(r.occ)+'"></div>'})})
+          m.on('click',function(){openList([r],'rent')})
+          return m
+        })
+      }
+    })
+  }
+  diffRender(rentLayer, shownRent, wanted)
+}
+
+// ── 동별 예약률 원: diff 렌더(이미 보이는 배지는 그대로 → 깜빡임 없음) ──
+function renderCircles(){
+  var wanted=new Map()
+  if(show.circles && map.getZoom()>=CIRCLE_ZOOM){
+    var b=map.getBounds().pad(0.1)
+    CIRCLES.forEach(function(c){
+      if(!b.contains([c[0],c[1]])) return
+      wanted.set(c[4]+'_'+c[0], function(){
+        var g=L.layerGroup()
+        L.circle([c[0],c[1]],{radius:420,color:occColor(c[2]),weight:1.5,fillColor:occColor(c[2]),fillOpacity:.13,interactive:false}).addTo(g)
+        L.marker([c[0],c[1]],{interactive:false,icon:L.divIcon({className:'occ-badge-wrap',iconSize:null,
+          html:'<div class="occ-badge" style="border-color:'+occColor(c[2])+';color:'+occColor(c[2])+'">'+c[4]+'<br><b>'+c[2]+'%</b><span class=occ-n>·'+c[3]+'</span></div>'})}).addTo(g)
+        return g
+      })
+    })
+  }
+  diffRender(circleLayer, shownCirc, wanted)
+}
+
+// ── 부동산(네이버): 줌 15+ bbox 조회 ──
 var navTimer=null, navSeq=0
 function loadNaver(){
-  navC.clearLayers()
-  if(!show.naver||map.getZoom()<NAVER_ZOOM){setStat();return}
+  if(!show.naver||map.getZoom()<NAVER_ZOOM){navLayer.clearLayers();setStat();return}
   var b=map.getBounds(), seq=++navSeq
-  document.getElementById('stat').textContent='부동산 불러오는 중…'
   var p=new URLSearchParams({min_lat:b.getSouth(),max_lat:b.getNorth(),min_lng:b.getWest(),max_lng:b.getEast(),rent:'0'})
   fetch('/samsam/api/map?'+p.toString(),{credentials:'same-origin'})
     .then(function(r){return r.json()}).then(function(d){
-      if(seq!==navSeq) return   // 더 최신 요청이 있으면 이 응답은 버림
-      var ms=[]
+      if(seq!==navSeq) return
+      navLayer.clearLayers()
       ;(d.naver||[]).forEach(function(n){
         var m=L.marker([n.lat,n.lng],{icon:L.divIcon({className:'',iconSize:[13,13],html:'<div class="pin nv"></div>'})})
-        m.__d=n; m.on('click',function(){openList([n],'nv')})
-        ms.push(m)
+        m.on('click',function(){openList([n],'nv')})
+        navLayer.addLayer(m)
       })
-      navC.addLayers(ms); setStat(ms.length)
+      setStat((d.naver||[]).length)
     }).catch(function(){setStat()})
 }
 function setStat(navN){
   var z=map.getZoom(), s
-  if(z<NAVER_ZOOM) s='렌트 '+rentTotal.toLocaleString()+'개 로드됨 · 확대하면 부동산 표시 · 점 색=예약률'
+  if(z<NAVER_ZOOM) s='렌트 '+rentTotal.toLocaleString()+'개 · 확대하면 부동산 표시 · 점 색=예약률'
   else s='부동산 '+(navN!=null?navN:0)+'개 · 점 색=예약률'
   document.getElementById('stat').textContent=s
 }
 
+// ── 초기 1회 로드 → supercluster 인덱스 ──
+fetch('/samsam/api/map_all',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
+  CIRCLES=d.circles||[]
+  var feats=(d.rent||[]).map(function(a){
+    return {type:'Feature',geometry:{type:'Point',coordinates:[a[2],a[1]]},
+      properties:{id:a[0],lat:a[1],lng:a[2],occ:a[3],week:a[4],pyeong:a[5],btype:a[6],name:a[7],sigungu:a[8],dong:a[9]}}
+  })
+  rentTotal=feats.length
+  idx=new Supercluster({radius:56,maxZoom:17,minPoints:2}).load(feats)
+  renderRent(); renderCircles(); setStat()
+}).catch(function(){document.getElementById('stat').textContent='로드 실패 — 새로고침 해주세요'})
+
+// 이동 중에도 부드럽게(throttle), 끝나면 확정 렌더. 네이버만 디바운스 fetch.
+var mvTimer=null
+map.on('move',function(){
+  if(mvTimer) return
+  mvTimer=setTimeout(function(){mvTimer=null;renderRent();renderCircles()},120)
+})
 map.on('moveend zoomend',function(){
-  renderCircles()                                              // 로컬 — 즉시
-  clearTimeout(navTimer); navTimer=setTimeout(loadNaver,400)   // 네트워크 — 네이버만
+  renderRent(); renderCircles()
+  clearTimeout(navTimer); navTimer=setTimeout(loadNaver,400)
 })
 
 ;['circles','rent','naver'].forEach(function(k){
   document.getElementById('t_'+k).addEventListener('click',function(){
     show[k]=!show[k]; this.classList.toggle('on',show[k])
     if(k==='circles') renderCircles()
-    else if(k==='rent'){ if(show.rent){map.addLayer(rentC)}else{map.removeLayer(rentC)} }
+    else if(k==='rent') renderRent()
     else loadNaver()
   })
 })
