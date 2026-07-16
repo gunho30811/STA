@@ -18,6 +18,7 @@ import json
 import os
 import statistics
 import sys
+import time
 from datetime import datetime
 
 import requests
@@ -53,7 +54,9 @@ import search  # noqa: E402  (건물명·역명 텍스트 검색 색인 — 외�
 SAM_COLS = ("room_id", "url", "name", "building_type", "building_name",
             "sido", "sigungu", "dong", "area_pyeong", "rent_total_weekly",
             "booked_days_1m", "booked_days_2m", "booked_days_3m", "blocked_days_1m",
-            "basic_options", "extra_options", "station_500m_names", "collected_at")
+            "basic_options", "extra_options", "station_500m_names", "collected_at",
+            "lat", "lng",   # 지도(/api/map) 표시용 좌표
+            "parking")      # 주차 가능 여부 — 옵션 영향 분석에 '주차'로 합류
 
 # 삼삼 옵션 영문 코드 → 한글 표시명
 OPTION_KO = {
@@ -66,6 +69,7 @@ OPTION_KO = {
     "BATHTUB": "욕조", "DRYER": "건조기", "BALCONY": "발코니", "DRESSING_ROOM": "드레스룸",
     "AIR_PURIFIER": "공기청정기", "GAS_RANGE": "가스레인지", "ELECTRIC_RANGE": "전기레인지",
     "CURTAINS": "커튼", "CABLE_TV": "케이블TV", "BIDET": "비데",
+    "PARKING": "주차",   # samsam_listings.parking(불리언)에서 합류 — '주차불가 예약률' 비교용
 }
 
 
@@ -93,6 +97,8 @@ def _parse_list(v):
 def _enrich(r):
     """행에 options(set)·occ·vac·주당만원·역 파생."""
     opts = set(_parse_list(r.get("basic_options")) + _parse_list(r.get("extra_options")))
+    if r.get("parking"):
+        opts.add("PARKING")   # 주차(불리언 컬럼)를 옵션으로 합류 → '있/없' 예약률 비교 가능
     r["options"] = opts
     blocked = r.get("blocked_days_1m") or 0
     booked = r.get("booked_days_1m") or 0
@@ -148,11 +154,23 @@ def load_listings():
     return rows, src
 
 
-_LC=None
+_LC = None
+_LOADED_AT = 0.0
+_TTL = 300   # 5분마다 캐시(_LC/_IDX/_MC) 무효화 → 크롤 갱신이 재배포 없이도 반영(웜 인스턴스 stale 방지).
+
+
+def _expire_if_stale():
+    global _LC, _IDX, _MC, _LOADED_AT
+    if time.time() - _LOADED_AT > _TTL:
+        _LC = _IDX = _MC = None
+        _LOADED_AT = time.time()
+
+
 def _ensure():
     global _LC
+    _expire_if_stale()
     if _LC is None:
-        _LC=load_listings()
+        _LC = load_listings()
     return _LC
 def L():
     return _ensure()[0]
@@ -166,6 +184,7 @@ def SRC():
 _IDX = None
 def _indexes():
     global _IDX
+    _expire_if_stale()
     if _IDX is None:
         bi, si = search.TextIndex(), search.TextIndex()
         for r in L():
@@ -215,11 +234,12 @@ def _load_matches():
     return out
 
 
-_MC=None
+_MC = None
 def M():
     global _MC
+    _expire_if_stale()
     if _MC is None:
-        _MC=_load_matches()
+        _MC = _load_matches()
     return _MC
 
 
@@ -434,6 +454,36 @@ def api_listings():
     return jsonify({"total": len(items), "items": items, "optionName": ko(option)})
 
 
+# ── 역세권 분류 ──────────────────────────────────────────────────────────────
+# 더블/트리플 = 매물 500m 내 서로 다른 역 개수(2개=더블, 3개↑=트리플).
+# 공항철도·신분당선 = 500m 내 역이 해당 노선 역이면 그 역세권(역명은 '역' 접미사 뗀 기준).
+_SHINBUNDANG = {"신사", "논현", "신논현", "강남", "양재", "양재시민의숲", "청계산입구",
+                "판교", "정자", "미금", "동천", "수지구청", "성복", "상현", "광교중앙", "광교"}
+_AIRPORT = {"서울", "공덕", "홍대입구", "디지털미디어시티", "마곡나루", "김포공항", "계양",
+            "검암", "청라국제도시", "영종", "운서", "공항화물청사",
+            "인천공항1터미널", "인천공항2터미널"}
+
+
+def _base_station(st):
+    st = (st or "").strip()
+    return st[:-1] if st.endswith("역") else st
+
+
+def subway_zones(station_names):
+    """500m 내 역명 리스트 → 역세권 태그 리스트(더블/트리플/신분당선/공항철도)."""
+    uniq = {_base_station(s) for s in (station_names or []) if s}
+    tags = []
+    if len(uniq) >= 3:
+        tags.append("트리플역세권")
+    elif len(uniq) >= 2:
+        tags.append("더블역세권")
+    if uniq & _SHINBUNDANG:
+        tags.append("신분당선")
+    if uniq & _AIRPORT:
+        tags.append("공항철도")
+    return tags
+
+
 @app.route("/api/buildings")
 def api_buildings():
     """건물(오피스텔) 단위 인기 순위 — 한 건물에 삼삼 매물이 여러 채 있고 그게 다 잘 나가면
@@ -517,6 +567,8 @@ def api_buildings():
             "bd": {"maxRev": avg("maxRev"), "rent": avg("rent"), "mgmt": avg("mgmt"),
                    "dep": dep, "fixed": fixed} if calcs else None,
             "station": next((x["station"] for x in xs if x.get("station")), ""),
+            "stations": sorted({s for x in xs for s in (x.get("stations") or [])}),
+            "zones": subway_zones([s for x in xs for s in (x.get("stations") or [])]),
             "room_ids": [x["room_id"] for x in xs],
             "sam_url": sample.get("url", "") or "",
             "naver_url": M().get(sample["room_id"], {}).get("nUrl", "") or "",
@@ -527,6 +579,9 @@ def api_buildings():
             "nv_dep": M().get(sample["room_id"], {}).get("repDep"),
             "nv_floor": M().get(sample["room_id"], {}).get("repFloor", "") or "",
         })
+    zone = a.get("zone", "").strip()
+    if zone:   # 역세권 필터(더블역세권/트리플역세권/신분당선/공항철도)
+        out = [r for r in out if zone in r["zones"]]
     if occ_min_filter is not None:
         out = [r for r in out if r["occ_min"] >= occ_min_filter]
     if net_min_filter is not None:
@@ -536,6 +591,155 @@ def api_buildings():
     # 평균예약률 높고 매물 많은 순. (최저예약률도 높으면 전 호실 검증된 건물)
     out.sort(key=lambda r: (-r["occ_avg"], -r["n"]))
     return jsonify({"total": len(out), "items": out})
+
+
+# /api/map?all=1 응답 캐시(5분) — 22k 매물 배열 직렬화를 매 요청 반복하지 않게.
+_MAPALL = {"t": 0.0, "body": None}
+
+
+@app.route("/api/map_all")
+def api_map_all():
+    """지도 초기 1회 로드용 — 전체 렌트 매물(콤팩트 배열) + 전 동별 예약률 원.
+
+    이후 팬/줌은 네트워크 없이 클라이언트에서 처리(클러스터·원 재계산).
+    rent: [id, lat, lng, occ%, week만, pyeong, btype, name, sigungu, dong, net만|null]
+      net = 기대월순수익(보증금 1000 기준, 네이버 매칭분만 — 미매칭은 null)
+    circles: [lat, lng, occ%, n, dong]
+    """
+    now = time.time()
+    if _MAPALL["body"] is not None and now - _MAPALL["t"] < 300:
+        return app.response_class(_MAPALL["body"], mimetype="application/json")
+    rent, agg = [], {}
+    for r in L():
+        la, ln = r.get("lat"), r.get("lng")
+        # 불량 좌표(0,0 등 한국 밖) 제외 — 평균 좌표를 끌고 가 동 원이 엉뚱한 데 그려짐(역삼동 lng=0 사례).
+        if la is None or ln is None or not (33.0 <= la <= 39.5 and 124.0 <= ln <= 132.0):
+            continue
+        occ = round((r.get("occ") or 0) * 100, 1)
+        c = calc_at_deposit(r["room_id"], 1000, 0)   # 월순수익(보증금 1000) — 네이버 매칭분만
+        rent.append([r["room_id"], round(la, 5), round(ln, 5), occ,
+                     r.get("sam_week_man"), r.get("area_pyeong"),
+                     r.get("building_type") or "", r.get("name") or r.get("building_name") or "",
+                     r.get("sigungu") or "", r.get("dong") or "",
+                     round(c["net"], 1) if c else None])
+        key = (r.get("sigungu") or "", r.get("dong") or "")
+        g = agg.setdefault(key, [0.0, 0.0, 0.0, 0])
+        g[0] += la; g[1] += ln; g[2] += occ; g[3] += 1
+    circles = [[round(g[0] / g[3], 6), round(g[1] / g[3], 6), round(g[2] / g[3], 1), g[3], d]
+               for (sg, d), g in agg.items() if g[3] >= 3]
+    # 역/지역 검색용 지하철역 좌표(589역, 작음)
+    try:
+        import subway
+        stations = [[n, round(y, 5), round(x, 5)] for n, y, x in subway._load()]
+    except Exception:
+        stations = []
+    # 수요시설 POI(병원·대학·산단) — '왜 이 동네에 수요가 있나'의 근거 레이어
+    try:
+        import poi as poi_mod
+        pois = [[k, n, round(y, 5), round(x, 5)] for k, n, y, x in poi_mod.load_poi()]
+    except Exception:
+        pois = []
+    body = json.dumps({"rent": rent, "circles": circles, "stations": stations, "pois": pois},
+                      ensure_ascii=False, separators=(",", ":"))
+    _MAPALL.update(t=now, body=body)
+    return app.response_class(body, mimetype="application/json")
+
+
+@app.route("/api/map")
+def api_map():
+    """지도 검색 — bbox(뷰포트) 안의 렌트(삼삼)·부동산(네이버) 매물 + 동별 예약률 원.
+
+    파라미터: min_lat/max_lat/min_lng/max_lng(필수), building_type(선택),
+              rent=0/naver=0 으로 레이어 끔. 매물 마커는 과밀 방지로 상한(렌트 1500·네이버 1000).
+    circles: bbox 안 렌트 매물을 (시군구,동)으로 묶어 중심좌표·평균 예약률·매물수 — 지도의 '이 근처 예약률 N%' 원.
+    """
+    a = request.args
+    try:
+        b = {k: float(a[k]) for k in ("min_lat", "max_lat", "min_lng", "max_lng")}
+    except (KeyError, ValueError):
+        return jsonify({"error": "bbox(min_lat/max_lat/min_lng/max_lng) 필요"}), 400
+    bt = a.get("building_type", "").strip()
+
+    out = {"rent": [], "naver": [], "circles": []}
+
+    # ── 렌트(삼삼): 메모리(L())에서 bbox 필터 ──
+    in_box = []
+    for r in L():
+        la, ln = r.get("lat"), r.get("lng")
+        if la is None or ln is None:
+            continue
+        if not (b["min_lat"] <= la <= b["max_lat"] and b["min_lng"] <= ln <= b["max_lng"]):
+            continue
+        if bt and r.get("building_type") != bt:
+            continue
+        in_box.append(r)
+
+    # 동별 예약률 원 — 개별 마커 상한과 무관하게 bbox 전체로 집계.
+    agg = {}
+    for r in in_box:
+        key = (r.get("sigungu") or "", r.get("dong") or "")
+        g = agg.setdefault(key, [0.0, 0.0, 0.0, 0])   # [sum_lat, sum_lng, sum_occ, n]
+        g[0] += r["lat"]; g[1] += r["lng"]; g[2] += (r.get("occ") or 0) * 100; g[3] += 1
+    for (sg, dong), g in agg.items():
+        if g[3] < 3:   # 표본 3개 미만 동은 원 생략(신뢰도)
+            continue
+        out["circles"].append({
+            "sigungu": sg, "dong": dong, "n": g[3],
+            "lat": round(g[0] / g[3], 6), "lng": round(g[1] / g[3], 6),
+            "occ": round(g[2] / g[3], 1),
+        })
+
+    if a.get("rent", "1") != "0":
+        in_box.sort(key=lambda r: -(r.get("occ") or 0))
+        out["rent"] = [{
+            "id": r["room_id"], "lat": r["lat"], "lng": r["lng"],
+            "name": r.get("name") or r.get("building_name") or "",
+            "btype": r.get("building_type") or "", "pyeong": r.get("area_pyeong"),
+            "occ": round((r.get("occ") or 0) * 100, 1),
+            "week": r.get("sam_week_man"), "url": r.get("url") or "",
+        } for r in in_box[:1500]]
+
+    # ── 부동산(네이버): nl_live 를 bbox SQL 조회 ──
+    if a.get("naver", "1") != "0":
+        try:
+            # Supabase 풀러+pg8000 은 파라미터 쿼리에서 간헐적으로 26000
+            # (unnamed prepared statement)이 난다 → 새 연결로 1회 재시도.
+            rows, last_err = [], None
+            for _ in range(2):
+                try:
+                    conn = db.connect()
+                    # nl_live(뷰 조인+정렬)는 bbox당 수 초 걸림 → 상세 테이블 직접 + (lat,lng) 인덱스
+                    # (ix_nl_latlng) + 정렬 제거로 ~0.5s. 지도는 '그 화면에 뭐가 있나'라 정렬 불필요.
+                    rows = conn.execute(
+                        "SELECT article_no, building_name, building_type_code, deposit, rent_monthly,"
+                        " area_exclusive_m2, floor_current, lat, lng"
+                        " FROM naver_listings"
+                        " WHERE lat BETWEEN %s AND %s AND lng BETWEEN %s AND %s"
+                        "   AND rent_monthly BETWEEN 1 AND 5000"
+                        " LIMIT 1000",
+                        (b["min_lat"], b["max_lat"], b["min_lng"], b["max_lng"])).fetchall()
+                    conn.close()
+                    last_err = None
+                    break
+                except Exception as e:
+                    last_err = e
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+            if last_err is not None:
+                raise last_err
+            out["naver"] = [{
+                "id": r["article_no"], "lat": r["lat"], "lng": r["lng"],
+                "name": r["building_name"] or "", "btcode": r["building_type_code"] or "",
+                "dep": r["deposit"], "rent": r["rent_monthly"],
+                "m2": r["area_exclusive_m2"], "floor": r["floor_current"],
+                "url": f"https://new.land.naver.com/offices?articleNo={r['article_no']}",
+            } for r in rows]
+        except Exception as e:
+            out["naver_error"] = str(e)[:80]
+
+    return jsonify(out)
 
 
 @app.route("/api/trend")
@@ -557,6 +761,9 @@ def api_trend():
         where, params = [], []
         if sido_f:
             where.append("sido = ANY(%s)"); params.append(list(sido_f))
+        bt = a.get("building_type", "").strip()   # 건물유형 필터(지역 트렌드도 유형별로)
+        if bt:
+            where.append("building_type = %s"); params.append(bt)
         w = (" WHERE " + " AND ".join(where)) if where else ""
         rows = [dict(r) for r in conn.execute(
             "SELECT snapshot_date, sido, sigungu, dong, n, avg_occ_1m, avg_occ_2m, avg_occ_3m"

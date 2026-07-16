@@ -170,10 +170,26 @@ def init_db(force=False):
         avg_week       REAL,
         PRIMARY KEY (snapshot_date, sido, sigungu, dong, building_type)
     )""")
+    # 매물 변동 집계(추가/삭제) + 직전 라이브셋 — 크롤러가 회차마다 diff 적재.
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS samsam_churn (
+        crawl_date  TEXT,
+        sido        TEXT,
+        added       INTEGER,
+        removed     INTEGER,
+        total       INTEGER,
+        PRIMARY KEY (crawl_date, sido)
+    )""")
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS samsam_live (
+        room_id  INTEGER PRIMARY KEY,
+        sido     TEXT
+    )""")
     for idx in (
         "CREATE INDEX IF NOT EXISTS ix_sl_region ON samsam_listings(sido,sigungu,dong)",
         "CREATE INDEX IF NOT EXISTS ix_sl_rent ON samsam_listings(rent_total_weekly)",
         "CREATE INDEX IF NOT EXISTS ix_sl_building ON samsam_listings(building_name)",
+        "CREATE INDEX IF NOT EXISTS ix_churn_date ON samsam_churn(crawl_date)",
     ):
         conn.execute(idx)
     conn.commit()

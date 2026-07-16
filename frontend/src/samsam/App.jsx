@@ -6,9 +6,11 @@ import BuildingView from './BuildingView.jsx'
 import RankingView from './RankingView.jsx'
 import TrendView from './TrendView.jsx'
 import OptionView from './OptionView.jsx'
+import MapView from './MapView.jsx'
 
 const TABS = [
   { id: 'building', label: '건물 인기' },
+  { id: 'map', label: '🗺️ 지도' },
   { id: 'ranking', label: '🏆 랭킹' },
   { id: 'trend', label: '지역 트렌드' },
   { id: 'option', label: '옵션 영향' },
@@ -18,7 +20,9 @@ const DEFAULT_F = { sidos: [], sigungu: '', dong: '', btype: '', pmin: '', pmax:
 export default function App() {
   const [facets, setFacets] = useState(null)
   const [f, setF] = useState(DEFAULT_F)
-  const [view, setView] = useState('building')
+  // 딥링크: /samsam/?view=map 처럼 탭을 직접 열 수 있게(네브바 '지도' 메뉴 등).
+  const initView = new URLSearchParams(window.location.search).get('view')
+  const [view, setView] = useState(TABS.some((t) => t.id === initView) ? initView : 'building')
   const [runSeq, setRunSeq] = useState(0)
 
   useEffect(() => { getJSON('api/facets').then(setFacets).catch(() => {}) }, [])
@@ -57,6 +61,7 @@ export default function App() {
         </div>
 
         {view === 'building' && <BuildingView filters={f} runSeq={runSeq} />}
+        {view === 'map' && <MapView filters={f} />}
         {view === 'ranking' && <RankingView />}
         {view === 'trend' && <TrendView filters={f} runSeq={runSeq} />}
         {view === 'option' && <OptionView filters={f} runSeq={runSeq} />}

@@ -186,13 +186,22 @@ class _Conn:
         return _Cursor(cur)
 
     def commit(self):
+        # 연결은 autocommit=True 로 열려 모든 execute/executemany 가 이미 커밋된다.
+        # 이 상태의 명시적 commit 은 열린 트랜잭션이 없어 불필요하고, Supabase 트랜잭션
+        # 풀러(pgbouncer)에선 bare 'commit' 이 백엔드 교체와 겹쳐 간헐적으로
+        # 'unnamed prepared statement does not exist'(26000)를 낸다 → autocommit 이면 건너뛴다.
+        if getattr(self._conn, 'autocommit', False):
+            return
         self._conn.commit()
 
     def close(self):
         self._conn.close()
 
     def rollback(self):
-        self._conn.rollback()
+        try:
+            self._conn.rollback()
+        except Exception:
+            pass
 
 
 def connect():
@@ -522,6 +531,28 @@ def init_db(force=False):
         created_at  TEXT,
         sent_at     TEXT
     )""")
+    # 현재 접속자수: 로그인 여부와 무관하게 최근 활동 세션을 핑으로 기록(auth.py before_request).
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS visitor_pings (
+        session_id  TEXT PRIMARY KEY,
+        last_seen   TEXT NOT NULL
+    )""")
+    # 삼삼 매물 변동(추가/삭제): 크롤 회차마다 수도권 시도별로 신규/사라진 매물 수를 적재.
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS samsam_churn (
+        crawl_date  TEXT,
+        sido        TEXT,
+        added       INTEGER,
+        removed     INTEGER,
+        total       INTEGER,
+        PRIMARY KEY (crawl_date, sido)
+    )""")
+    # 직전 크롤의 라이브 매물 집합(room_id→sido). 다음 크롤과 diff 해 추가/삭제를 계산.
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS samsam_live (
+        room_id  INTEGER PRIMARY KEY,
+        sido     TEXT
+    )""")
     for idx in [
         "CREATE INDEX IF NOT EXISTS ix_l_region ON listings(sido,sigungu,dong)",
         "CREATE INDEX IF NOT EXISTS ix_l_deposit ON listings(deposit)",
@@ -543,6 +574,11 @@ def init_db(force=False):
         "CREATE INDEX IF NOT EXISTS ix_scm_room ON samsam_chat_messages(room_id)",
         "CREATE INDEX IF NOT EXISTS ix_scm_time ON samsam_chat_messages(message_time)",
         "CREATE INDEX IF NOT EXISTS ix_sco_status ON samsam_chat_outbox(status)",
+        "CREATE INDEX IF NOT EXISTS ix_vp_last_seen ON visitor_pings(last_seen)",
+        "CREATE INDEX IF NOT EXISTS ix_churn_date ON samsam_churn(crawl_date)",
+        # 지도 bbox 조회용 좌표 인덱스(/samsam/api/map — 없으면 425k 풀스캔으로 팬/줌마다 수 초).
+        "CREATE INDEX IF NOT EXISTS ix_listings_latlon ON listings(lat, lon)",
+        "CREATE INDEX IF NOT EXISTS ix_nl_latlng ON naver_listings(lat, lng)",
     ]:
         conn.execute(idx)
     conn.commit()

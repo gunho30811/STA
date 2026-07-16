@@ -13,9 +13,10 @@ const BCOLS = [
 const NUM = new Set(['pyeong', 'n', 'occ_avg', 'occ2_avg', 'occ3_avg', 'occ_min', 'occ_max', 'week_avg', 'net_avg', 'breakeven', 'n_matched'])
 
 export default function BuildingView({ filters, runSeq }) {
-  const [ctrl, setCtrl] = useState({ building: '', station: '', minn: '2', deposit: '1000', fixed: '0', occmin: '', netmin: '', bemax: '' })
+  const [ctrl, setCtrl] = useState({ building: '', station: '', minn: '2', deposit: '1000', fixed: '0', occmin: '', netmin: '', bemax: '', zone: '' })
   const [bld, setBld] = useState([])
   const [sort, setSort] = useState({ col: 'occ_avg', dir: 'desc' })
+  const [modal, setModal] = useState(null)   // 모바일: 행 탭 시 전체 상세 모달
   const c = (k, v) => setCtrl((s) => ({ ...s, [k]: v }))
 
   const load = useCallback(async () => {
@@ -28,11 +29,13 @@ export default function BuildingView({ filters, runSeq }) {
     if (ctrl.netmin.trim()) p.set('net_min_filter', ctrl.netmin.trim())
     if (ctrl.bemax.trim()) p.set('breakeven_max', ctrl.bemax.trim())
     if (ctrl.building.trim()) p.set('building', ctrl.building.trim())
+    if (ctrl.zone) p.set('zone', ctrl.zone)
     const r = await getJSON('api/buildings?' + p.toString())
     setBld(r.items || [])
   }, [filters, ctrl])
 
   useEffect(() => { load() /* eslint-disable-next-line */ }, [runSeq])
+  useEffect(() => { load() /* 역세권 칩 변경 시 즉시 반영 */ /* eslint-disable-next-line */ }, [ctrl.zone])
 
   const onSort = (k) => setSort((s) => (s.col === k ? { col: k, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col: k, dir: 'desc' }))
 
@@ -78,11 +81,20 @@ export default function BuildingView({ filters, runSeq }) {
         <b>손익분기점</b> <input type="number" value={ctrl.bemax} placeholder="예: 3" style={{ width: 55 }} onChange={(e) => c('bemax', e.target.value)} /> 주 이하 ·<br />
         월순수익=렌트월매출−부동산월세@보증금−관리비−고정비 (셀에 마우스 올리면 분해) · <b>손익분기점(주)</b>=작을수록 회수 빠름 · 헤더 클릭 정렬.
       </p>
+      <div className="zone-filter">
+        <span className="zone-lbl">역세권</span>
+        {['', '더블역세권', '트리플역세권', '신분당선', '공항철도'].map((z) => (
+          <button key={z || 'all'} className={'zone-chip' + (ctrl.zone === z ? ' on' : '')} onClick={() => c('zone', z)}>{z || '전체'}</button>
+        ))}
+        <span className="mut" style={{ fontSize: 11 }}>더블/트리플=500m 내 서로 다른 역 2/3개↑</span>
+      </div>
       <div className="flex">
         <span className="mut" style={{ fontSize: 12 }}>{rows.length ? `${rows.length.toLocaleString()}개 건물` : ''}</span>
         <button className="btn btn-go" style={{ padding: '6px 14px', fontSize: 12 }} onClick={downloadCsv}>📥 CSV 다운로드</button>
       </div>
-      <div className="scroll">
+
+      {/* PC: 전체 표 (행 클릭 시에도 상세 모달) */}
+      <div className="scroll desk-only">
         <table>
           <thead><tr>{BCOLS.map((col) => {
             const sortable = col.s !== false
@@ -95,15 +107,43 @@ export default function BuildingView({ filters, runSeq }) {
           <tbody>
             {rows.length === 0 ? (
               <tr><td colSpan={BCOLS.length} className="empty">매물수 조건을 만족하는 건물이 없습니다.</td></tr>
-            ) : rows.map((r, i) => <BuildingRow key={i} r={r} />)}
+            ) : rows.map((r, i) => <BuildingRow key={i} r={r} onClick={() => setModal(r)} />)}
           </tbody>
         </table>
       </div>
+
+      {/* 모바일: 핵심(건물명·시군구·동·예약률)만 카드로, 탭하면 전체 상세 모달 */}
+      <div className="mob-only mob-list">
+        {rows.length === 0 ? (
+          <div className="empty">매물수 조건을 만족하는 건물이 없습니다.</div>
+        ) : rows.map((r, i) => {
+          const occc = r.occ_avg >= 60 ? 'good' : r.occ_avg < 30 ? 'bad' : 'occ'
+          return (
+            <button className="mob-item" key={i} onClick={() => setModal(r)}>
+              <div className="mi-top">
+                <span className="mi-name">{r.building}</span>
+                <span className={`mi-occ ${occc}`}>{r.occ_avg}%</span>
+              </div>
+              <div className="mi-sub">
+                📍 {[r.sigungu, r.dong].filter(Boolean).join(' ') || '-'}{r.station ? ` · 🚇${r.station}` : ''}
+                <span className="mut"> · {r.btype} · {r.pyeong ?? '-'}평 · 매물 {r.n}</span>
+              </div>
+              {r.zones && r.zones.length > 0 && (
+                <div className="mi-zones">{r.zones.map((z) => (
+                  <span key={z} className={'ztag' + (z === '공항철도' ? ' air' : z === '신분당선' ? ' sbd' : '')}>{z}</span>
+                ))}</div>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {modal && <BuildingModal r={modal} onClose={() => setModal(null)} />}
     </div>
   )
 }
 
-function BuildingRow({ r }) {
+function BuildingRow({ r, onClick }) {
   const minc = r.occ_min >= 60 ? 'good' : r.occ_min < 30 ? 'bad' : 'mut'
   const netc = r.net_avg == null ? 'mut' : r.net_avg >= 0 ? 'good' : 'bad'
   let netTip = ''
@@ -111,8 +151,9 @@ function BuildingRow({ r }) {
   const bc = r.breakeven == null ? '' : r.breakeven <= 3 ? 'good' : r.breakeven > 6 ? 'bad' : ''
   let beTip = ''
   if (r.bd && r.breakeven != null) { const b = r.bd; beTip = `(부동산월세 ${b.rent} + 관리비 ${b.mgmt}) ÷ 주당 ${r.week_avg}\n= ${r.breakeven}주면 월 고정비용 회수` }
+  const stop = (e) => e.stopPropagation()   // 링크 클릭이 행 모달을 열지 않게
   return (
-    <tr>
+    <tr onClick={onClick}>
       <td className="l" style={{ fontWeight: 700 }}>{r.building}</td>
       <td className="l">{r.dong}</td><td className="l">{r.btype}</td><td>{r.pyeong ?? '-'}</td><td className="l">{r.station || '-'}</td>
       <td style={{ fontWeight: 800 }}>{r.n}</td><td className="occ">{r.occ_avg}%</td>
@@ -123,11 +164,50 @@ function BuildingRow({ r }) {
       <td>{r.breakeven == null ? <span className="mut">-</span>
         : <span className={bc} style={{ fontWeight: 800, cursor: 'help', borderBottom: '1px dotted #94a3b8' }} title={beTip}>{r.breakeven}주</span>}</td>
       <td className="mut">{r.n_matched || 0}</td>
-      <td className="l">
+      <td className="l" onClick={stop}>
         {r.sam_url ? <a className="lnk" href={r.sam_url} target="_blank" rel="noreferrer">렌트 예시</a> : null}
         {r.naver_url ? <> <a className="lnk" style={{ background: '#4321F3' }} href={r.naver_url} target="_blank" rel="noreferrer">부동산</a></> : null}
         {!r.sam_url && !r.naver_url ? <span className="mut">-</span> : null}
       </td>
     </tr>
+  )
+}
+
+// 모바일 상세 모달 — 표에 있던 전 항목을 세로로.
+function BuildingModal({ r, onClose }) {
+  const Row = ({ label, children }) => (
+    <div className="md-row"><span className="md-k">{label}</span><span className="md-v">{children}</span></div>
+  )
+  return (
+    <div className="modal-back" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <div>
+            <div className="modal-title">{r.building}</div>
+            <div className="modal-sub">📍 {[r.sigungu, r.dong].filter(Boolean).join(' ') || '-'} · {r.btype}</div>
+          </div>
+          <button className="modal-x" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <Row label="1달 예약률"><b className="occ">{r.occ_avg}%</b> <span className="mut">(2달 {r.occ2_avg}% · 3달 {r.occ3_avg}%)</span></Row>
+          <Row label="최저~최고(1달)">{r.occ_min}% ~ {r.occ_max}%</Row>
+          <Row label="평 / 역">{r.pyeong ?? '-'}평 · {r.station || '-'}</Row>
+          {r.stations && r.stations.length > 1 && <Row label="500m 내 역">{r.stations.join(', ')}</Row>}
+          {r.zones && r.zones.length > 0 && <Row label="역세권">{r.zones.map((z) => (
+            <span key={z} className={'ztag' + (z === '공항철도' ? ' air' : z === '신분당선' ? ' sbd' : '')}>{z}</span>
+          ))}</Row>}
+          <Row label="매물수 / 매칭수">{r.n} 채 · {r.n_matched || 0}</Row>
+          <Row label="평균 주당">{r.week_avg} 만원</Row>
+          <Row label="월순수익">{r.net_avg == null ? '-' : <b className={r.net_avg >= 0 ? 'good' : 'bad'}>{r.net_avg} 만원</b>}</Row>
+          <Row label="손익분기점">{r.breakeven == null ? '-' : `${r.breakeven} 주`}</Row>
+          {r.bd && <Row label="수익 분해"><span className="mut" style={{ fontSize: 12 }}>렌트매출 {r.bd.maxRev} − 부동산월세 {r.bd.rent} − 관리비 {r.bd.mgmt}{r.bd.fixed ? ` − 고정비 ${r.bd.fixed}` : ''}</span></Row>}
+          {(r.phone || r.office) && <Row label="부동산">{r.office || ''} {r.phone ? <a href={`tel:${r.phone}`}>{r.phone}</a> : ''}</Row>}
+        </div>
+        <div className="modal-foot">
+          {r.sam_url ? <a className="lnk" href={r.sam_url} target="_blank" rel="noreferrer">렌트 예시</a> : null}
+          {r.naver_url ? <a className="lnk" style={{ background: '#4321F3' }} href={r.naver_url} target="_blank" rel="noreferrer">부동산 매물</a> : null}
+        </div>
+      </div>
+    </div>
   )
 }
