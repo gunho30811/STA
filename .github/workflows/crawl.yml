@@ -12,7 +12,7 @@ permissions:
 jobs:
   crawl:
     runs-on: ubuntu-latest
-    timeout-minutes: 300    # 최대 5시간
+    timeout-minutes: 360    # 최대 6시간 (수도권 7종 전량 재크롤)
 
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -33,12 +33,19 @@ jobs:
       - name: Playwright Chromium 설치
         run: python -m playwright install chromium --with-deps
 
-      - name: 네이버 목록 크롤 (수도권 주거 전 유형 — 오피스텔/아파트/빌라/원룸/단독다가구)
-        run: python pipeline/naver/crawler.py --types APT,OPST,VL,OR,DDDGG
+      - name: 진행상태 리셋 (주간 전량 재크롤 — crawl_state 없이는 done 스킵돼 갱신 안 됨)
+        run: python -c "import db; c=db.connect(); c.execute('DELETE FROM crawl_state'); c.commit(); print('crawl_state 리셋')"
+
+      - name: 네이버 목록 크롤 (수도권 7종 월세 — 아파트/오피스텔/빌라/원룸/단독다가구/상가/전원주택)
+        run: python pipeline/naver/crawler.py --types APT,OPST,VL,OR,DDDGG,SG,JWJT
         continue-on-error: true   # 목록 실패해도 상세 시도
 
+      - name: 실시간 뷰·인덱스 갱신 (nl_live/nl_base + VACUUM ANALYZE)
+        run: python pipeline/naver/create_live_view.py
+        continue-on-error: true
+
       - name: 네이버 상세 크롤 (naver_listings 갱신, 신규분만 · 상가 제외)
-        run: python pipeline/naver/crawl_detail.py --exclude-types 상가
+        run: python pipeline/naver/crawl_detail.py --sidos 서울시,경기도,인천시 --exclude-types 상가
 
       - name: 네이버 JSONL export (수도권 부동산 뷰어용 lab 파일 갱신)
         run: python pipeline/naver/export_jsonl.py

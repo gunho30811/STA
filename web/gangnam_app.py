@@ -29,8 +29,29 @@ init_auth(app)
 
 TYPE_NAMES = {
     "APT": "아파트", "OPST": "오피스텔", "VL": "빌라",
-    "OR": "원룸", "DDDGG": "단독/다가구", "SG": "상가",
+    "OR": "원룸", "DDDGG": "단독/다가구", "SG": "상가", "JWJT": "전원주택",
 }
+
+# 사이트가 읽는 소스: naver_listings(상세) 대신 실시간 뷰 nl_live.
+#   nl_live = listings(실시간·전량·수도권·최근7일) LEFT JOIN naver_listings(상세 보강).
+#   목록 크롤이 listings에 넣는 즉시 사이트에 뜨고, 상세는 채워지는 대로 자동 병합된다.
+SRC = "nl_live"
+# 집계/카운트용: 조인 없는 listings-only 뷰(같은 컬럼명, 인덱스로 빠름).
+#   LEFT JOIN(naver_listings.article_no 유니크)이라 기본필터 count는 nl_live와 동일.
+#   단 상세 전용 컬럼(rooms/주소/역명, office=상세 summary) 필터가 걸리면 nl_live로 카운트.
+BASE = "nl_base"
+
+# 집계(count/DISTINCT/stats)는 40만 행 뷰 전체 스캔이라 느림 → 짧은 TTL 캐시.
+#   실시간 크롤 중이라도 몇 십 초 지연은 무방(카드 목록 자체는 캐시 없이 실시간).
+import time as _time
+_CACHE = {}
+def _cached(key, ttl, fn):
+    hit = _CACHE.get(key)
+    if hit and (_time.time() - hit[0]) < ttl:
+        return hit[1]
+    val = fn()
+    _CACHE[key] = (_time.time(), val)
+    return val
 
 # 업무용 오피스텔 판별: 부동산이 상세 summary에 '업무용' 또는 '전입(신고) 불가'라고 써놓은 것.
 # 주의: '전입신고'만 매칭하면 '전입신고 가능'(주거용)까지 잡히므로, 반드시 '불가'가 붙은 문구만.
@@ -123,7 +144,9 @@ _GU_SQL = ("CASE WHEN position(' ' in sigungu) > 0 THEN split_part(sigungu, ' ',
 
 # 정렬 → SQL ORDER BY (월순수익 net_desc 는 삼삼 계산이 필요해 파이썬에서 처리).
 _ORDER_SQL = {
-    "recent": "confirmed_at DESC NULLS LAST",
+    # 실시간 뷰(nl_live)에서 'recent'는 크롤 최신순(crawled_at, 인덱스 정렬로 빠름).
+    # 등록확인일(confirmed_at)은 표현식이라 전체 정렬이 느려 기본 정렬로는 안 씀.
+    "recent": "crawled_at DESC NULLS LAST",
     "rent_asc": "rent_monthly ASC NULLS LAST",
     "rent_desc": "rent_monthly DESC NULLS LAST",
     "deposit_asc": "deposit ASC NULLS LAST",
@@ -161,17 +184,19 @@ def assets(filename):
 def api_facets():
     # 첫 화면을 막지 않게 '가벼운 것만' 준다. 지역 트리는 /api/regions 로 lazy,
     # 업무용 매물수(느린 ILIKE 스캔)는 /api/office_count 로 async 로 뺐다.
-    conn = db.connect()
-    try:
-        sidos = [r[0] for r in conn.execute(
-            "SELECT DISTINCT sido FROM naver_listings "
-            "WHERE sido IS NOT NULL AND sido <> '' ORDER BY sido").fetchall()]
-        present = {r[0] for r in conn.execute(
-            "SELECT DISTINCT building_type_code FROM naver_listings").fetchall()}
-    finally:
-        conn.close()
-    types = [{"code": c, "name": TYPE_NAMES.get(c, c)}
-             for c in ["APT", "OPST", "VL", "OR", "DDDGG", "SG"] if c in present]
+    # sido는 작은 regions 테이블(수도권)에서 — nl_live(29만) DISTINCT 전체 스캔 회피.
+    # types는 고정 7종(수도권 월세는 전부 존재) — building_type_code DISTINCT 스캔 회피.
+    def _load():
+        conn = db.connect()
+        try:
+            return [r[0] for r in conn.execute(
+                "SELECT DISTINCT sido FROM regions "
+                "WHERE sido IN ('서울시','경기도','인천시') ORDER BY sido").fetchall()]
+        finally:
+            conn.close()
+    sidos = _cached("facets_sido", 600, _load)
+    types = [{"code": c, "name": TYPE_NAMES[c]}
+             for c in ["APT", "OPST", "VL", "OR", "DDDGG", "SG", "JWJT"]]
     return jsonify({"sido": sidos, "types": types,
                     "stations": sorted(STATION_COORDS.keys())})
 
@@ -182,55 +207,63 @@ def api_regions():
     sido = request.args.get("sido", "").strip()
     if not sido:
         return jsonify([])
-    conn = db.connect()
-    try:
-        rows = [list(r) for r in conn.execute(
-            f"SELECT DISTINCT {_SI_SQL}, {_GU_SQL}, dong FROM naver_listings "
-            "WHERE sido = %s AND dong IS NOT NULL AND dong <> '' ORDER BY 1, 2, 3",
-            [sido]).fetchall()]
-    finally:
-        conn.close()
-    return jsonify(rows)   # [[시/군, 구, 동], ...]
+    def _load():
+        conn = db.connect()
+        try:
+            return [list(r) for r in conn.execute(
+                f"SELECT DISTINCT {_SI_SQL}, {_GU_SQL}, dong FROM {BASE} "
+                "WHERE sido = %s AND dong IS NOT NULL AND dong <> '' ORDER BY 1, 2, 3",
+                [sido]).fetchall()]
+        finally:
+            conn.close()
+    return jsonify(_cached(f"regions:{sido}", 300, _load))   # [[시/군, 구, 동], ...]
 
 
 @app.route("/api/office_count")
 def api_office_count():
     """업무용 오피스텔 수 — summary ILIKE 전체 스캔이라 느려서 facets에서 빼 async로 분리."""
-    conn = db.connect()
-    try:
-        office_kw = " OR ".join(["summary ILIKE %s"] * len(OFFICE_KW))
-        n = conn.execute(
-            f"SELECT COUNT(*) FROM naver_listings "
-            f"WHERE building_type_code = 'OPST' AND ({office_kw})",
-            [f"%{k}%" for k in OFFICE_KW]).fetchone()[0]
-    finally:
-        conn.close()
-    return jsonify({"office": n})
+    def _load():
+        conn = db.connect()
+        try:
+            office_kw = " OR ".join(["summary ILIKE %s"] * len(OFFICE_KW))
+            return conn.execute(
+                f"SELECT COUNT(*) FROM {SRC} "
+                f"WHERE building_type_code = 'OPST' AND ({office_kw})",
+                [f"%{k}%" for k in OFFICE_KW]).fetchone()[0]
+        finally:
+            conn.close()
+    return jsonify({"office": _cached("office_count", 120, _load)})
 
 
 @app.route("/api/stats")
 def api_stats():
-    conn = db.connect()
-    try:
-        total = conn.execute("SELECT COUNT(*) FROM naver_listings").fetchone()[0]
-        dong_count = conn.execute(
-            "SELECT COUNT(DISTINCT dong) FROM naver_listings "
-            "WHERE dong IS NOT NULL AND dong <> ''").fetchone()[0]
-        med = conn.execute(
-            "SELECT percentile_disc(0.5) WITHIN GROUP (ORDER BY rent_monthly) "
-            "FROM naver_listings WHERE rent_monthly > 0").fetchone()[0]
-        by_type = [(r[0], r[1]) for r in conn.execute(
-            "SELECT building_type_code, COUNT(*) c FROM naver_listings "
-            "GROUP BY building_type_code ORDER BY c DESC").fetchall()]
-    finally:
-        conn.close()
-    return jsonify({
-        "total": total,
-        "dong_count": dong_count,
-        "rent_median": med,
-        "by_type": [{"code": k, "name": TYPE_NAMES.get(k, k), "count": c}
-                    for k, c in by_type],
-    })
+    def _load():
+        conn = db.connect()
+        try:
+            total = conn.execute(f"SELECT COUNT(*) FROM {BASE}").fetchone()[0]
+            dong_count = conn.execute(
+                f"SELECT COUNT(DISTINCT dong) FROM {BASE} "
+                "WHERE dong IS NOT NULL AND dong <> ''").fetchone()[0]
+            # 정확한 중앙값은 40만행 정렬이라 수십 초 → listings 10% 표본으로 근사(뷰는 TABLESAMPLE 불가).
+            med = conn.execute(
+                "SELECT percentile_disc(0.5) WITHIN GROUP (ORDER BY rent) "
+                "FROM listings TABLESAMPLE SYSTEM(10) "
+                "WHERE sido IN ('서울시','경기도','인천시') "
+                "AND crawled_at >= to_char(now() - interval '7 days','YYYY-MM-DD') "
+                "AND rent > 0").fetchone()[0]
+            by_type = [(r[0], r[1]) for r in conn.execute(
+                f"SELECT building_type_code, COUNT(*) c FROM {BASE} "
+                "GROUP BY building_type_code ORDER BY c DESC").fetchall()]
+        finally:
+            conn.close()
+        return {
+            "total": total,
+            "dong_count": dong_count,
+            "rent_median": med,
+            "by_type": [{"code": k, "name": TYPE_NAMES.get(k, k), "count": c}
+                        for k, c in by_type],
+        }
+    return jsonify(_cached("stats", 300, _load))
 
 
 def _build_where(a):
@@ -376,17 +409,23 @@ def api_listings():
     conn = db.connect()
     try:
         if not needs_python:
-            total = conn.execute(
-                f"SELECT COUNT(*) FROM naver_listings{where_sql}", params).fetchone()[0]
-            order = _ORDER_SQL.get(sort, "confirmed_at DESC NULLS LAST")
+            # 상세전용 필터(방수/키워드/업무용)가 없으면 조인 없는 nl_base로 카운트(빠름).
+            #   있으면 상세 컬럼이 필요하니 nl_live로 카운트.
+            enriched = bool(a.getlist("rooms")) or bool(a.get("keyword", "").strip()) or a.get("office") == "1"
+            count_src = SRC if enriched else BASE
+            # 총 건수(페이지네이션용) → 필터 시그니처별 60초 캐시.
+            total = _cached(f"cnt:{count_src}:{where_sql}:{params}", 60,
+                            lambda: conn.execute(
+                                f"SELECT COUNT(*) FROM {count_src}{where_sql}", params).fetchone()[0])
+            order = _ORDER_SQL.get(sort, "crawled_at DESC NULLS LAST")
             rows = conn.execute(
-                f"SELECT {cols} FROM naver_listings{where_sql} "
+                f"SELECT {cols} FROM {SRC}{where_sql} "
                 f"ORDER BY {order} LIMIT %s OFFSET %s",
                 params + [size, (page - 1) * size]).fetchall()
             items = [_enrich_row(dict(r)) for r in rows]
         else:
             items_all = [_enrich_row(dict(r)) for r in conn.execute(
-                f"SELECT {cols} FROM naver_listings{where_sql}", params).fetchall()]
+                f"SELECT {cols} FROM {SRC}{where_sql}", params).fetchall()]
             if stns:   # bbox 로 좁힌 뒤 haversine 정밀 판정
                 coords = [STATION_COORDS[s] for s in stns]
                 items_all = [x for x in items_all
@@ -422,7 +461,11 @@ def api_detail(no):
     try:
         import db
         conn = db.connect()
+        # 상세 보강된 매물은 naver_listings 전체 컬럼, 아직 상세 안 된 실시간 매물은
+        # nl_live(기본정보)로 폴백 — 상세 크롤이 채우기 전에도 모달이 뜨게.
         r = conn.execute("SELECT * FROM naver_listings WHERE article_no=%s", (no,)).fetchone()
+        if not r:
+            r = conn.execute(f"SELECT * FROM {SRC} WHERE article_no=%s", (no,)).fetchone()
         conn.close()
         if not r:
             return jsonify({})
@@ -441,7 +484,7 @@ def _n(v):
 
 if __name__ == "__main__":
     import socket
-    print(f"수도권 부동산 매물 {len(L())}건 로드됨")
+    print("수도권 부동산 매물 뷰어 (실시간 뷰 nl_live)")
     try:
         ip = socket.gethostbyname(socket.gethostname())
     except Exception:

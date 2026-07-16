@@ -14,3 +14,10 @@ lab/naver_listings.jsonl
 frontend/node_modules/
 # frontend/dist 는 커밋한다 — Vercel(Python 서버리스)이 이 정적 산출물을 그대로 서빙하므로.
 # (프론트 수정 시 `npm run build` 후 dist 변경분도 함께 커밋)
+
+# PyInstaller 빌드 산출물
+dist_exe/
+build_exe/
+*.spec
+_selftest_naver.db
+selftest_result.txt

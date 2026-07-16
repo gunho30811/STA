@@ -39,6 +39,17 @@ ROOTS = [
     ("인천시", "2800000000"),
 ]
 
+# 전국 시/도 루트(new.land /api/regions/list?cortarNo=0000000000 실측). 로컬 GUI의 '전국' 선택용.
+# 기본 크롤(--sidos 미지정)은 ROOTS(수도권)만 — 사이트/주간크롤 범위 불변.
+ALL_ROOTS = [
+    ("서울시", "1100000000"), ("경기도", "4100000000"), ("인천시", "2800000000"),
+    ("부산시", "2600000000"), ("대전시", "3000000000"), ("대구시", "2700000000"),
+    ("울산시", "3100000000"), ("세종시", "3600000000"), ("전남광주시", "1200000000"),
+    ("강원도", "5100000000"), ("충청북도", "4300000000"), ("충청남도", "4400000000"),
+    ("경상북도", "4700000000"), ("경상남도", "4800000000"), ("전북도", "5200000000"),
+    ("제주도", "5000000000"),
+]
+
 # 네이버 realEstateType 코드 (라이브 API 호출로 확인, SCHEMA.md 참고)
 TYPES = {
     "APT": "아파트",
@@ -47,7 +58,18 @@ TYPES = {
     "OR": "원룸",
     "DDDGG": "단독/다가구",
     "SG": "상가",
+    "JWJT": "전원주택",
 }
+
+# 네이버 tradeType 코드. 사이트/주간크롤은 월세(B2)만, 로컬 GUI는 전세·매매도 선택 가능.
+TRADE_TYPES = {
+    "B2": "월세",
+    "B1": "전세",
+    "A1": "매매",
+}
+
+# 협조적 즉시 중지 플래그 — GUI 등에서 True 로 세팅하면 잡 루프가 다음 잡에서 곧바로 멈춘다.
+STOP = False
 
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -176,11 +198,11 @@ class NaverLand:
         j = self.api(f"https://new.land.naver.com/api/regions/list?cortarNo={cortarNo}")
         return (j or {}).get("regionList", [])
 
-    def articles_page(self, cortarNo, page, real_estate_type="OPST"):
+    def articles_page(self, cortarNo, page, real_estate_type="OPST", trade_type="B2"):
         url = (
             "https://new.land.naver.com/api/articles"
             f"?cortarNo={cortarNo}&order=rank"
-            f"&realEstateType={real_estate_type}&tradeType=B2"
+            f"&realEstateType={real_estate_type}&tradeType={trade_type}"
             "&tag=%3A%3A%3A%3A%3A%3A%3A%3A"
             "&rentPriceMin=0&rentPriceMax=900000000"
             "&priceMin=0&priceMax=900000000"
@@ -218,6 +240,8 @@ def build_region_tree(nl, roots, only_sido=None, only_gu=None):
                 if only_gu and len(path) == 1 and only_gu not in name:
                     # 시/도 바로 아래(구/시) 레벨에서 only_gu 필터
                     continue
+                if len(path) >= 1:   # 진행 표시(조용한 트리탐색이 멈춘 것처럼 보이지 않게)
+                    print(f"[{now()}]   탐색 중: {' '.join(path[1:] + [name])}  (동 {len(dongs)}개 발견)")
                 walk(cno, path + [name])
 
     for sido_name, root_no in roots:
@@ -239,27 +263,34 @@ def save_regions(dongs):
 
 # ----------------------------------------------------------------------------- listings
 
-def crawl_dong(nl, cortarNo, sido, sigungu, dong, max_pages=60, real_estate_type="OPST"):
-    # 진행상태 키: OPST는 기존 동작 그대로 cortarNo 단독(이미 done인 동 재크롤 방지),
-    # 그 외 타입은 "cortarNo:타입코드"로 따로 기록(동 하나에 타입별로 진행상태가 갈림).
-    state_key = cortarNo if real_estate_type == "OPST" else f"{cortarNo}:{real_estate_type}"
+def crawl_dong(nl, cortarNo, sido, sigungu, dong, max_pages=60, real_estate_type="OPST", trade_type="B2", limit=None):
+    # 진행상태 키: 월세(B2)는 기존 키 유지(OPST=cortarNo 단독, 그 외=cortarNo:타입) — 주간크롤 재개 호환.
+    # 전세·매매(B1/A1)는 거래유형까지 붙여 별도 진행상태.
+    if trade_type == "B2":
+        state_key = cortarNo if real_estate_type == "OPST" else f"{cortarNo}:{real_estate_type}"
+    else:
+        state_key = f"{cortarNo}:{real_estate_type}:{trade_type}"
 
     conn = db.connect()
-    state = conn.execute("SELECT status FROM crawl_state WHERE cortarNo=?",
-                         (state_key,)).fetchone()
-    if state and state["status"] == "done":
-        conn.close()
-        return 0  # 이미 완료
+    # limit(샘플 모드)일 땐 done 스킵 안 함 — 소량만 뽑는 게 목적이라 진행상태와 무관.
+    if limit is None:
+        state = conn.execute("SELECT status FROM crawl_state WHERE cortarNo=?",
+                             (state_key,)).fetchone()
+        if state and state["status"] == "done":
+            conn.close()
+            return 0  # 이미 완료
 
     total = 0
     page = 1
     while page <= max_pages:
-        j = nl.articles_page(cortarNo, page, real_estate_type)
+        j = nl.articles_page(cortarNo, page, real_estate_type, trade_type)
         if not j:
             break
         arts = j.get("articleList", [])
         if not arts:
             break
+        if limit is not None and total + len(arts) > limit:
+            arts = arts[:max(0, limit - total)]   # 필요한 만큼만(TOP N)
         rows = []
         for a in arts:
             rows.append((
@@ -287,6 +318,10 @@ def crawl_dong(nl, cortarNo, sido, sigungu, dong, max_pages=60, real_estate_type
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", rows)
         conn.commit()
         total += len(rows)
+        if STOP:                                    # 즉시 중지(페이지 사이)
+            break
+        if limit is not None and total >= limit:   # 원하는 개수 채우면 종료
+            break
         if not j.get("isMoreData"):
             break
         page += 1
@@ -302,18 +337,28 @@ def crawl_dong(nl, cortarNo, sido, sigungu, dong, max_pages=60, real_estate_type
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--sido", help="서울시 / 경기도 / 인천시 중 하나만")
+    ap.add_argument("--sido", help="서울시 / 경기도 / 인천시 중 하나만 (부분일치)")
+    ap.add_argument("--sidos", default="", help="콤마구분 시/도 정확매칭 복수(예: 서울시,경기도,인천시)")
     ap.add_argument("--gu", help="특정 구/시 이름 필터 (예: 강남구)")
     ap.add_argument("--limit-dongs", type=int, default=0, help="동 N개만 (테스트)")
+    ap.add_argument("--max-per-type", type=int, default=0,
+                    help="각 매물종류당 최대 N건만 수집(TOP N 샘플). 예: 10 → 아파트10·오피스텔10…")
     ap.add_argument("--show", action="store_true", help="브라우저 표시")
     ap.add_argument("--types", default="OPST",
-                    help="콤마구분 realEstateType 코드(예: APT,OPST,VL,OR,DDDGG,SG) "
+                    help="콤마구분 realEstateType 코드(예: APT,OPST,VL,OR,DDDGG,SG,JWJT) "
                          "또는 'all'. 기본 OPST(기존 동작과 동일, GH Actions 주간 크롤 영향 없음)")
+    ap.add_argument("--trade-types", default="B2",
+                    help="콤마구분 거래유형(B2월세/B1전세/A1매매) 또는 'all'. 기본 B2(월세).")
     args = ap.parse_args()
     type_codes = list(TYPES) if args.types == "all" else [c.strip() for c in args.types.split(",") if c.strip()]
     unknown = [c for c in type_codes if c not in TYPES]
     if unknown:
         ap.error(f"알 수 없는 타입 코드: {unknown} (가능: {list(TYPES)})")
+    trade_codes = list(TRADE_TYPES) if args.trade_types == "all" else [t.strip() for t in args.trade_types.split(",") if t.strip()]
+    unknown_t = [t for t in trade_codes if t not in TRADE_TYPES]
+    if unknown_t:
+        ap.error(f"알 수 없는 거래유형: {unknown_t} (가능: {list(TRADE_TYPES)})")
+    sidos = [s.strip() for s in args.sidos.split(",") if s.strip()]
 
     db.init_db()
 
@@ -324,8 +369,17 @@ def main():
     if have:
         q = "SELECT cortarNo,sido,sigungu,dong,lat,lon FROM regions WHERE 1=1"
         p = []
-        if args.sido:
+        if sidos:                       # --sidos: 복수 시/도 정확매칭
+            q += " AND sido IN (%s)" % ",".join("?" * len(sidos))
+            p.extend(sidos)
+        elif args.sido:                 # --sido: 단일 부분일치
             q += " AND sido LIKE ?"; p.append(f"%{args.sido}%")
+        else:
+            # regions 테이블엔 비수도권(crawl_nonseoul.py)도 섞여 있음.
+            # 미지정 시 ROOTS(수도권: 서울/경기/인천)만 대상으로 제한.
+            root_names = [n for n, _ in ROOTS]
+            q += " AND sido IN (%s)" % ",".join("?" * len(root_names))
+            p.extend(root_names)
         if args.gu:
             q += " AND sigungu LIKE ?"; p.append(f"%{args.gu}%")
         dongs_db = [tuple(r) for r in conn.execute(q + " ORDER BY sido,sigungu,dong", p)]
@@ -337,29 +391,46 @@ def main():
             dongs = dongs_db
             print(f"[{now()}] DB에서 동 목록 로드: {len(dongs)}개 (트리 재탐색 생략)")
         else:
-            dongs = build_region_tree(nl, ROOTS, args.sido, args.gu)
+            # --sidos 지정 시 해당 시/도 루트만 탐색(전국 중 선택분). 미지정이면 수도권(ROOTS).
+            roots_to_walk = [(n, c) for n, c in ALL_ROOTS if n in sidos] if sidos else ROOTS
+            dongs = build_region_tree(nl, roots_to_walk, args.sido, args.gu)
             save_regions(dongs)
         print(f"[{now()}] 대상 동 수: {len(dongs)}")
         if args.limit_dongs:
             dongs = dongs[:args.limit_dongs]
 
-        print(f"[{now()}] 대상 타입: {[TYPES[c] for c in type_codes]}")
-        jobs = [(cno, sido, sigungu, dong, code)
-                for cno, sido, sigungu, dong, lat, lon in dongs for code in type_codes]
+        print(f"[{now()}] 대상 타입: {[TYPES[c] for c in type_codes]} / 거래유형: {[TRADE_TYPES[t] for t in trade_codes]}")
+        jobs = [(cno, sido, sigungu, dong, code, trade)
+                for cno, sido, sigungu, dong, lat, lon in dongs
+                for code in type_codes for trade in trade_codes]
 
+        global STOP
+        STOP = False   # 새 실행마다 초기화
         grand = 0
-        for i, (cno, sido, sigungu, dong, code) in enumerate(jobs, 1):
+        collected = {}   # (종류,거래)별 누적 — --max-per-type 예산 관리
+        for i, (cno, sido, sigungu, dong, code, trade) in enumerate(jobs, 1):
+            if STOP:
+                print(f"[{now()}] ⏹ 중지됨 — 크롤 중단 (누적 {grand}건)")
+                break
+            limit = None
+            if args.max_per_type:
+                got = collected.get((code, trade), 0)
+                if got >= args.max_per_type:
+                    continue                       # 이 종류·거래는 이미 목표치 채움 → 남은 동 스킵
+                limit = args.max_per_type - got
             try:
-                n = crawl_dong(nl, cno, sido, sigungu, dong, real_estate_type=code)
+                n = crawl_dong(nl, cno, sido, sigungu, dong, real_estate_type=code, trade_type=trade, limit=limit)
             except Exception as e:
-                print(f"[{now()}] 동 처리 실패 {sido} {sigungu} {dong} {TYPES[code]}: {repr(e)[:80]}")
+                print(f"[{now()}] 동 처리 실패 {sido} {sigungu} {dong} {TYPES[code]} {TRADE_TYPES[trade]}: {repr(e)[:80]}")
                 try:
                     nl.restart()
                 except Exception:
                     pass
                 continue
             grand += n
-            print(f"[{now()}] ({i}/{len(jobs)}) {sido} {sigungu} {dong} {TYPES[code]}: {n}건 (누적 {grand})")
+            if args.max_per_type:
+                collected[(code, trade)] = collected.get((code, trade), 0) + n
+            print(f"[{now()}] ({i}/{len(jobs)}) {sido} {sigungu} {dong} {TYPES[code]} {TRADE_TYPES[trade]}: {n}건 (누적 {grand})")
             if i % 150 == 0:        # 메모리 누적 방지: 주기적 재시작
                 nl.restart()
         print(f"[{now()}] 완료. 총 {grand}건 수집.")
