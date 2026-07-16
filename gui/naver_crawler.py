@@ -43,7 +43,10 @@ def app_dir():
 BASE = resource_base()
 CONFIG_PATH = os.path.join(app_dir(), 'naver_crawler_config.json')
 
-SIDOS = ['서울시', '경기도', '인천시']
+# 전국 시/도 (crawler.ALL_ROOTS 와 동일 이름). 기본은 수도권만 체크.
+SIDOS = ['서울시', '경기도', '인천시', '부산시', '대전시', '대구시', '울산시', '세종시',
+         '전남광주시', '강원도', '충청북도', '충청남도', '경상북도', '경상남도', '전북도', '제주도']
+CAPITAL = ['서울시', '경기도', '인천시']
 # 화면 라벨 → 네이버 realEstateType 코드
 PROPERTY_TYPES = [
     ('아파트', 'APT'), ('오피스텔', 'OPST'), ('빌라', 'VL'), ('원룸', 'OR'),
@@ -114,9 +117,9 @@ def run_pipeline(opts, log_q, stop_flag):
                 '--types', ','.join(opts['types']),
                 '--trade-types', ','.join(opts['trades'])]
         if opts['test']:
-            argv += ['--limit-dongs', '3']
+            argv += ['--limit-dongs', str(opts.get('test_count', 3))]
         print(f"[GUI] 목록 크롤 시작 — 지역 {opts['sidos']} / 거래 {opts['trades']} / 종류 {len(opts['types'])}개"
-              + ("  (테스트: 동 3개)" if opts['test'] else ""))
+              + (f"  (테스트: 동 {opts.get('test_count', 3)}개)" if opts['test'] else ""))
         if stop_flag.is_set():
             return
         sys.argv = argv
@@ -229,15 +232,30 @@ def launch_gui():
     stop_flag = threading.Event()
     worker = {'thread': None}
 
-    # ── 지역(수도권 복수) ──
-    rf = ttk.LabelFrame(root, text='지역 (복수 선택)', padding=8)
+    # ── 지역(전국 복수) ──
+    rf = ttk.LabelFrame(root, text='지역 (전국 · 복수 선택)', padding=8)
     rf.pack(fill='x', padx=10, pady=(10, 4))
-    saved_sidos = set(cfg.get('sidos', SIDOS))
+    saved_sidos = set(cfg.get('sidos', CAPITAL))
     sido_vars = {}
+    PER_ROW = 6
     for i, s in enumerate(SIDOS):
         v = tk.BooleanVar(value=(s in saved_sidos))
-        ttk.Checkbutton(rf, text=s, variable=v).grid(row=0, column=i, padx=10)
+        ttk.Checkbutton(rf, text=s, variable=v).grid(
+            row=i // PER_ROW, column=i % PER_ROW, padx=6, pady=1, sticky='w')
         sido_vars[s] = v
+    brow = ttk.Frame(rf)
+    brow.grid(row=(len(SIDOS) // PER_ROW) + 1, column=0, columnspan=PER_ROW, sticky='w', pady=(4, 0))
+
+    def _set_sidos(names):
+        for s, v in sido_vars.items():
+            v.set(s in names)
+
+    ttk.Button(brow, text='전국 전체', width=9,
+               command=lambda: _set_sidos(SIDOS)).pack(side='left')
+    ttk.Button(brow, text='수도권만', width=9,
+               command=lambda: _set_sidos(CAPITAL)).pack(side='left', padx=4)
+    ttk.Button(brow, text='전체 해제', width=9,
+               command=lambda: _set_sidos([])).pack(side='left')
 
     # ── 거래유형(복수) ──
     trf = ttk.LabelFrame(root, text='거래유형 (복수 선택)', padding=8)
@@ -303,7 +321,11 @@ def launch_gui():
     detail_var = tk.BooleanVar(value=cfg.get('detail', False))
     export_var = tk.BooleanVar(value=cfg.get('export', False))
     save_var = tk.BooleanVar(value=True)
-    ttk.Checkbutton(of, text='테스트 (동 3개만)', variable=test_var).pack(side='left')
+    ttk.Checkbutton(of, text='테스트 (동', variable=test_var).pack(side='left')
+    test_count = ttk.Spinbox(of, from_=1, to=100000, width=6)
+    test_count.set(str(cfg.get('test_count', 3)))
+    test_count.pack(side='left', padx=(2, 0))
+    ttk.Label(of, text='개만)').pack(side='left', padx=(2, 8))
     ttk.Checkbutton(of, text='상세정보도 수집 (느림)', variable=detail_var).pack(side='left', padx=10)
     ttk.Checkbutton(of, text='JSONL export', variable=export_var).pack(side='left')
     ttk.Checkbutton(of, text='이 PC에 설정 저장', variable=save_var).pack(side='left', padx=10)
@@ -357,18 +379,22 @@ def launch_gui():
                 messagebox.showwarning('입력 필요', '데이터를 쌓을 폴더를 선택하세요.'); return
             if not os.path.isdir(folder):
                 messagebox.showwarning('폴더 없음', f'폴더가 존재하지 않습니다:\n{folder}'); return
+        try:
+            tcount = max(1, int(test_count.get()))
+        except (ValueError, tk.TclError):
+            tcount = 3
         if save_var.get():
             try:
                 with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
                     json.dump({'sidos': sidos, 'trades': trades, 'types': types, 'mode': mode,
-                               'folder': folder, 'database_url': db_url,
+                               'folder': folder, 'database_url': db_url, 'test_count': tcount,
                                'detail': detail_var.get(), 'export': export_var.get()},
                               f, ensure_ascii=False, indent=2)
             except Exception as e:
                 append(f"[설정 저장 실패: {e}]\n")
 
         opts = {'sidos': sidos, 'trades': trades, 'types': types, 'mode': mode,
-                'folder': folder, 'database_url': db_url,
+                'folder': folder, 'database_url': db_url, 'test_count': tcount,
                 'test': test_var.get(), 'detail': detail_var.get(), 'export': export_var.get()}
         log.delete('1.0', 'end')
         stop_flag.clear()

@@ -39,6 +39,17 @@ ROOTS = [
     ("인천시", "2800000000"),
 ]
 
+# 전국 시/도 루트(new.land /api/regions/list?cortarNo=0000000000 실측). 로컬 GUI의 '전국' 선택용.
+# 기본 크롤(--sidos 미지정)은 ROOTS(수도권)만 — 사이트/주간크롤 범위 불변.
+ALL_ROOTS = [
+    ("서울시", "1100000000"), ("경기도", "4100000000"), ("인천시", "2800000000"),
+    ("부산시", "2600000000"), ("대전시", "3000000000"), ("대구시", "2700000000"),
+    ("울산시", "3100000000"), ("세종시", "3600000000"), ("전남광주시", "1200000000"),
+    ("강원도", "5100000000"), ("충청북도", "4300000000"), ("충청남도", "4400000000"),
+    ("경상북도", "4700000000"), ("경상남도", "4800000000"), ("전북도", "5200000000"),
+    ("제주도", "5000000000"),
+]
+
 # 네이버 realEstateType 코드 (라이브 API 호출로 확인, SCHEMA.md 참고)
 TYPES = {
     "APT": "아파트",
@@ -365,9 +376,9 @@ def main():
             dongs = dongs_db
             print(f"[{now()}] DB에서 동 목록 로드: {len(dongs)}개 (트리 재탐색 생략)")
         else:
-            dongs = build_region_tree(nl, ROOTS, args.sido, args.gu)
-            if sidos:                   # 트리 탐색 결과도 --sidos 로 좁힘
-                dongs = [d for d in dongs if d[1] in sidos]
+            # --sidos 지정 시 해당 시/도 루트만 탐색(전국 중 선택분). 미지정이면 수도권(ROOTS).
+            roots_to_walk = [(n, c) for n, c in ALL_ROOTS if n in sidos] if sidos else ROOTS
+            dongs = build_region_tree(nl, roots_to_walk, args.sido, args.gu)
             save_regions(dongs)
         print(f"[{now()}] 대상 동 수: {len(dongs)}")
         if args.limit_dongs:
