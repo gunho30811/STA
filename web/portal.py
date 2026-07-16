@@ -489,6 +489,17 @@ def calc():
     return render_template_string(CALC_PAGE, dong=_rq.args.get("dong", ""))
 
 
+@portal.route("/map")
+def fullmap():
+    """전용 풀스크린 지도 — 렌트·부동산 매물(클러스터) + 동별 예약률 원."""
+    u = current_user()
+    if not u:
+        from flask import redirect as _rd
+        return _rd("/auth/login?next=/map")
+    from map_view import MAP_PAGE
+    return render_template_string(MAP_PAGE)
+
+
 @portal.route("/")
 def home():
     u = current_user()
