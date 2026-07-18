@@ -1,0 +1,40 @@
+# rendit 배포 — 어느 서버든(Oracle VM·로컬·클라우드) `docker compose up -d` 한 방.
+# DB(Supabase)는 관리형이라 컨테이너화하지 않고 .env 의 DATABASE_URL 로 연결.
+#
+#   docker compose up -d --build        # web + tunnel 상시 가동
+#   docker compose logs -f web          # 로그
+#   docker compose --profile crawl run --rm insights   # 캐시 수동 갱신
+#
+# .env 파일(레포 밖, 시크릿) 을 같은 폴더에 두면 자동 주입된다.
+services:
+  web:
+    build: .
+    image: rendit-web
+    env_file: .env
+    ports:
+      - "8000:8000"          # 리버스프록시(Caddy) 뒤에 둘 거면 이 줄 삭제 가능
+    restart: unless-stopped  # VM 재부팅·크래시 시 자동 복구
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/auth/login', timeout=5)"]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 20s
+
+  # 외부 노출(HTTPS·도메인) — Cloudflare Tunnel. 토큰 방식(대시보드에서 터널 생성 후 토큰 주입).
+  # 토큰 없으면 이 서비스는 그냥 안 뜸(웹은 8000 으로 직접 접근 가능). 임시 URL만 원하면 command 교체.
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN:-}
+    depends_on:
+      - web
+    profiles: [tunnel]       # `docker compose --profile tunnel up -d` 일 때만
+
+  # 대시보드·추천 캐시 수동 갱신(평소엔 크롤 워크플로가 함). 1회성.
+  insights:
+    build: .
+    image: rendit-web
+    env_file: .env
+    command: python pipeline/refresh_insights.py
+    profiles: [crawl]
