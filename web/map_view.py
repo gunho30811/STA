@@ -164,11 +164,13 @@ function applyFilter(){
   rentShown=fs.length
   idx=new Supercluster({radius:56,maxZoom:17,minPoints:2}).load(fs)
   // 네이버지도식 지역 집계: 줌아웃에선 임의 클러스터 대신 실제 동/시군구 단위 건수 뱃지.
+  // "당산동5가"·"한강로2가" 같은 법정동 조각은 기본 동으로 합쳐 뱃지 수를 줄임(네이버와 동일).
   var gd={}, gs={}
   fs.forEach(function(f){
     var p=f.properties
-    var dk=(p.sigungu||'')+'|'+(p.dong||'')
-    var d=gd[dk]||(gd[dk]={lats:[],lngs:[],n:0,label:p.dong||p.sigungu||'기타',items:[]})
+    var bd=(p.dong||'').replace(/\d+가$/,'')
+    var dk=(p.sigungu||'')+'|'+bd
+    var d=gd[dk]||(gd[dk]={lats:[],lngs:[],n:0,label:bd||p.sigungu||'기타',items:[]})
     d.lats.push(p.lat); d.lngs.push(p.lng); d.n++; d.items.push(p)
     var sk=p.sigungu||'기타'
     var s=gs[sk]||(gs[sk]={lats:[],lngs:[],n:0,label:sk})
@@ -238,9 +240,10 @@ function renderRent(){
   if(!idx) return
   var wanted=new Map()
   var z=Math.round(map.getZoom())
-  // 줌아웃(15 미만): 네이버지도처럼 실제 행정구역 단위 건수 — 12~14는 동, 12 미만은 시군구.
+  // 줌아웃(15 미만): 네이버지도처럼 실제 행정구역 단위 건수 — 14는 동(화면≈한 구), 13 이하는 시군구.
+  // (동 티어를 12~13까지 내리면 서울 전역 수백 개 동이 한 화면에 도배됨 — z13 스크린샷으로 확인)
   if(show.rent && z<NAVER_ZOOM){
-    var b2=map.getBounds().pad(0.1), dong=z>=12
+    var b2=map.getBounds().pad(0.1), dong=z>=14
     var src=dong?DONG_AGG:SIG_AGG
     src.forEach(function(a){
       if(!b2.contains([a[0],a[1]])) return
