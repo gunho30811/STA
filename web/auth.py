@@ -152,6 +152,52 @@ def send_verify_email(email, code):
         return code
 
 
+def notify_admin_signup(name, email, via):
+    """새 가입(승인 대기) 발생 시 관리자에게 메일 알림 — 승인 타이밍을 알 수 있게.
+
+    수신자: ADMIN_NOTIFY_EMAIL(없으면 SMTP_USER). 백그라운드 스레드로 발송해
+    가입 응답을 지연시키지 않고, 실패해도 가입 흐름엔 영향 없음(로그만)."""
+    to = os.environ.get("ADMIN_NOTIFY_EMAIL") or os.environ.get("SMTP_USER")
+    if not (_smtp_configured() and to):
+        print(f"[auth][SIGNUP] 승인 대기: {name} ({email or '이메일없음'}, {via}) — 메일 미설정", flush=True)
+        return
+
+    def _send():
+        try:
+            import smtplib
+            from email.mime.text import MIMEText
+            from email.utils import formataddr
+            from email.header import Header
+            host = os.environ["SMTP_HOST"]
+            port = int(os.environ.get("SMTP_PORT", 587))
+            user = os.environ["SMTP_USER"]
+            pw = os.environ["SMTP_PASS"].replace(" ", "")
+            sender = os.environ.get("SMTP_FROM", user)
+            msg = MIMEText(
+                f"새 회원이 가입해 승인을 기다리고 있습니다.\n\n"
+                f"이름: {name}\n이메일: {email or '(없음)'}\n가입 경로: {via}\n\n"
+                f"승인하기: https://{os.environ.get('RENDIT_DOMAIN', 'rendits.duckdns.org')}/auth/members\n",
+                "plain", "utf-8")
+            msg["Subject"] = Header(f"[rendit] 가입 승인 대기 — {name}", "utf-8")
+            msg["From"] = formataddr((str(Header("rendit", "utf-8")), sender))
+            msg["To"] = to
+            if port == 465:
+                with smtplib.SMTP_SSL(host, port, timeout=15) as s:
+                    s.login(user, pw)
+                    s.sendmail(sender, [to], msg.as_string())
+            else:
+                with smtplib.SMTP(host, port, timeout=15) as s:
+                    s.starttls()
+                    s.login(user, pw)
+                    s.sendmail(sender, [to], msg.as_string())
+            print(f"[auth][SIGNUP] 관리자 알림 발송: {name} → {to}", flush=True)
+        except Exception as e:
+            print(f"[auth][SIGNUP][ERROR] 관리자 알림 실패: {repr(e)[:80]}", flush=True)
+
+    import threading
+    threading.Thread(target=_send, daemon=True).start()
+
+
 def pw_ok(pw):
     if len(pw or "") < 8:
         return "비밀번호는 8자 이상이어야 합니다."
@@ -358,9 +404,10 @@ def verify():
             conn.execute("UPDATE members SET email_verified=TRUE, verify_code=NULL WHERE id=%s",
                          (r["id"],))
             conn.commit()
+            notify_admin_signup(email.split("@")[0], email, "이메일")
             body = (f'<h1>✅ 인증 완료</h1><p class="sub">{email}</p>'
                     f'<div class="msg ok">이메일 인증이 완료됐습니다.<br>'
-                    f'<b>관리자 승인 후</b> 로그인할 수 있습니다. 승인되면 안내해 드립니다.</div>'
+                    f'<b>관리자가 승인해야 로그인이 완료됩니다.</b> 승인되면 안내해 드립니다.</div>'
                     f'<div class=lnk><a href="{url_for("auth.login")}">로그인 화면으로</a></div>')
             return _render("인증 완료", body)
     body = f"""<h1>📧 이메일 인증</h1><p class="sub">{email} 로 보낸 6자리 코드를 입력하세요</p>{msg}
@@ -644,6 +691,7 @@ def kakao_callback():
 
     conn = db.connect()
     pending = False
+    created = False
     try:
         row = conn.execute("SELECT id,role FROM members WHERE kakao_id=%s", (kakao_id,)).fetchone()
         if row and name and name != "카카오회원":
@@ -665,6 +713,7 @@ def kakao_callback():
                 "kakao_id,created_at) VALUES(%s,'!',%s,'member',TRUE,FALSE,%s,%s)",
                 (email, name, kakao_id, _now().isoformat(timespec="seconds")))
             conn.commit()
+            created = True
             row = conn.execute("SELECT id,role FROM members WHERE kakao_id=%s",
                                (kakao_id,)).fetchone()
         if not row:
@@ -681,11 +730,19 @@ def kakao_callback():
     finally:
         conn.close()
     if pending:
-        body = (f'<h1>✅ 가입 완료</h1><p class="sub">{name}님, 카카오로 가입되었습니다.</p>'
-                f'<div class="msg ok"><b>관리자 승인 후</b> 로그인할 수 있습니다. '
-                f'승인되면 안내해 드립니다.</div>'
+        if created:
+            notify_admin_signup(name, email, "카카오")
+            body = (f'<h1>✅ 가입 완료</h1><p class="sub">{name}님, 카카오로 가입되었습니다.</p>'
+                    f'<div class="msg ok"><b>관리자가 승인해야 로그인이 완료됩니다.</b><br>'
+                    f'관리자에게 가입 소식을 전달했어요 — 승인되면 카카오 버튼으로 바로 이용하실 수 있습니다.</div>'
+                    f'<div class=lnk><a href="{url_for("auth.login")}">로그인 화면으로</a></div>')
+            return _render("가입 완료 — 승인 대기", body)
+        # 재방문(가입은 됐지만 아직 미승인 상태에서 다시 로그인 시도)
+        body = (f'<h1>⏳ 승인 대기 중</h1><p class="sub">{name}님</p>'
+                f'<div class="msg info">가입은 완료됐고, 아직 <b>관리자 승인 대기 중</b>입니다.<br>'
+                f'승인이 끝나면 이 버튼으로 바로 로그인됩니다. 조금만 기다려 주세요!</div>'
                 f'<div class=lnk><a href="{url_for("auth.login")}">로그인 화면으로</a></div>')
-        return _render("가입 완료", body)
+        return _render("승인 대기 중", body)
     return redirect(request.args.get("next") or "/")
 
 
