@@ -535,9 +535,11 @@ function applyReco(){
   rset.only=document.getElementById('r_only').checked
   closeRModal()
   recoOn=true; document.getElementById('t_reco').classList.add('on')
+  fitOnDraw=true   // 적용 직후엔 지도 시야를 결과 스팟들에 맞춤(화면 밖이라 안 보이는 문제 방지)
   renderRent(); renderDongLabels(); applyGeoVisibility(); loadNaver()
   loadReco()
 }
+var fitOnDraw=false
 function recoOff(){
   closeRModal()
   recoOn=false; document.getElementById('t_reco').classList.remove('on')
@@ -565,6 +567,12 @@ function drawReco(){
     if(rset.only && !s.n_listings) return false
     return true
   })
+  if(fitOnDraw && list.length){
+    fitOnDraw=false
+    var bb=new kakao.maps.LatLngBounds()
+    list.forEach(function(s){ bb.extend(LL(s.lat,s.lon)) })
+    map.setBounds(bb, 60)
+  }else{ fitOnDraw=false }
   document.getElementById('stat').textContent='⭐ 추천 '+list.length+'곳'
     +(rset.area?' ['+rset.area.split('|').join(' ')+']':'')+(rset.btype?' · '+rset.btype:'')
     +(rset.mins?' · '+rset.mins+'점↑':'')
