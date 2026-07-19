@@ -712,20 +712,22 @@ def _reco_candidates(conn):
         workers_mod = None
 
     # ① 동별 네이버 집계: 대표좌표(중앙값)·월세회전율(최근7일 신규/활성)
+    #    시도 포함(서울 '중구'·인천 '중구' 같은 동명이인 구분 + 표기용 축약).
+    _SIDO_SHORT = {"서울특별시": "서울", "경기도": "경기", "인천광역시": "인천"}
     dong = {}
     rows = conn.execute(
-        "SELECT sigungu, dong,"
+        "SELECT sido, sigungu, dong,"
         " COUNT(*) FILTER (WHERE confirmymd IS NOT NULL) AS active,"
         " COUNT(*) FILTER (WHERE confirmymd::text >= to_char(now()-interval '7 days','YYYYMMDD')) AS new7,"
         " percentile_cont(0.5) WITHIN GROUP (ORDER BY lat) AS clat,"
         " percentile_cont(0.5) WITHIN GROUP (ORDER BY lon) AS clon"
         " FROM listings WHERE sido IN ('서울특별시','경기도','인천광역시')"
         "   AND dong IS NOT NULL AND lat BETWEEN 33 AND 39.5 AND lon BETWEEN 124 AND 132"
-        " GROUP BY sigungu, dong HAVING COUNT(*) FILTER (WHERE confirmymd IS NOT NULL) >= 20"
+        " GROUP BY sido, sigungu, dong HAVING COUNT(*) FILTER (WHERE confirmymd IS NOT NULL) >= 20"
     ).fetchall()
     for r in rows:
-        dong[(r[0], r[1])] = {"sigungu": r[0], "dong": r[1], "active": r[2],
-                              "new7": r[3], "lat": float(r[4]), "lon": float(r[5])}
+        dong[(r[1], r[2])] = {"sido": _SIDO_SHORT.get(r[0], r[0]), "sigungu": r[1], "dong": r[2],
+                              "active": r[3], "new7": r[4], "lat": float(r[5]), "lon": float(r[6])}
 
     # ② 삼삼 공급(동별 매물 수) — 공급이 많으면 이미 경쟁 시장이라 제외 대상
     sam = dict(conn.execute(
@@ -826,12 +828,12 @@ def api_recommend():
         if cache_fresh:
             cands = _RECO["cands"]
         else:
-            # 미리 계산해둔 후보(refresh_insights.py → kv_cache)를 우선 사용 → 20초 재계산 회피.
-            # 없으면(최초) 그때만 직접 계산. 나이 무관(데이터는 하루 1~2회 크롤).
+            # 미리 계산해둔 후보(refresh_insights.py → kv_cache)를 우선 사용 → 재계산 회피.
+            # v2 = sido 포함 스키마. 없으면(최초/구버전 캐시) 직접 계산 — 로컬 DB라 수 초.
             cands = None
             try:
                 row = conn.execute("SELECT data FROM kv_cache WHERE k = %s",
-                                   ("reco_candidates",)).fetchone()
+                                   ("reco_candidates_v2",)).fetchone()
                 if row and row[0]:
                     cands = json.loads(row[0])
             except Exception:

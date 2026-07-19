@@ -158,6 +158,13 @@ color:#64748b;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
         <div><label class=rl>보증금</label><div class=riw><input id=r_dep type=number class=ri placeholder=1000><span class=rsuf>만 이하</span></div></div>
         <div><label class=rl>월세</label><div class=riw><input id=r_rent type=number class=ri placeholder="무제한"><span class=rsuf>만 이하</span></div></div>
       </div>
+      <div class=rrow>
+        <div><label class=rl>추천 점수 (100점 만점)</label><div class=riw><input id=r_mins type=number class=ri placeholder=0><span class=rsuf>점 이상</span></div></div>
+        <div style="display:flex;align-items:flex-end;padding-bottom:9px">
+          <label style="font-size:12.5px;font-weight:700;color:#475569;display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type=checkbox id=r_only checked style="width:16px;height:16px;accent-color:#4321F3"> 조건 맞는 매물 있는 동만</label>
+        </div>
+      </div>
       <button class=rbtn onclick="applyReco()">적용하고 추천 보기</button>
       <button class=rbtn2 id=r_off style="display:none" onclick="recoOff()">추천 끄기 (일반 지도로)</button>
     </div>
@@ -198,7 +205,7 @@ var FEATS=[], STATIONS=[], POIS=[], idx=null, DONG_AGG=[], SIG_AGG=[], rentShown
 var GEO=null, GEO_STAT=[], GEO_IDX={}, GEOPOLYS=null   // 실제 행정동 경계 폴리곤 + 좌표귀속 통계
 var filt={btype:'',week:0,occ:0,net:0}
 // ⭐ 추천 설정(모달에서 지정) — 렌트 레이어 필터(filt)와 독립.
-var rset={area:'',btype:'',minp:0,maxdep:0,maxrent:0}
+var rset={area:'',btype:'',minp:0,maxdep:0,maxrent:0,mins:0,only:true}
 var shownRent=new Map(), shownDlbl=new Map(), shownPoi=new Map(), shownNav=[]
 var recoOn=false
 
@@ -490,15 +497,21 @@ function recoParams(){
   if(rset.maxrent) p.set('max_rent', rset.maxrent)
   return p.toString()
 }
-// 지역 셀렉트: 추천 후보가 실제로 있는 시군구만(개수와 함께) — 후보 목록은 필터와 무관해 1회면 됨.
+// 지역 셀렉트: 추천 후보가 실제로 있는 시군구만(시도+개수 표기) — 후보 목록은 필터와 무관해 1회면 됨.
+// CANDS는 옵션 채우기 전용 — 그리기용 RECO와 분리(선로드가 필터 결과를 덮어쓰던 경합 방지).
+var CANDS=null
+function areaKey(s){return (s.sido||'')+'|'+(s.sigungu||'기타')}
 function fillAreaOptions(){
   var sel=document.getElementById('r_area')
-  if(!RECO || sel.options.length>1) return
-  var cnt={}
-  RECO.forEach(function(s){ var k=s.sigungu||'기타'; cnt[k]=(cnt[k]||0)+1 })
-  Object.keys(cnt).sort().forEach(function(k){
+  if(!CANDS || sel.options.length>1) return
+  var cnt={}, lbl={}
+  CANDS.forEach(function(s){
+    var k=areaKey(s); cnt[k]=(cnt[k]||0)+1
+    lbl[k]=(s.sido? s.sido+' ':'')+(s.sigungu||'기타')
+  })
+  Object.keys(cnt).sort(function(a,b){return lbl[a]<lbl[b]?-1:1}).forEach(function(k){
     var o=document.createElement('option')
-    o.value=k; o.textContent=k+' ('+cnt[k]+')'
+    o.value=k; o.textContent=lbl[k]+' ('+cnt[k]+')'
     if(k===rset.area) o.selected=true
     sel.appendChild(o)
   })
@@ -506,10 +519,10 @@ function fillAreaOptions(){
 function openRecoSettings(){
   document.getElementById('r_off').style.display = recoOn ? 'block' : 'none'
   document.getElementById('rmodal').style.display='flex'
-  if(RECO) fillAreaOptions()
+  if(CANDS) fillAreaOptions()
   else   // 후보 목록 선로드(서버 kv_cache라 가벼움) → 시군구 옵션 채움
     fetch('/samsam/api/recommend',{credentials:'same-origin'}).then(function(r){return r.json()})
-      .then(function(d){ RECO=d.spots||[]; fillAreaOptions() }).catch(function(){})
+      .then(function(d){ CANDS=d.spots||[]; fillAreaOptions() }).catch(function(){})
 }
 function closeRModal(){document.getElementById('rmodal').style.display='none'}
 function applyReco(){
@@ -518,6 +531,8 @@ function applyReco(){
   rset.minp=parseFloat(document.getElementById('r_minp').value)||0
   rset.maxdep=parseFloat(document.getElementById('r_dep').value)||0
   rset.maxrent=parseFloat(document.getElementById('r_rent').value)||0
+  rset.mins=parseFloat(document.getElementById('r_mins').value)||0
+  rset.only=document.getElementById('r_only').checked
   closeRModal()
   recoOn=true; document.getElementById('t_reco').classList.add('on')
   renderRent(); renderDongLabels(); applyGeoVisibility(); loadNaver()
@@ -543,13 +558,18 @@ function loadReco(){
 function drawReco(){
   clearReco()
   if(!recoOn||!RECO) return
-  // 지역 설정(시군구 셀렉트)은 클라이언트에서 필터.
+  // 지역(시군구)·점수·매물유무는 클라이언트에서 필터.
   var list=RECO.filter(function(s){
-    return !rset.area || (s.sigungu||'기타')===rset.area
+    if(rset.area && areaKey(s)!==rset.area) return false
+    if(rset.mins && (s.score100!=null?s.score100:s.score)<rset.mins) return false
+    if(rset.only && !s.n_listings) return false
+    return true
   })
   document.getElementById('stat').textContent='⭐ 추천 '+list.length+'곳'
-    +(rset.area?' ['+rset.area+']':'')+(rset.btype?' · '+rset.btype:'')
+    +(rset.area?' ['+rset.area.split('|').join(' ')+']':'')+(rset.btype?' · '+rset.btype:'')
+    +(rset.mins?' · '+rset.mins+'점↑':'')
     +' · 순익'+(rset.minp||50)+'만↑ · 보증금'+(rset.maxdep||1000)+'만↓'+(rset.maxrent?' · 월세'+rset.maxrent+'만↓':'')
+    +(rset.only?' · 매물있는 동만':'')
   list.forEach(function(s){
     var pt=(s.score100!=null?s.score100:s.score)
     // 실제 동 경계가 있으면 그 동 폴리곤을 노랗게 강조(좌표로 판정), 없으면 원 폴백.
@@ -574,7 +594,7 @@ function drawReco(){
 }
 function openReco(s){
   var t=document.getElementById('mtitle'), b=document.getElementById('mbody')
-  t.textContent='⭐ '+s.sigungu+' '+s.dong+' — 추천 '+(s.score100!=null?s.score100:s.score)+'점/100'
+  t.textContent='⭐ '+(s.sido?s.sido+' ':'')+s.sigungu+' '+s.dong+' — 추천 '+(s.score100!=null?s.score100:s.score)+'점/100'
   var poi=(s.poi||[]).map(function(p){
     var ic={hospital:'🏥',university:'🎓',industrial:'🏭',academy:'📚',transport:'🚄',tour:'🗼'}[p.kind]||'📍'
     return ic+' '+p.name+' '+(p.dist_m/1000).toFixed(1)+'km' }).join(' · ')
