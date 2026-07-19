@@ -272,6 +272,14 @@ def dashboard_insights():
 
 LANDING = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
 <meta name=viewport content="width=device-width,initial-scale=1"><title>rendit · 단기임대 분석</title>
+<meta property="og:type" content="website">
+<meta property="og:title" content="rendit · 단기임대 수익성 분석">
+<meta property="og:description" content="공급부족 스팟 파인더 · 지도 검색 · 수익 계산기 — 이 월세 매물, 단기임대로 돌리면 얼마 벌까?">
+<meta property="og:image" content="https://rendits.duckdns.org/og.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:url" content="https://rendits.duckdns.org/">
+<meta name="twitter:card" content="summary_large_image">
+
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxMDAgMTAwJz48Y2lyY2xlIGN4PSc1MCcgY3k9JzUwJyByPSc1MCcgZmlsbD0nIzQzMjFGMycvPjxnIGZpbGw9J25vbmUnIHN0cm9rZT0nI2ZmZicgc3Ryb2tlLXdpZHRoPScxMycgc3Ryb2tlLWxpbmVjYXA9J3JvdW5kJyBzdHJva2UtbGluZWpvaW49J3JvdW5kJz48cGF0aCBkPSdNNDAgMzRWNjcnLz48cGF0aCBkPSdNNDAgNDdDNDMgMzkgNTIgMzYgNjEgNDAnLz48L2c+PC9zdmc+">
 
 <link rel=stylesheet href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard-dynamic-subset.css">
@@ -440,6 +448,14 @@ padding:14px;text-align:center}
 PUBLIC_LANDING = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
 <title>rendit · 단기임대 수익성 분석</title>
+<meta property="og:type" content="website">
+<meta property="og:title" content="rendit · 단기임대 수익성 분석">
+<meta property="og:description" content="공급부족 스팟 파인더 · 지도 검색 · 수익 계산기 — 이 월세 매물, 단기임대로 돌리면 얼마 벌까?">
+<meta property="og:image" content="https://rendits.duckdns.org/og.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:url" content="https://rendits.duckdns.org/">
+<meta name="twitter:card" content="summary_large_image">
+
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxMDAgMTAwJz48Y2lyY2xlIGN4PSc1MCcgY3k9JzUwJyByPSc1MCcgZmlsbD0nIzQzMjFGMycvPjxnIGZpbGw9J25vbmUnIHN0cm9rZT0nI2ZmZicgc3Ryb2tlLXdpZHRoPScxMycgc3Ryb2tlLWxpbmVjYXA9J3JvdW5kJyBzdHJva2UtbGluZWpvaW49J3JvdW5kJz48cGF0aCBkPSdNNDAgMzRWNjcnLz48cGF0aCBkPSdNNDAgNDdDNDMgMzkgNTIgMzYgNjEgNDAnLz48L2c+PC9zdmc+">
 <link rel=stylesheet href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard-dynamic-subset.css">
 <style>
@@ -649,7 +665,16 @@ def fullmap():
     return render_template_string(MAP_PAGE)
 
 
+@portal.route("/og.png")
+def og_image():
+    """카톡/SNS 링크 미리보기 이미지(비로그인 접근 — auth의 og_image 예외)."""
+    from flask import send_file
+    return send_file(os.path.join(os.path.dirname(os.path.abspath(__file__)), "og.png"),
+                     mimetype="image/png", max_age=86400)
+
+
 @portal.route("/")
+
 def home():
     u = current_user()
     if not u:
