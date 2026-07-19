@@ -377,7 +377,8 @@ function renderDongLabels(){
         var s=GEO_STAT[f._i]||{on:0}
         var occ=s.on?Math.round(s.occ/s.on*10)/10:null
         var h='<div class=dpl><b>'+p.name+'</b>'
-        if(occ!=null) h+='<span class=pct style="color:'+occColor(occ)+'">'+occ+'%</span><span class=cnt>·'+s.on+'</span>'
+        // 렌트 켜면 건수(rcnt)가 뜨므로 표본 수(·on)는 숨김 — "·354 354개" 중복 방지.
+        if(occ!=null) h+='<span class=pct style="color:'+occColor(occ)+'">'+occ+'%</span>'+(show.rent?'':'<span class=cnt>·'+s.on+'</span>')
         if(show.rent&&s.n) h+='<span class=rcnt>'+s.n+'개</span>'
         h+='</div>'
         return L.marker([p.cy,p.cx],{interactive:false,icon:L.divIcon({className:'',iconSize:null,html:h})})
