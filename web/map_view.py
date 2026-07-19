@@ -89,6 +89,15 @@ text-shadow:0 1px 3px #fff,0 -1px 3px #fff,1px 0 3px #fff,-1px 0 3px #fff,1px 1p
 .it-occ{font-size:15px;font-weight:800;white-space:nowrap}
 .it-go{font-size:11px;color:#4321F3;font-weight:700;white-space:nowrap}
 .good{color:#059669}.midc{color:#d97706}.bad{color:#dc2626}.mut{color:#94a3b8}
+/* ⭐ 추천 설정 모달 */
+.rl{display:block;font-size:11.5px;font-weight:700;color:#64748b;margin:12px 0 4px}
+.ri{width:100%;padding:9px 11px;border:1.5px solid #cbd5e1;border-radius:9px;font-size:14px;font-weight:700;font-family:inherit}
+.ri:focus{outline:none;border-color:#4321F3}
+.rrow{display:flex;gap:8px}.rrow>div{flex:1}
+.rbtn{width:100%;margin-top:16px;padding:12px;border:none;border-radius:10px;background:#4321F3;color:#fff;
+font-size:14px;font-weight:800;cursor:pointer;font-family:inherit}
+.rbtn2{width:100%;margin-top:8px;padding:10px;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;
+color:#64748b;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
 @media(max-width:640px){.bar{left:12px;top:10px}.sbox input{width:100px}}
 </style></head><body>
 <div id=wrap>
@@ -99,8 +108,6 @@ text-shadow:0 1px 3px #fff,0 -1px 3px #fff,1px 0 3px #fff,-1px 0 3px #fff,1px 1p
     <span class=num>주당≥<input id=f_week type=number placeholder=0>만</span>
     <span class=num>순수익≥<input id=f_net type=number placeholder=0>만</span>
     <span class=num>예약률≥<input id=f_occ type=number placeholder=0>%</span>
-    <span class=num title="⭐ 추천 스팟 매물에 적용 (기본 1000)">보증금≤<input id=f_dep type=number placeholder=1000>만</span>
-    <span class=num title="⭐ 추천: 삼삼 시세로 추정한 예상 월순익 하한 (기본 50)">예상순익≥<input id=f_rmin type=number placeholder=50>만</span>
     <span class=stat id=stat>렌트 매물 불러오는 중…</span>
   </div>
   <div class=row id=chips>
@@ -130,6 +137,27 @@ text-shadow:0 1px 3px #fff,0 -1px 3px #fff,1px 0 3px #fff,-1px 0 3px #fff,1px 1p
   <div class=mcard onclick="event.stopPropagation()">
     <div class=mhead><div class=mtitle id=mtitle></div><button class=mx onclick="closeModal()">✕</button></div>
     <div class=mbody id=mbody></div>
+  </div>
+</div>
+<div class=mback id=rmodal style="display:none" onclick="closeRModal()">
+  <div class=mcard onclick="event.stopPropagation()" style="max-width:430px">
+    <div class=mhead><div class=mtitle>⭐ 추천 스팟 설정</div><button class=mx onclick="closeRModal()">✕</button></div>
+    <div class=mbody style="padding:2px 18px 18px">
+      <label class=rl>지역 (비우면 수도권 전체 — 예: 수원, 강남, 부천)</label>
+      <input id=r_area class=ri placeholder="전체">
+      <label class=rl>건물 유형</label>
+      <select id=r_btype class=ri>
+        <option value="">전체</option><option>오피스텔</option><option>원룸건물</option>
+        <option>아파트</option><option>연립빌라</option><option>단독주택</option><option>상가주택</option>
+      </select>
+      <div class=rrow>
+        <div><label class=rl>예상 월순익 ≥</label><input id=r_minp type=number class=ri placeholder=50></div>
+        <div><label class=rl>보증금 ≤</label><input id=r_dep type=number class=ri placeholder=1000></div>
+        <div><label class=rl>월세 ≤</label><input id=r_rent type=number class=ri placeholder="제한없음"></div>
+      </div>
+      <button class=rbtn onclick="applyReco()">적용하고 추천 보기</button>
+      <button class=rbtn2 id=r_off style="display:none" onclick="recoOff()">추천 끄기 (일반 지도로)</button>
+    </div>
   </div>
 </div>
 <script src="https://unpkg.com/supercluster@8.0.1/dist/supercluster.min.js"></script>
@@ -165,7 +193,9 @@ var show={circles:true,rent:false,naver:false}
 var poiShow={hospital:false,university:false,industrial:false,academy:false,transport:false,tour:false}
 var FEATS=[], STATIONS=[], POIS=[], idx=null, DONG_AGG=[], SIG_AGG=[], rentShown=0
 var GEO=null, GEO_STAT=[], GEO_IDX={}, GEOPOLYS=null   // 실제 행정동 경계 폴리곤 + 좌표귀속 통계
-var filt={btype:'',week:0,occ:0,net:0,dep:0,rmin:0}
+var filt={btype:'',week:0,occ:0,net:0}
+// ⭐ 추천 설정(모달에서 지정) — 렌트 레이어 필터(filt)와 독립.
+var rset={area:'',btype:'',minp:0,maxdep:0,maxrent:0}
 var shownRent=new Map(), shownDlbl=new Map(), shownPoi=new Map(), shownNav=[]
 var recoOn=false
 
@@ -448,13 +478,35 @@ function renderPois(){
 
 // ── ⭐ 추천 스팟: 수요근거는 많은데 단기임대 공급 없는 동 + 근처 부동산 매물 ──
 var RECO=null, recoKey=null, recoShapes=[]
-// 추천 매물 매칭 필터 → 쿼리스트링. 기본값: 보증금≤1000만, 예상 월순익≥50만 (입력으로 조정).
+// 추천 매물 매칭 필터 → 쿼리스트링. 설정 모달(rset) 기준. 기본: 보증금≤1000, 예상순익≥50.
 function recoParams(){
   var p=new URLSearchParams()
-  if(filt.btype && NAV_TYPE[filt.btype]) p.set('btype', NAV_TYPE[filt.btype])
-  p.set('max_dep', filt.dep||1000)
-  p.set('min_profit', filt.rmin||50)
+  if(rset.btype && NAV_TYPE[rset.btype]) p.set('btype', NAV_TYPE[rset.btype])
+  p.set('max_dep', rset.maxdep||1000)
+  p.set('min_profit', rset.minp||50)
+  if(rset.maxrent) p.set('max_rent', rset.maxrent)
   return p.toString()
+}
+function openRecoSettings(){
+  document.getElementById('r_off').style.display = recoOn ? 'block' : 'none'
+  document.getElementById('rmodal').style.display='flex'
+}
+function closeRModal(){document.getElementById('rmodal').style.display='none'}
+function applyReco(){
+  rset.area=(document.getElementById('r_area').value||'').trim()
+  rset.btype=document.getElementById('r_btype').value||''
+  rset.minp=parseFloat(document.getElementById('r_minp').value)||0
+  rset.maxdep=parseFloat(document.getElementById('r_dep').value)||0
+  rset.maxrent=parseFloat(document.getElementById('r_rent').value)||0
+  closeRModal()
+  recoOn=true; document.getElementById('t_reco').classList.add('on')
+  renderRent(); renderDongLabels(); applyGeoVisibility(); loadNaver()
+  loadReco()
+}
+function recoOff(){
+  closeRModal()
+  recoOn=false; document.getElementById('t_reco').classList.remove('on')
+  clearReco(); renderRent(); renderDongLabels(); applyGeoVisibility(); loadNaver(); setStat()
 }
 function clearReco(){ recoShapes.forEach(function(s){s.setMap(null)}); recoShapes=[] }
 function loadReco(){
@@ -465,13 +517,20 @@ function loadReco(){
   recoKey=key
   document.getElementById('stat').textContent='추천 스팟 분석 중…'
   fetch('/samsam/api/recommend'+(key?'?'+key:''),{credentials:'same-origin'}).then(function(r){return r.json()})
-    .then(function(d){ RECO=d.spots||[]; drawReco(); document.getElementById('stat').textContent='⭐ 추천 스팟 '+RECO.length+'곳 (수요근거 많은데 단기임대 없는 동)' })
+    .then(function(d){ RECO=d.spots||[]; drawReco() })
     .catch(function(){ document.getElementById('stat').textContent='추천 로드 실패' })
 }
 function drawReco(){
   clearReco()
   if(!recoOn||!RECO) return
-  RECO.forEach(function(s){
+  // 지역 설정은 클라이언트에서 부분일치 필터(시군구+동).
+  var list=RECO.filter(function(s){
+    return !rset.area || ((s.sigungu||'')+' '+(s.dong||'')).indexOf(rset.area)>=0
+  })
+  document.getElementById('stat').textContent='⭐ 추천 '+list.length+'곳'
+    +(rset.area?' ['+rset.area+']':'')+(rset.btype?' · '+rset.btype:'')
+    +' · 순익'+(rset.minp||50)+'만↑ · 보증금'+(rset.maxdep||1000)+'만↓'+(rset.maxrent?' · 월세'+rset.maxrent+'만↓':'')
+  list.forEach(function(s){
     var pt=(s.score100!=null?s.score100:s.score)
     // 실제 동 경계가 있으면 그 동 폴리곤을 노랗게 강조(좌표로 판정), 없으면 원 폴백.
     var di = GEO ? dongOf(s.lat,s.lon) : -1
@@ -514,7 +573,7 @@ function openReco(s){
       '<div style="text-align:right">'+(m.enet!=null?'<div class="it-occ '+(m.enet>=0?'good':'bad')+'">+'+m.enet+'만</div><div style="font-size:9.5px;color:#94a3b8">예상 월순익</div>':'')+
       '<div class=it-go>매물 보기 →</div></div></a>'
   })
-  if(!s.listings.length) h+='<div style="padding:14px;color:#94a3b8">현재 필터(보증금·예상순익) 조건에 맞는 매물이 없어요 — 상단 입력값을 낮춰보세요.</div>'
+  if(!s.listings.length) h+='<div style="padding:14px;color:#94a3b8">현재 설정(보증금·월세·예상순익) 조건에 맞는 매물이 없어요 — ⭐ 버튼에서 설정을 낮춰보세요.</div>'
   b.innerHTML=h
   document.getElementById('modal').style.display='flex'
 }
@@ -599,20 +658,13 @@ kakao.maps.load(function(){
 document.querySelectorAll('#chips .chip').forEach(function(ch){
   ch.addEventListener('click',function(){
     document.querySelectorAll('#chips .chip').forEach(function(x){x.classList.remove('on')})
-    ch.classList.add('on'); filt.btype=ch.dataset.t||''; applyFilter(); if(recoOn) loadReco()
+    ch.classList.add('on'); filt.btype=ch.dataset.t||''; applyFilter()
   })
 })
 ;['week','occ','net'].forEach(function(k){
   var el=document.getElementById('f_'+k), tm=null
   el.addEventListener('input',function(){
     clearTimeout(tm); tm=setTimeout(function(){filt[k]=parseFloat(el.value)||0; applyFilter()},400)
-  })
-})
-// 보증금 상한·예상순익 하한 — ⭐ 추천 스팟 매물 매칭에만 적용(수요점수 무관, 서버 캐시 재사용).
-;[['f_dep','dep'],['f_rmin','rmin']].forEach(function(kv){
-  var el=document.getElementById(kv[0]), tm=null
-  el.addEventListener('input',function(){
-    clearTimeout(tm); tm=setTimeout(function(){ filt[kv[1]]=parseFloat(el.value)||0; if(recoOn) loadReco() },400)
   })
 })
 ;['circles','rent','naver'].forEach(function(k){
@@ -629,12 +681,7 @@ document.querySelectorAll('#poirow .ptog').forEach(function(el){
     var k=el.dataset.k; poiShow[k]=!poiShow[k]; el.classList.toggle('on',poiShow[k]); renderPois()
   })
 })
-// ⭐ 추천만 보기: 켜면 렌트/폴리곤/부동산 숨기고 추천 스팟만, 끄면 원복
-document.getElementById('t_reco').addEventListener('click',function(){
-  recoOn=!recoOn; this.classList.toggle('on',recoOn)
-  renderRent(); renderDongLabels(); applyGeoVisibility(); loadNaver()
-  if(recoOn) loadReco()
-  else { clearReco(); setStat() }
-})
+// ⭐ 추천 스팟: 누르면 설정 모달(지역·유형·순수익·보증금·월세) → 적용하고 보기 / 끄기
+document.getElementById('t_reco').addEventListener('click',openRecoSettings)
 </script>
 </body></html>"""

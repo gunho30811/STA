@@ -809,9 +809,13 @@ def api_recommend():
         min_profit = int(request.args.get("min_profit") or 50)  # 예상 월순익 하한(만원)
     except ValueError:
         min_profit = 50
+    try:
+        max_rent = int(request.args.get("max_rent") or 0)       # 월세 상한(만원, 0=제한없음)
+    except ValueError:
+        max_rent = 0
     btype = request.args.get("btype") or ""               # 네이버 건물유형 코드
     types = (btype,) if btype in _RECO_NAV_CODES else _RECO_NAV_CODES
-    cache_key = f"{btype if btype in _RECO_NAV_CODES else 'ALL'}|{max_dep}|{min_profit}"
+    cache_key = f"{btype if btype in _RECO_NAV_CODES else 'ALL'}|{max_dep}|{min_profit}|{max_rent}"
 
     cache_fresh = _RECO["cands"] is not None and now - _RECO["t"] < 1800
     if cache_fresh and cache_key in _RECO["bodies"]:
@@ -848,11 +852,12 @@ def api_recommend():
     comps = _sam_comps()
     type_ph = ",".join(["%s"] * len(types))
     dep_sql = " AND deposit <= %s" if max_dep > 0 else ""
+    rent_hi = max_rent if max_rent > 0 else 200   # 월세 상한(사용자 설정, 기본 200)
     spots = []
     for c in cands:
         try:
             params = [c["lat"] - 0.014, c["lat"] + 0.014, c["lon"] - 0.017, c["lon"] + 0.017,
-                      *types, "%반지하%", "%반지층%", "%반지하%", "%반지층%"]
+                      rent_hi, *types, "%반지하%", "%반지층%", "%반지하%", "%반지층%"]
             if max_dep > 0:
                 params.append(max_dep)
             params.append(RECO_FETCH)
@@ -861,7 +866,7 @@ def api_recommend():
                 " floor_current, lat, lng, maintenance_monthly, building_type_code"
                 " FROM naver_listings"
                 " WHERE lat BETWEEN %s AND %s AND lng BETWEEN %s AND %s"
-                "   AND rent_monthly BETWEEN 20 AND 200"
+                "   AND rent_monthly BETWEEN 1 AND %s"
                 f"   AND building_type_code IN ({type_ph})"
                 "   AND COALESCE(summary, '') NOT LIKE %s AND COALESCE(summary, '') NOT LIKE %s"
                 "   AND COALESCE(summary_tags, '') NOT LIKE %s AND COALESCE(summary_tags, '') NOT LIKE %s"
@@ -970,8 +975,11 @@ def api_map():
                         " FROM naver_listings"
                         " WHERE lat BETWEEN %s AND %s AND lng BETWEEN %s AND %s"
                         "   AND rent_monthly BETWEEN 1 AND 5000"
+                        "   AND COALESCE(summary, '') NOT LIKE %s AND COALESCE(summary, '') NOT LIKE %s"
+                        "   AND COALESCE(summary_tags, '') NOT LIKE %s AND COALESCE(summary_tags, '') NOT LIKE %s"
                         " LIMIT 1000",
-                        (b["min_lat"], b["max_lat"], b["min_lng"], b["max_lng"])).fetchall()
+                        (b["min_lat"], b["max_lat"], b["min_lng"], b["max_lng"],
+                         "%반지하%", "%반지층%", "%반지하%", "%반지층%")).fetchall()
                     conn.close()
                     last_err = None
                     break
