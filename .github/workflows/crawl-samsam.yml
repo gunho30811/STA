@@ -1,11 +1,9 @@
 name: 삼삼엠투 크롤링 자동화 (매일)
 
 on:
-  schedule:
-    # 매일 21:00 UTC (한국시간 06:00, 아침). 네이버 주간 크롤(월 01:00 UTC=10:00 KST)과
-    # 몇 시간 떨어져 있어 같은 파일(net_profit_integrated.csv)을 커밋할 때 겹칠 일이 없다.
-    - cron: '0 21 * * *'
-  workflow_dispatch:        # 수동 실행 가능
+  # 스케줄 중단(2026-07-20): GHA 러너(미국 IP)는 삼삼 소프트차단으로 항상 빈 데이터 —
+  # 일일 크롤은 오라클 VM(한국 IP) 크론으로 이전(deploy/crawl_samsam_daily.sh, 04:30 KST).
+  workflow_dispatch:        # 수동 실행만 가능
 
 permissions:
   contents: write      # jsonl·csv 를 main에 직접 커밋·push (main은 실제로 미보호 → PR 불필요)
