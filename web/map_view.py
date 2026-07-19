@@ -348,7 +348,7 @@ function geoStyle(i){
   var s=GEO_STAT[i]
   if(!s||!s.on) return {color:'#94a3b8',weight:.7,fillColor:'#94a3b8',fillOpacity:.04}
   var occ=Math.round(s.occ/s.on*10)/10
-  return {color:'#64748b',weight:.8,fillColor:occColor(occ),fillOpacity:.24}
+  return {color:'#64748b',weight:.8,fillColor:occColor(occ),fillOpacity:.17}
 }
 function restyleGeo(){
   if(geoLayer) geoLayer.eachLayer(function(l){ l.setStyle(geoStyle(l.feature._i)) })
@@ -372,7 +372,8 @@ function renderDongLabels(){
     GEO.features.forEach(function(f){
       var p=f.properties
       if(!b.contains([p.cy,p.cx])) return
-      wanted.set('l'+f._i, function(){
+      // 키에 렌트 상태 포함 — 렌트 토글 시 라벨(건수 표시)이 diff 렌더에서 새로 그려지게.
+      wanted.set('l'+f._i+(show.rent?'r':''), function(){
         var s=GEO_STAT[f._i]||{on:0}
         var occ=s.on?Math.round(s.occ/s.on*10)/10:null
         var h='<div class=dpl><b>'+p.name+'</b>'
