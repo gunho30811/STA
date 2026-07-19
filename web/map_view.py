@@ -348,11 +348,16 @@ function dongOf(lat,lng){
   }
   return -1
 }
+// 색칠 원칙: 신호등 3색으로 전 동을 칠하면 서울 전체가 두드러기처럼 됨(사용자: "징그럽다") →
+// 수요 높은 동만 브랜드 보라로 강조하고 낮음·표본부족은 거의 투명. 스팟 파인더 목적에 부합.
 function geoStyle(i){
   var s=GEO_STAT[i]
-  if(!s||!s.on) return {c:'#94a3b8',w:.7,fc:'#94a3b8',fo:.04}
-  var occ=Math.round(s.occ/s.on*10)/10
-  return {c:'#64748b',w:.8,fc:occColor(occ),fo:.17}
+  if(!s||s.on<3) return {c:'#c3c8d4',w:.5,fc:'#94a3b8',fo:.02}   // 표본<3: 사실상 안 칠함
+  var occ=s.occ/s.on
+  if(occ>=70) return {c:'#4321F3',w:1,fc:'#4321F3',fo:.32}
+  if(occ>=55) return {c:'#6d5ef2',w:.8,fc:'#6d5ef2',fo:.20}
+  if(occ>=40) return {c:'#8b7dff',w:.6,fc:'#8b7dff',fo:.11}
+  return {c:'#c3c8d4',w:.5,fc:'#94a3b8',fo:.03}                  // 예약률 낮음: 색 없음
 }
 function restyleGeo(){
   if(!GEOPOLYS) return
