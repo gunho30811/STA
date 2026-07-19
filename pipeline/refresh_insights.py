@@ -51,8 +51,8 @@ def main():
         import samsam_app
         t = dt.datetime.now()
         cands = samsam_app._reco_candidates(conn)
-        _save(conn, "reco_candidates", cands)
-        print(f"reco_candidates 저장: {len(cands)}곳 "
+        _save(conn, "reco_candidates_v2", cands)   # v2 = sido 포함 스키마
+        print(f"reco_candidates_v2 저장: {len(cands)}곳 "
               f"({(dt.datetime.now()-t).total_seconds():.1f}s)")
     except Exception as e:
         print(f"reco_candidates 스킵: {repr(e)[:100]}")
