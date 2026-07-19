@@ -168,7 +168,7 @@ function applyFilter(){
   var gd={}, gs={}
   fs.forEach(function(f){
     var p=f.properties
-    var bd=(p.dong||'').replace(/\d+가$/,'')
+    var bd=(p.dong||'').replace(/\\d+가$/,'')
     var dk=(p.sigungu||'')+'|'+bd
     var d=gd[dk]||(gd[dk]={lats:[],lngs:[],n:0,label:bd||p.sigungu||'기타',items:[]})
     d.lats.push(p.lat); d.lngs.push(p.lng); d.n++; d.items.push(p)
