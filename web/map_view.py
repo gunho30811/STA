@@ -94,6 +94,9 @@ text-shadow:0 1px 3px #fff,0 -1px 3px #fff,1px 0 3px #fff,-1px 0 3px #fff,1px 1p
 .ri{width:100%;padding:9px 11px;border:1.5px solid #cbd5e1;border-radius:9px;font-size:14px;font-weight:700;font-family:inherit}
 .ri:focus{outline:none;border-color:#4321F3}
 .rrow{display:flex;gap:8px}.rrow>div{flex:1}
+.riw{position:relative}
+.riw .ri{padding-right:52px}
+.rsuf{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;color:#94a3b8;pointer-events:none}
 .rbtn{width:100%;margin-top:16px;padding:12px;border:none;border-radius:10px;background:#4321F3;color:#fff;
 font-size:14px;font-weight:800;cursor:pointer;font-family:inherit}
 .rbtn2{width:100%;margin-top:8px;padding:10px;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;
@@ -105,9 +108,9 @@ color:#64748b;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
 <div class=bar>
   <div class=row>
     <div class=sbox><input id=q placeholder="동 · 역 검색 (예: 역삼동, 강남역)"><button onclick="doSearch()">이동</button></div>
-    <span class=num>주당≥<input id=f_week type=number placeholder=0>만</span>
-    <span class=num>순수익≥<input id=f_net type=number placeholder=0>만</span>
-    <span class=num>예약률≥<input id=f_occ type=number placeholder=0>%</span>
+    <span class=num title="주당 렌트비 n만원 이상만">주당 <input id=f_week type=number placeholder=0>만↑</span>
+    <span class=num title="월순수익 n만원 이상만">순수익 <input id=f_net type=number placeholder=0>만↑</span>
+    <span class=num title="예약률 n% 이상만">예약률 <input id=f_occ type=number placeholder=0>%↑</span>
     <span class=stat id=stat>렌트 매물 불러오는 중…</span>
   </div>
   <div class=row id=chips>
@@ -151,9 +154,9 @@ color:#64748b;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
         <option>아파트</option><option>연립빌라</option><option>단독주택</option><option>상가주택</option>
       </select>
       <div class=rrow>
-        <div><label class=rl>예상 월순익 ≥</label><input id=r_minp type=number class=ri placeholder=50></div>
-        <div><label class=rl>보증금 ≤</label><input id=r_dep type=number class=ri placeholder=1000></div>
-        <div><label class=rl>월세 ≤</label><input id=r_rent type=number class=ri placeholder="제한없음"></div>
+        <div><label class=rl>예상 월순익</label><div class=riw><input id=r_minp type=number class=ri placeholder=50><span class=rsuf>만 이상</span></div></div>
+        <div><label class=rl>보증금</label><div class=riw><input id=r_dep type=number class=ri placeholder=1000><span class=rsuf>만 이하</span></div></div>
+        <div><label class=rl>월세</label><div class=riw><input id=r_rent type=number class=ri placeholder="무제한"><span class=rsuf>만 이하</span></div></div>
       </div>
       <button class=rbtn onclick="applyReco()">적용하고 추천 보기</button>
       <button class=rbtn2 id=r_off style="display:none" onclick="recoOff()">추천 끄기 (일반 지도로)</button>
