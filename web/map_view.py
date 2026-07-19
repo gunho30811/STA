@@ -63,6 +63,15 @@ box-shadow:0 1px 4px rgba(0,0,0,.2);opacity:.55}
 border:3px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.35);line-height:1.1;text-align:center;cursor:pointer}
 .clus.rent{background:#4321F3}
 .clus small{font-weight:600;font-size:9px;display:block}
+/* 네이버지도 스타일 지역(동/시군구) 건수 뱃지 — 예약률 점·배지와 안 겹치게 지점 위로 띄움 */
+.dongb{transform:translate(-50%,-112%);display:flex;flex-direction:column;align-items:center;
+background:rgba(67,33,243,.93);color:#fff;border:2.5px solid rgba(255,255,255,.9);border-radius:13px;
+padding:4px 10px;line-height:1.15;white-space:nowrap;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.35);
+font-weight:800;text-align:center}
+.dongb b{font-size:14px}.dongb small{font-size:9px;font-weight:600;opacity:.85;margin-left:1px}
+.dongb .dn{display:block;font-size:10px;font-weight:700;opacity:.92}
+.dongb.mid b{font-size:15px}
+.dongb.big{padding:5px 12px}.dongb.big b{font-size:16px}
 .mback{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:2000;display:flex;align-items:flex-end;justify-content:center}
 .mcard{background:#fff;width:100%;max-width:560px;border-radius:16px 16px 0 0;max-height:78vh;display:flex;flex-direction:column;color:#1f2937}
 @media(min-width:641px){.mback{align-items:center}.mcard{border-radius:16px}}
@@ -138,7 +147,7 @@ var poiLayer=L.layerGroup().addTo(map)
 // 첫인상 정리: 동 예약률만 켜고 시작. 렌트/부동산/수요시설은 사용자가 필요할 때 켠다.
 var show={circles:true,rent:false,naver:false}
 var poiShow={hospital:false,university:false,industrial:false,academy:false,transport:false,tour:false}
-var FEATS=[], STATIONS=[], POIS=[], idx=null, CIRCLES=[], rentShown=0
+var FEATS=[], STATIONS=[], POIS=[], idx=null, CIRCLES=[], DONG_AGG=[], SIG_AGG=[], rentShown=0
 var filt={btype:'',week:0,occ:0,net:0,dep:0}
 var shownRent=new Map(), shownCirc=new Map()
 
@@ -154,6 +163,19 @@ function applyFilter(){
   })
   rentShown=fs.length
   idx=new Supercluster({radius:56,maxZoom:17,minPoints:2}).load(fs)
+  // 네이버지도식 지역 집계: 줌아웃에선 임의 클러스터 대신 실제 동/시군구 단위 건수 뱃지.
+  var gd={}, gs={}
+  fs.forEach(function(f){
+    var p=f.properties
+    var dk=(p.sigungu||'')+'|'+(p.dong||'')
+    var d=gd[dk]||(gd[dk]={lats:[],lngs:[],n:0,label:p.dong||p.sigungu||'기타',items:[]})
+    d.lats.push(p.lat); d.lngs.push(p.lng); d.n++; d.items.push(p)
+    var sk=p.sigungu||'기타'
+    var s=gs[sk]||(gs[sk]={lats:[],lngs:[],n:0,label:sk})
+    s.lats.push(p.lat); s.lngs.push(p.lng); s.n++
+  })
+  DONG_AGG=Object.keys(gd).map(function(k){var v=gd[k];return [median(v.lats),median(v.lngs),v.n,v.label,k,v.items]})
+  SIG_AGG=Object.keys(gs).map(function(k){var v=gs[k];return [median(v.lats),median(v.lngs),v.n,v.label,k,null]})
   // 동 원(지역 수요 지표)은 매물 필터와 무관하게 항상 '전체' 기준 — 예약률 50%↑ 필터를 걸면
   // 남은 매물 평균이라 모든 동이 높아 보이는 선택 편향 방지. 유형 칩만 세그먼트로 반영.
   var fsCirc = filt.btype ? FEATS.filter(function(f){return f.properties.btype===filt.btype}) : FEATS
@@ -215,8 +237,28 @@ function diffRender(group, shownMap, wanted){
 function renderRent(){
   if(!idx) return
   var wanted=new Map()
-  if(show.rent){
-    var b=map.getBounds(), z=Math.round(map.getZoom())
+  var z=Math.round(map.getZoom())
+  // 줌아웃(15 미만): 네이버지도처럼 실제 행정구역 단위 건수 — 12~14는 동, 12 미만은 시군구.
+  if(show.rent && z<NAVER_ZOOM){
+    var b2=map.getBounds().pad(0.1), dong=z>=12
+    var src=dong?DONG_AGG:SIG_AGG
+    src.forEach(function(a){
+      if(!b2.contains([a[0],a[1]])) return
+      wanted.set((dong?'d':'s')+a[4], function(){
+        var n=a[2]
+        var m=L.marker([a[0],a[1]],{icon:L.divIcon({className:'',iconSize:null,
+          html:'<div class="dongb'+(n>=100?' big':n>=30?' mid':'')+'"><div><b>'+n+'</b><small>개</small></div><span class=dn>'+a[3]+'</span></div>'})})
+        m.on('click',function(){
+          if(dong&&n<=LIST_MAX) openList(a[5].slice(),'rent')
+          else map.setView([a[0],a[1]],dong?15:13)
+        })
+        return m
+      })
+    })
+  }
+  // 확대(15+): 개별 매물 핀 — supercluster는 같은 지점에 겹친 매물 정리용으로만.
+  if(show.rent && z>=NAVER_ZOOM){
+    var b=map.getBounds()
     var items=idx.getClusters([b.getWest()-0.02,b.getSouth()-0.02,b.getEast()+0.02,b.getNorth()+0.02], z)
     items.forEach(function(f){
       var lng=f.geometry.coordinates[0], lat=f.geometry.coordinates[1]
