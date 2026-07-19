@@ -602,6 +602,7 @@ function loadNaver(){
     }).catch(function(){setStat()})
 }
 function setStat(navN){
+  if(recoOn) return   // 추천 모드에선 drawReco가 상태바(설정 요약)를 소유 — 덮어쓰기 금지
   var z=zv()
   var f=(filt.btype||'전체')+(filt.week?' · 주당'+filt.week+'만↑':'')+(filt.net?' · 순수익'+filt.net+'만↑':'')+(filt.occ?' · 예약률'+filt.occ+'%↑':'')
   var s='렌트 '+rentShown.toLocaleString()+'개 ['+f+']'
