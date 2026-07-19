@@ -72,6 +72,14 @@ font-weight:800;text-align:center}
 .dongb .dn{display:block;font-size:10px;font-weight:700;opacity:.92}
 .dongb.mid b{font-size:15px}
 .dongb.big{padding:5px 12px}.dongb.big b{font-size:16px}
+/* 동 폴리곤 라벨: 흰 헤일로 텍스트(동명 + 예약률 + 렌트 건수) */
+.dpl{transform:translate(-50%,-50%);text-align:center;font-weight:800;font-size:10.5px;line-height:1.25;
+color:#334155;white-space:nowrap;pointer-events:none;
+text-shadow:0 1px 3px #fff,0 -1px 3px #fff,1px 0 3px #fff,-1px 0 3px #fff,1px 1px 3px #fff,-1px -1px 3px #fff}
+.dpl b{display:block;font-size:11.5px}
+.dpl .pct{font-weight:900;font-size:11px}
+.dpl .cnt{color:#94a3b8;font-size:9px;font-weight:600}
+.dpl .rcnt{margin-left:4px;color:#4321F3;font-weight:900;font-size:10.5px}
 .mback{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:2000;display:flex;align-items:flex-end;justify-content:center}
 .mcard{background:#fff;width:100%;max-width:560px;border-radius:16px 16px 0 0;max-height:78vh;display:flex;flex-direction:column;color:#1f2937}
 @media(min-width:641px){.mback{align-items:center}.mcard{border-radius:16px}}
@@ -137,19 +145,20 @@ function occColor(o){return o==null?'#94a3b8':o>=60?'#059669':o>=30?'#f59e0b':'#
 function occCls(o){return o==null?'mut':o>=60?'good':o>=30?'midc':'bad'}
 function median(arr){var a=arr.slice().sort(function(x,y){return x-y});var m=a.length>>1;return a.length%2?a[m]:(a[m-1]+a[m])/2}
 
-var map=L.map('map',{center:[37.5665,126.978],zoom:13})
+var map=L.map('map',{center:[37.5665,126.978],zoom:13,preferCanvas:true})
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map)
 
 var rentLayer=L.layerGroup().addTo(map)
-var circleLayer=L.layerGroup().addTo(map)
 var navLayer=L.layerGroup().addTo(map)
 var poiLayer=L.layerGroup().addTo(map)
-// 첫인상 정리: 동 예약률만 켜고 시작. 렌트/부동산/수요시설은 사용자가 필요할 때 켠다.
+var dlabelLayer=L.layerGroup().addTo(map)
+// 첫인상 정리: 동 경계(예약률 색)만 켜고 시작. 렌트/부동산/수요시설은 사용자가 필요할 때 켠다.
 var show={circles:true,rent:false,naver:false}
 var poiShow={hospital:false,university:false,industrial:false,academy:false,transport:false,tour:false}
-var FEATS=[], STATIONS=[], POIS=[], idx=null, CIRCLES=[], DONG_AGG=[], SIG_AGG=[], rentShown=0
+var FEATS=[], STATIONS=[], POIS=[], idx=null, DONG_AGG=[], SIG_AGG=[], rentShown=0
+var GEO=null, GEO_STAT=[], GEO_IDX={}, geoLayer=null   // 실제 행정동 경계 폴리곤 + 좌표귀속 통계
 var filt={btype:'',week:0,occ:0,net:0,dep:0}
-var shownRent=new Map(), shownCirc=new Map()
+var shownRent=new Map(), shownDlbl=new Map()
 
 // ── 필터 적용: 인덱스 재구축(22k ~100ms) + 동 원 재계산(중앙값 좌표) ──
 function applyFilter(){
@@ -178,23 +187,24 @@ function applyFilter(){
   })
   DONG_AGG=Object.keys(gd).map(function(k){var v=gd[k];return [median(v.lats),median(v.lngs),v.n,v.label,k,v.items]})
   SIG_AGG=Object.keys(gs).map(function(k){var v=gs[k];return [median(v.lats),median(v.lngs),v.n,v.label,k,null]})
-  // 동 원(지역 수요 지표)은 매물 필터와 무관하게 항상 '전체' 기준 — 예약률 50%↑ 필터를 걸면
-  // 남은 매물 평균이라 모든 동이 높아 보이는 선택 편향 방지. 유형 칩만 세그먼트로 반영.
-  var fsCirc = filt.btype ? FEATS.filter(function(f){return f.properties.btype===filt.btype}) : FEATS
-  var g={}
-  fsCirc.forEach(function(f){
-    var p=f.properties, k=p.sigungu+'|'+p.dong
-    if(!g[k]) g[k]={lats:[],lngs:[],occ:0,n:0,dong:p.dong}
-    g[k].lats.push(p.lat); g[k].lngs.push(p.lng); g[k].occ+=(p.occ||0); g[k].n++
-  })
-  CIRCLES=[]
-  Object.keys(g).forEach(function(k){
-    var v=g[k]   // 매물 1개뿐인 동도 표기(요청: 동이면 다 보이게). 표본 수(·n)로 신뢰도 판단.
-    CIRCLES.push([median(v.lats),median(v.lngs),Math.round(v.occ/v.n*10)/10,v.n,v.dong,k])
-  })
+  // 동 폴리곤 통계(예약률·건수). 예약률은 매물 필터와 무관하게 항상 '전체' 기준 — 예약률 50%↑
+  // 필터를 걸면 남은 매물 평균이라 모든 동이 높아 보이는 선택 편향 방지. 유형 칩만 세그먼트 반영.
+  if(GEO){
+    GEO_STAT=GEO.features.map(function(){return {occ:0,on:0,n:0,items:null}})
+    var pop = filt.btype ? FEATS.filter(function(f){return f.properties.btype===filt.btype}) : FEATS
+    pop.forEach(function(f){
+      var p=f.properties
+      if(p.di>=0){var s=GEO_STAT[p.di]; s.occ+=(p.occ||0); s.on++}
+    })
+    fs.forEach(function(f){
+      var p=f.properties
+      if(p.di>=0){var s=GEO_STAT[p.di]; s.n++; (s.items=s.items||[]).push(p)}
+    })
+    restyleGeo()
+  }
   shownRent.forEach(function(ly){rentLayer.removeLayer(ly)}); shownRent.clear()
-  shownCirc.forEach(function(ly){circleLayer.removeLayer(ly)}); shownCirc.clear()
-  renderRent(); renderCircles(); loadNaver(); setStat()
+  shownDlbl.forEach(function(ly){dlabelLayer.removeLayer(ly)}); shownDlbl.clear()
+  renderRent(); renderDongLabels(); loadNaver(); setStat()
 }
 
 // ── 모달 ──
@@ -242,7 +252,8 @@ function renderRent(){
   var z=Math.round(map.getZoom())
   // 줌아웃(15 미만): 네이버지도처럼 실제 행정구역 단위 건수 — 14는 동(화면≈한 구), 13 이하는 시군구.
   // (동 티어를 12~13까지 내리면 서울 전역 수백 개 동이 한 화면에 도배됨 — z13 스크린샷으로 확인)
-  if(show.rent && z<NAVER_ZOOM){
+  // 동 폴리곤이 켜져 있으면 z14 건수는 폴리곤 라벨이 담당 → 동 뱃지는 폴리곤 꺼졌을 때만.
+  if(show.rent && z<NAVER_ZOOM && !(z>=14 && show.circles && GEO)){
     var b2=map.getBounds().pad(0.1), dong=z>=14
     var src=dong?DONG_AGG:SIG_AGG
     src.forEach(function(a){
@@ -292,29 +303,87 @@ function renderRent(){
   diffRender(rentLayer, shownRent, wanted)
 }
 
-function renderCircles(){
+// ── 실제 행정동 경계 폴리곤: 동 면적 그대로 예약률 색칠, 매물은 좌표→폴리곤 귀속 ──
+// (매물 dong은 법정동, 경계는 행정동이라 이름 매칭이 안 됨 — 좌표 점-내부-판정으로 회피)
+function eachOuter(f,cb){
+  var g=f.geometry
+  if(g.type==='Polygon') cb(g.coordinates[0])
+  else g.coordinates.forEach(function(p){cb(p[0])})
+}
+function pip(lat,lng,ring){
+  var inside=false
+  for(var i=0,j=ring.length-1;i<ring.length;j=i++){
+    var xi=ring[i][0], yi=ring[i][1], xj=ring[j][0], yj=ring[j][1]
+    if(((yi>lat)!==(yj>lat)) && (lng < (xj-xi)*(lat-yi)/(yj-yi)+xi)) inside=true
+  }
+  return inside
+}
+function buildGeoIndex(){
+  GEO.features.forEach(function(f,i){
+    var bb=[999,999,-999,-999]   // [minLng,minLat,maxLng,maxLat]
+    eachOuter(f,function(r){r.forEach(function(pt){
+      if(pt[0]<bb[0])bb[0]=pt[0]; if(pt[1]<bb[1])bb[1]=pt[1]
+      if(pt[0]>bb[2])bb[2]=pt[0]; if(pt[1]>bb[3])bb[3]=pt[1]
+    })})
+    f._bb=bb; f._i=i
+    for(var a=Math.floor(bb[1]/0.02); a<=Math.floor(bb[3]/0.02); a++)
+      for(var o=Math.floor(bb[0]/0.02); o<=Math.floor(bb[2]/0.02); o++){
+        var k=a+'_'+o; (GEO_IDX[k]=GEO_IDX[k]||[]).push(i)
+      }
+  })
+}
+function dongOf(lat,lng){
+  var c=GEO_IDX[Math.floor(lat/0.02)+'_'+Math.floor(lng/0.02)]
+  if(!c) return -1
+  for(var i=0;i<c.length;i++){
+    var f=GEO.features[c[i]], bb=f._bb
+    if(lng<bb[0]||lat<bb[1]||lng>bb[2]||lat>bb[3]) continue
+    var hit=false
+    eachOuter(f,function(r){ if(!hit&&pip(lat,lng,r)) hit=true })
+    if(hit) return c[i]
+  }
+  return -1
+}
+function geoStyle(i){
+  var s=GEO_STAT[i]
+  if(!s||!s.on) return {color:'#94a3b8',weight:.7,fillColor:'#94a3b8',fillOpacity:.04}
+  var occ=Math.round(s.occ/s.on*10)/10
+  return {color:'#64748b',weight:.8,fillColor:occColor(occ),fillOpacity:.24}
+}
+function restyleGeo(){
+  if(geoLayer) geoLayer.eachLayer(function(l){ l.setStyle(geoStyle(l.feature._i)) })
+}
+function initGeo(){
+  buildGeoIndex()
+  FEATS.forEach(function(f){ f.properties.di=dongOf(f.properties.lat,f.properties.lng) })
+  geoLayer=L.geoJSON(GEO,{style:function(f){return geoStyle(f._i)},onEachFeature:function(f,l){
+    l.on('click',function(){
+      var s=GEO_STAT[f._i]
+      if(s&&s.items&&s.items.length) openList(s.items.slice(),'rent')
+    })
+  }})
+  if(show.circles) geoLayer.addTo(map)
+}
+// 동 라벨: 줌 14+ 에서 폴리곤 내부점에 동명·예약률(렌트 켜면 건수도). 그 미만은 색만.
+function renderDongLabels(){
   var wanted=new Map()
-  if(show.circles && map.getZoom()>=CIRCLE_ZOOM){
-    var b=map.getBounds().pad(0.1), z=map.getZoom()
-    // 줌 14 미만: 글자 배지가 화면을 덮어 지저분 → 예약률 '점'만(색으로 수준 표현).
-    // 줌 14+: 동명·예약률 배지 표시(그 정도로 확대하면 화면당 동 수가 적어 안 겹침).
-    var showBadge = z>=14
-    CIRCLES.forEach(function(c){
-      if(!b.contains([c[0],c[1]])) return
-      wanted.set(c[5]+(showBadge?'b':'d'), function(){
-        if(!showBadge){
-          return L.circleMarker([c[0],c[1]],{radius:6,color:'#fff',weight:1,
-            fillColor:occColor(c[2]),fillOpacity:.75,interactive:false})
-        }
-        var g=L.layerGroup()
-        L.circle([c[0],c[1]],{radius:420,color:occColor(c[2]),weight:1.2,fillColor:occColor(c[2]),fillOpacity:.10,interactive:false}).addTo(g)
-        L.marker([c[0],c[1]],{interactive:false,icon:L.divIcon({className:'occ-badge-wrap',iconSize:null,
-          html:'<div class="occ-badge" style="border-color:'+occColor(c[2])+';color:'+occColor(c[2])+'">'+c[4]+'<br><b>'+c[2]+'%</b><span class=occ-n>·'+c[3]+'</span></div>'})}).addTo(g)
-        return g
+  if(show.circles && GEO && map.getZoom()>=14){
+    var b=map.getBounds().pad(0.1)
+    GEO.features.forEach(function(f){
+      var p=f.properties
+      if(!b.contains([p.cy,p.cx])) return
+      wanted.set('l'+f._i, function(){
+        var s=GEO_STAT[f._i]||{on:0}
+        var occ=s.on?Math.round(s.occ/s.on*10)/10:null
+        var h='<div class=dpl><b>'+p.name+'</b>'
+        if(occ!=null) h+='<span class=pct style="color:'+occColor(occ)+'">'+occ+'%</span><span class=cnt>·'+s.on+'</span>'
+        if(show.rent&&s.n) h+='<span class=rcnt>'+s.n+'개</span>'
+        h+='</div>'
+        return L.marker([p.cy,p.cx],{interactive:false,icon:L.divIcon({className:'',iconSize:null,html:h})})
       })
     })
   }
-  diffRender(circleLayer, shownCirc, wanted)
+  diffRender(dlabelLayer, shownDlbl, wanted)
 }
 
 // ── 수요시설 POI: 왜 이 동네에 수요가 있나(병원 통원·대학 계절학기·산단 출장) ──
@@ -438,9 +507,10 @@ function doSearch(){
   for(var i=0;i<STATIONS.length;i++){
     if(STATIONS[i][0].indexOf(qq)>=0){map.setView([STATIONS[i][1],STATIONS[i][2]],15);return}
   }
-  for(var j=0;j<CIRCLES.length;j++){
-    if(CIRCLES[j][4].indexOf(q)>=0){map.setView([CIRCLES[j][0],CIRCLES[j][1]],15);return}
-  }
+  if(GEO){ for(var j=0;j<GEO.features.length;j++){
+    var gp=GEO.features[j].properties
+    if(gp.name.indexOf(q)>=0){map.setView([gp.cy,gp.cx],15);return}
+  }}
   for(var k=0;k<FEATS.length;k++){   // 필터로 원이 사라진 동도 전체 매물에서 검색
     var p=FEATS[k].properties
     if(p.dong&&p.dong.indexOf(q)>=0){map.setView([p.lat,p.lng],15);return}
@@ -449,13 +519,19 @@ function doSearch(){
 }
 document.getElementById('q').addEventListener('keydown',function(e){if(e.key==='Enter')doSearch()})
 
-// ── 초기 1회 로드 ──
-fetch('/samsam/api/map_all',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
+// ── 초기 1회 로드: 매물 + 동 경계(정적, 7일 캐시) 병렬 ──
+Promise.all([
+  fetch('/samsam/api/map_all',{credentials:'same-origin'}).then(function(r){return r.json()}),
+  fetch('/dong_geo.json').then(function(r){return r.json()}).catch(function(){return null})
+]).then(function(res){
+  var d=res[0]
   STATIONS=d.stations||[]
   POIS=d.pois||[]
   FEATS=(d.rent||[]).filter(function(a){return a[1]>=33&&a[1]<=39.5&&a[2]>=124&&a[2]<=132})
     .map(function(a){return {type:'Feature',geometry:{type:'Point',coordinates:[a[2],a[1]]},
       properties:{id:a[0],lat:a[1],lng:a[2],occ:a[3],week:a[4],pyeong:a[5],btype:a[6],name:a[7],sigungu:a[8],dong:a[9],net:a[10]}}})
+  GEO=res[1]
+  if(GEO) initGeo()   // 경계 로드 실패 시에도 나머지 지도는 동작
   applyFilter(); renderPois()
 }).catch(function(){document.getElementById('stat').textContent='로드 실패 — 새로고침 해주세요'})
 
@@ -463,10 +539,10 @@ fetch('/samsam/api/map_all',{credentials:'same-origin'}).then(function(r){return
 var mvTimer=null
 map.on('move',function(){
   if(mvTimer) return
-  mvTimer=setTimeout(function(){mvTimer=null;renderRent();renderCircles()},120)
+  mvTimer=setTimeout(function(){mvTimer=null;renderRent();renderDongLabels()},120)
 })
 map.on('moveend zoomend',function(){
-  renderRent(); renderCircles(); renderPois()
+  renderRent(); renderDongLabels(); renderPois()
   clearTimeout(navTimer); navTimer=setTimeout(loadNaver,400)
 })
 
@@ -493,8 +569,11 @@ document.querySelectorAll('#chips .chip').forEach(function(ch){
 ;['circles','rent','naver'].forEach(function(k){
   document.getElementById('t_'+k).addEventListener('click',function(){
     show[k]=!show[k]; this.classList.toggle('on',show[k])
-    if(k==='circles') renderCircles()
-    else if(k==='rent') renderRent()
+    if(k==='circles'){
+      if(geoLayer){ if(show.circles) geoLayer.addTo(map); else map.removeLayer(geoLayer) }
+      renderDongLabels(); renderRent()   // 폴리곤 온오프에 따라 동 뱃지 표시도 달라짐
+    }
+    else if(k==='rent'){ renderRent(); renderDongLabels() }
     else loadNaver()
   })
 })
@@ -508,10 +587,12 @@ document.querySelectorAll('#poirow .ptog').forEach(function(el){
 document.getElementById('t_reco').addEventListener('click',function(){
   recoOn=!recoOn; this.classList.toggle('on',recoOn)
   if(recoOn){
-    map.removeLayer(rentLayer); map.removeLayer(circleLayer); map.removeLayer(navLayer)
+    map.removeLayer(rentLayer); map.removeLayer(dlabelLayer); map.removeLayer(navLayer)
+    if(geoLayer) map.removeLayer(geoLayer)
     loadReco()
   }else{
-    map.addLayer(rentLayer); map.addLayer(circleLayer); map.addLayer(navLayer)
+    map.addLayer(rentLayer); map.addLayer(dlabelLayer); map.addLayer(navLayer)
+    if(geoLayer&&show.circles) geoLayer.addTo(map)
     recoLayer.clearLayers(); setStat()
   }
 })
