@@ -146,8 +146,8 @@ color:#64748b;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
   <div class=mcard onclick="event.stopPropagation()" style="max-width:430px">
     <div class=mhead><div class=mtitle>⭐ 추천 스팟 설정</div><button class=mx onclick="closeRModal()">✕</button></div>
     <div class=mbody style="padding:2px 18px 18px">
-      <label class=rl>지역 (비우면 수도권 전체 — 예: 수원, 강남, 부천)</label>
-      <input id=r_area class=ri placeholder="전체">
+      <label class=rl>지역 (추천 스팟이 있는 시군구만 표시)</label>
+      <select id=r_area class=ri><option value="">전체 (수도권)</option></select>
       <label class=rl>건물 유형</label>
       <select id=r_btype class=ri>
         <option value="">전체</option><option>오피스텔</option><option>원룸건물</option>
@@ -490,13 +490,30 @@ function recoParams(){
   if(rset.maxrent) p.set('max_rent', rset.maxrent)
   return p.toString()
 }
+// 지역 셀렉트: 추천 후보가 실제로 있는 시군구만(개수와 함께) — 후보 목록은 필터와 무관해 1회면 됨.
+function fillAreaOptions(){
+  var sel=document.getElementById('r_area')
+  if(!RECO || sel.options.length>1) return
+  var cnt={}
+  RECO.forEach(function(s){ var k=s.sigungu||'기타'; cnt[k]=(cnt[k]||0)+1 })
+  Object.keys(cnt).sort().forEach(function(k){
+    var o=document.createElement('option')
+    o.value=k; o.textContent=k+' ('+cnt[k]+')'
+    if(k===rset.area) o.selected=true
+    sel.appendChild(o)
+  })
+}
 function openRecoSettings(){
   document.getElementById('r_off').style.display = recoOn ? 'block' : 'none'
   document.getElementById('rmodal').style.display='flex'
+  if(RECO) fillAreaOptions()
+  else   // 후보 목록 선로드(서버 kv_cache라 가벼움) → 시군구 옵션 채움
+    fetch('/samsam/api/recommend',{credentials:'same-origin'}).then(function(r){return r.json()})
+      .then(function(d){ RECO=d.spots||[]; fillAreaOptions() }).catch(function(){})
 }
 function closeRModal(){document.getElementById('rmodal').style.display='none'}
 function applyReco(){
-  rset.area=(document.getElementById('r_area').value||'').trim()
+  rset.area=document.getElementById('r_area').value||''
   rset.btype=document.getElementById('r_btype').value||''
   rset.minp=parseFloat(document.getElementById('r_minp').value)||0
   rset.maxdep=parseFloat(document.getElementById('r_dep').value)||0
@@ -526,9 +543,9 @@ function loadReco(){
 function drawReco(){
   clearReco()
   if(!recoOn||!RECO) return
-  // 지역 설정은 클라이언트에서 부분일치 필터(시군구+동).
+  // 지역 설정(시군구 셀렉트)은 클라이언트에서 필터.
   var list=RECO.filter(function(s){
-    return !rset.area || ((s.sigungu||'')+' '+(s.dong||'')).indexOf(rset.area)>=0
+    return !rset.area || (s.sigungu||'기타')===rset.area
   })
   document.getElementById('stat').textContent='⭐ 추천 '+list.length+'곳'
     +(rset.area?' ['+rset.area+']':'')+(rset.btype?' · '+rset.btype:'')
