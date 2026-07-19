@@ -652,6 +652,52 @@ _POI_WEIGHT = {"hospital": 3.0, "industrial": 3.0, "university": 2.0,
                "tour": 2.5, "academy": 1.5, "transport": 1.0, "tourspot": 0.2}
 # 추천 매물 매칭 대상 건물유형(네이버 코드) — 지도 유형 칩 6종과 동일.
 _RECO_NAV_CODES = ("OPST", "OR", "VL", "APT", "DDDGG", "SG")
+_NAV2SAM = {"OPST": "오피스텔", "OR": "원룸건물", "VL": "연립빌라",
+            "APT": "아파트", "DDDGG": "단독주택", "SG": "상가주택"}
+
+
+def _sam_comps():
+    """삼삼 시세 비교군: (시군구,유형)별 주당가·예약률 중앙값 (+유형별 폴백).
+
+    추천 동은 삼삼 매물이 거의 없는 곳이라(그게 추천 이유) 같은 시군구의 동일 유형
+    매물로 예상 매출을 근사한다. 예상 월순익 = 주당가중앙값 × 4.345주 × 예약률중앙값
+    − (월세+관리비). 표본 5개 미만이면 수도권 전체 유형 중앙값으로 폴백."""
+    from statistics import median
+    by_sb, by_b = {}, {}
+    for r in L():
+        wk, oc = r.get("sam_week_man"), r.get("occ")
+        bt, sg = r.get("building_type"), r.get("sigungu")
+        if not wk or not bt:
+            continue
+        by_b.setdefault(bt, ([], []))
+        by_b[bt][0].append(wk)
+        if oc is not None:
+            by_b[bt][1].append(oc)
+        if sg:
+            by_sb.setdefault((sg, bt), ([], []))
+            by_sb[(sg, bt)][0].append(wk)
+            if oc is not None:
+                by_sb[(sg, bt)][1].append(oc)
+
+    def _med(pair, occ_fb):
+        wks, ocs = pair
+        return (median(wks), median(ocs) if ocs else occ_fb)
+
+    b = {bt: _med(p, 0.5) for bt, p in by_b.items()}
+    sb = {k: _med(p, b.get(k[1], (0, 0.5))[1])
+          for k, p in by_sb.items() if len(p[0]) >= 5}
+    return sb, b
+
+
+def _est_net(comps, sigungu, btcode, rent, mfee):
+    """네이버 매물 1건의 예상 월순익(만원) — 비교군 없으면 None."""
+    sb, b = comps
+    bt = _NAV2SAM.get(btcode)
+    c = sb.get((sigungu, bt)) or b.get(bt)
+    if not c or not c[0]:
+        return None
+    week, occ = c
+    return round(week * 4.345 * occ - (rent or 0) - (mfee or 0), 1)
 
 
 def _reco_candidates(conn):
@@ -747,18 +793,25 @@ def api_recommend():
     """추천 스팟 — 수요 근거(POI·월세 회전율)는 많은데 단기임대(삼삼) 공급이 없는 동.
     각 추천 동에 근처 부동산(네이버) 매물을 매칭해 '여기 이 매물로 시작하라'까지 제시.
 
-    쿼리 파라미터(선택): max_dep(보증금 상한 만원, 0=제한없음),
+    쿼리 파라미터(선택): max_dep(보증금 상한 만원, 기본 1000, 0=제한없음),
+      min_profit(예상 월순익 하한 만원, 기본 50, 0=제한없음),
       btype(건물유형 네이버 코드 OPST/OR/VL/APT/DDDGG/SG, 없으면 6종 전부).
-    무거운 수요점수는 30분 캐시(보증금·유형 무관), 매물 매칭만 파라미터별로 캐시.
+    점수는 100점 만점으로 정규화(score100). 매물별 예상 월순익(enet) =
+    같은 시군구·유형 삼삼 주당가중앙값×4.345×예약률중앙값 − (월세+관리비).
+    무거운 수요점수는 30분 캐시(파라미터 무관), 매물 매칭만 파라미터별로 캐시.
     """
     now = time.time()
     try:
-        max_dep = int(request.args.get("max_dep") or 0)   # 보증금 상한(만원)
+        max_dep = int(request.args.get("max_dep") or 1000)      # 보증금 상한(만원)
     except ValueError:
-        max_dep = 0
+        max_dep = 1000
+    try:
+        min_profit = int(request.args.get("min_profit") or 50)  # 예상 월순익 하한(만원)
+    except ValueError:
+        min_profit = 50
     btype = request.args.get("btype") or ""               # 네이버 건물유형 코드
     types = (btype,) if btype in _RECO_NAV_CODES else _RECO_NAV_CODES
-    cache_key = f"{btype if btype in _RECO_NAV_CODES else 'ALL'}|{max_dep}"
+    cache_key = f"{btype if btype in _RECO_NAV_CODES else 'ALL'}|{max_dep}|{min_profit}"
 
     cache_fresh = _RECO["cands"] is not None and now - _RECO["t"] < 1800
     if cache_fresh and cache_key in _RECO["bodies"]:
@@ -787,10 +840,12 @@ def api_recommend():
     if not cache_fresh:
         _RECO.update(t=now, cands=cands, bodies={})
 
-    # ④ 각 추천 동에 근처 부동산 매물 매칭(주거 소형, 대표좌표 1.5km, 싼 월세 순).
-    #    보증금 상한·건물유형은 파라미터로 반영. 반지하/반지층은 단기임대에 부적합해 제외.
-    #    COUNT(*) OVER()로 조건 맞는 전체 매물 수도 같이 반환.
+    # ④ 각 추천 동에 근처 부동산 매물 매칭(주거 소형, 대표좌표 1.5km).
+    #    보증금 상한·유형은 SQL로, 예상 월순익 하한은 삼삼 비교군 기반이라 파이썬에서 필터.
+    #    반지하/반지층은 단기임대에 부적합해 제외. 예상 순익 높은 순으로 상위 N건 노출.
     RECO_LISTING_LIMIT = 30          # 모달은 스크롤되므로 상위 N건까지 노출
+    RECO_FETCH = 150                 # 순익 계산 대상(월세 싼 순) — 여기서 min_profit 필터
+    comps = _sam_comps()
     type_ph = ",".join(["%s"] * len(types))
     dep_sql = " AND deposit <= %s" if max_dep > 0 else ""
     spots = []
@@ -800,10 +855,11 @@ def api_recommend():
                       *types, "%반지하%", "%반지층%", "%반지하%", "%반지층%"]
             if max_dep > 0:
                 params.append(max_dep)
-            params.append(RECO_LISTING_LIMIT)
+            params.append(RECO_FETCH)
             ms = conn.execute(
                 "SELECT article_no, building_name, rent_monthly, deposit, area_exclusive_m2,"
-                " floor_current, lat, lng, COUNT(*) OVER() AS total FROM naver_listings"
+                " floor_current, lat, lng, maintenance_monthly, building_type_code"
+                " FROM naver_listings"
                 " WHERE lat BETWEEN %s AND %s AND lng BETWEEN %s AND %s"
                 "   AND rent_monthly BETWEEN 20 AND 200"
                 f"   AND building_type_code IN ({type_ph})"
@@ -812,16 +868,31 @@ def api_recommend():
                 f"{dep_sql}"
                 " ORDER BY rent_monthly ASC LIMIT %s",
                 tuple(params)).fetchall()
-            n_listings = ms[0][8] if ms else 0    # 조건 맞는 부동산 매물 전체 개수
-            listings = [{
-                "id": m[0], "name": m[1] or "", "rent": m[2], "dep": m[3],
-                "m2": m[4], "floor": m[5], "lat": m[6], "lng": m[7],
-                "url": f"https://new.land.naver.com/offices?articleNo={m[0]}",
-            } for m in ms]
+            listings = []
+            for m in ms:
+                enet = _est_net(comps, c["sigungu"], m[9], m[2], m[8])
+                if min_profit > 0 and (enet is None or enet < min_profit):
+                    continue
+                listings.append({
+                    "id": m[0], "name": m[1] or "", "rent": m[2], "dep": m[3],
+                    "m2": m[4], "floor": m[5], "lat": m[6], "lng": m[7],
+                    "mfee": m[8], "btype": _NAV2SAM.get(m[9], m[9]), "enet": enet,
+                    "url": f"https://new.land.naver.com/offices?articleNo={m[0]}",
+                })
+            listings.sort(key=lambda x: -(x["enet"] if x["enet"] is not None else -9999))
+            n_listings = len(listings)
+            listings = listings[:RECO_LISTING_LIMIT]
         except Exception:
             n_listings, listings = 0, []
         spots.append({**c, "n_listings": n_listings, "listings": listings})
     conn.close()
+
+    # 점수 100점 만점 정규화(최고점 동 = 100점).
+    max_s = max((s["score"] for s in spots), default=0) or 1
+    for s in spots:
+        s["score100"] = round(s["score"] / max_s * 100)
+    # 조건 맞는 매물이 있는 동을 앞으로(점수순 유지) — '여기 이 매물'까지 이어지는 추천 우선.
+    spots.sort(key=lambda s: (0 if s["n_listings"] else 1, -s["score100"]))
 
     body = json.dumps({"spots": spots}, ensure_ascii=False, separators=(",", ":"))
     _RECO["bodies"][cache_key] = body

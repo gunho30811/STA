@@ -99,7 +99,8 @@ text-shadow:0 1px 3px #fff,0 -1px 3px #fff,1px 0 3px #fff,-1px 0 3px #fff,1px 1p
     <span class=num>주당≥<input id=f_week type=number placeholder=0>만</span>
     <span class=num>순수익≥<input id=f_net type=number placeholder=0>만</span>
     <span class=num>예약률≥<input id=f_occ type=number placeholder=0>%</span>
-    <span class=num title="⭐ 추천 스팟 매물에 적용">보증금≤<input id=f_dep type=number placeholder=0>만</span>
+    <span class=num title="⭐ 추천 스팟 매물에 적용 (기본 1000)">보증금≤<input id=f_dep type=number placeholder=1000>만</span>
+    <span class=num title="⭐ 추천: 삼삼 시세로 추정한 예상 월순익 하한 (기본 50)">예상순익≥<input id=f_rmin type=number placeholder=50>만</span>
     <span class=stat id=stat>렌트 매물 불러오는 중…</span>
   </div>
   <div class=row id=chips>
@@ -164,7 +165,7 @@ var show={circles:true,rent:false,naver:false}
 var poiShow={hospital:false,university:false,industrial:false,academy:false,transport:false,tour:false}
 var FEATS=[], STATIONS=[], POIS=[], idx=null, DONG_AGG=[], SIG_AGG=[], rentShown=0
 var GEO=null, GEO_STAT=[], GEO_IDX={}, GEOPOLYS=null   // 실제 행정동 경계 폴리곤 + 좌표귀속 통계
-var filt={btype:'',week:0,occ:0,net:0,dep:0}
+var filt={btype:'',week:0,occ:0,net:0,dep:0,rmin:0}
 var shownRent=new Map(), shownDlbl=new Map(), shownPoi=new Map(), shownNav=[]
 var recoOn=false
 
@@ -447,11 +448,12 @@ function renderPois(){
 
 // ── ⭐ 추천 스팟: 수요근거는 많은데 단기임대 공급 없는 동 + 근처 부동산 매물 ──
 var RECO=null, recoKey=null, recoShapes=[]
-// 추천 매물 매칭에 적용할 필터 → 쿼리스트링(유형 칩·보증금 상한). 수요점수는 서버에서 캐시 재사용.
+// 추천 매물 매칭 필터 → 쿼리스트링. 기본값: 보증금≤1000만, 예상 월순익≥50만 (입력으로 조정).
 function recoParams(){
   var p=new URLSearchParams()
   if(filt.btype && NAV_TYPE[filt.btype]) p.set('btype', NAV_TYPE[filt.btype])
-  if(filt.dep) p.set('max_dep', filt.dep)
+  p.set('max_dep', filt.dep||1000)
+  p.set('min_profit', filt.rmin||50)
   return p.toString()
 }
 function clearReco(){ recoShapes.forEach(function(s){s.setMap(null)}); recoShapes=[] }
@@ -469,22 +471,31 @@ function loadReco(){
 function drawReco(){
   clearReco()
   if(!recoOn||!RECO) return
-  // 점수 정규화 → 원 크기·강조
-  var maxS=Math.max.apply(null, RECO.map(function(s){return s.score})) || 1
   RECO.forEach(function(s){
-    var r=340+Math.round(s.score/maxS*320)
-    var c=new kakao.maps.Circle({center:LL(s.lat,s.lon),radius:r,strokeWeight:2,strokeColor:'#ca8a04',
-      strokeOpacity:.9,fillColor:'#facc15',fillOpacity:.22})
-    c.setMap(map); recoShapes.push(c)
+    var pt=(s.score100!=null?s.score100:s.score)
+    // 실제 동 경계가 있으면 그 동 폴리곤을 노랗게 강조(좌표로 판정), 없으면 원 폴백.
+    var di = GEO ? dongOf(s.lat,s.lon) : -1
+    if(di>=0){
+      eachOuter(GEO.features[di],function(ring){
+        var pg=new kakao.maps.Polygon({path:ring.map(function(p){return LL(p[1],p[0])}),
+          strokeWeight:2,strokeColor:'#ca8a04',strokeOpacity:.9,fillColor:'#facc15',fillOpacity:.28})
+        kakao.maps.event.addListener(pg,'click',function(){ openReco(s) })
+        pg.setMap(map); recoShapes.push(pg)
+      })
+    }else{
+      var c=new kakao.maps.Circle({center:LL(s.lat,s.lon),radius:450,strokeWeight:2,strokeColor:'#ca8a04',
+        strokeOpacity:.9,fillColor:'#facc15',fillOpacity:.22})
+      c.setMap(map); recoShapes.push(c)
+    }
     var o=mkOv(s.lat,s.lon,
-      '<div class="reco-badge">⭐ '+s.dong+'<br><b>'+s.score+'점</b><span class=reco-n> 매물'+(s.n_listings!=null?s.n_listings:s.listings.length)+'</span></div>',
+      '<div class="reco-badge">⭐ '+s.dong+'<br><b>'+pt+'점</b><span class=reco-n>/100 · 매물'+(s.n_listings!=null?s.n_listings:s.listings.length)+'</span></div>',
       function(){ openReco(s) },50)
     o.setMap(map); recoShapes.push(o)
   })
 }
 function openReco(s){
   var t=document.getElementById('mtitle'), b=document.getElementById('mbody')
-  t.textContent='⭐ '+s.sigungu+' '+s.dong+' — 추천 '+s.score+'점'
+  t.textContent='⭐ '+s.sigungu+' '+s.dong+' — 추천 '+(s.score100!=null?s.score100:s.score)+'점/100'
   var poi=(s.poi||[]).map(function(p){
     var ic={hospital:'🏥',university:'🎓',industrial:'🏭',academy:'📚',transport:'🚄',tour:'🗼'}[p.kind]||'📍'
     return ic+' '+p.name+' '+(p.dist_m/1000).toFixed(1)+'km' }).join(' · ')
@@ -493,16 +504,17 @@ function openReco(s){
     (s.workers ? ' · 종사자 <b>'+s.workers.toLocaleString()+'명</b>' : '')+
     (s.wealth ? ' · 소비력 <b>아파트보증금 '+(s.wealth>=10000?(s.wealth/10000).toFixed(1)+'억':s.wealth+'만')+'</b>' : '')+'<br>'+
     '<span style="color:#ca8a04;font-weight:700">'+poi+'</span></div>'+
-    '<div style="padding:8px;font-size:12px;color:#64748b">여기서 시작할 만한 부동산 매물 <b>'+(s.n_listings!=null?s.n_listings:s.listings.length)+'건</b>'+
-      ((s.n_listings!=null&&s.n_listings>s.listings.length)?' <span style="color:#94a3b8">(월세 싼 순 '+s.listings.length+'건 표시)</span>':'')+' ↓</div>'
+    '<div style="padding:8px;font-size:12px;color:#64748b">조건 맞는 부동산 매물 <b>'+(s.n_listings!=null?s.n_listings:s.listings.length)+'건</b>'+
+      ' <span style="color:#94a3b8">(예상 월순익 높은 순'+((s.n_listings!=null&&s.n_listings>s.listings.length)?' · 상위 '+s.listings.length+'건 표시':'')+')</span> ↓</div>'
   s.listings.forEach(function(m){
     h+='<a class=item href="'+m.url+'" target=_blank rel=noreferrer>'+
-      '<div><div class=it-name>'+(m.name||'(이름없음)')+'</div>'+
-      '<div class=it-sub>월세 '+(m.rent!=null?m.rent:'-')+'만 / 보증금 '+(m.dep!=null?m.dep.toLocaleString():'-')+'만'+
+      '<div><div class=it-name>'+(m.name||'(이름없음)')+(m.btype?' <span style="font-weight:600;color:#94a3b8;font-size:11px">'+m.btype+'</span>':'')+'</div>'+
+      '<div class=it-sub>월세 '+(m.rent!=null?m.rent:'-')+'만'+(m.mfee?'+관리 '+m.mfee+'만':'')+' / 보증금 '+(m.dep!=null?m.dep.toLocaleString():'-')+'만'+
       (m.m2?' · '+m.m2+'㎡':'')+(m.floor!=null?' · '+m.floor+'층':'')+'</div></div>'+
-      '<div class=it-go>매물 보기 →</div></a>'
+      '<div style="text-align:right">'+(m.enet!=null?'<div class="it-occ '+(m.enet>=0?'good':'bad')+'">+'+m.enet+'만</div><div style="font-size:9.5px;color:#94a3b8">예상 월순익</div>':'')+
+      '<div class=it-go>매물 보기 →</div></div></a>'
   })
-  if(!s.listings.length) h+='<div style="padding:14px;color:#94a3b8">근처 조건 맞는 부동산 매물이 아직 없어요.</div>'
+  if(!s.listings.length) h+='<div style="padding:14px;color:#94a3b8">현재 필터(보증금·예상순익) 조건에 맞는 매물이 없어요 — 상단 입력값을 낮춰보세요.</div>'
   b.innerHTML=h
   document.getElementById('modal').style.display='flex'
 }
@@ -596,13 +608,13 @@ document.querySelectorAll('#chips .chip').forEach(function(ch){
     clearTimeout(tm); tm=setTimeout(function(){filt[k]=parseFloat(el.value)||0; applyFilter()},400)
   })
 })
-// 보증금 상한 — ⭐ 추천 스팟 매물 매칭에만 적용(수요점수 무관, 서버 캐시 재사용).
-;(function(){
-  var el=document.getElementById('f_dep'), tm=null
+// 보증금 상한·예상순익 하한 — ⭐ 추천 스팟 매물 매칭에만 적용(수요점수 무관, 서버 캐시 재사용).
+;[['f_dep','dep'],['f_rmin','rmin']].forEach(function(kv){
+  var el=document.getElementById(kv[0]), tm=null
   el.addEventListener('input',function(){
-    clearTimeout(tm); tm=setTimeout(function(){ filt.dep=parseFloat(el.value)||0; if(recoOn) loadReco() },400)
+    clearTimeout(tm); tm=setTimeout(function(){ filt[kv[1]]=parseFloat(el.value)||0; if(recoOn) loadReco() },400)
   })
-})()
+})
 ;['circles','rent','naver'].forEach(function(k){
   document.getElementById('t_'+k).addEventListener('click',function(){
     show[k]=!show[k]; this.classList.toggle('on',show[k])
