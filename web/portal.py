@@ -673,6 +673,14 @@ def og_image():
                      mimetype="image/png", max_age=86400)
 
 
+@portal.route("/dong_geo.json")
+def dong_geo():
+    """수도권 행정동 경계(GeoJSON, mapshaper 8% 단순화) — /map 폴리곤 레이어용 정적 자산."""
+    from flask import send_file
+    return send_file(os.path.join(os.path.dirname(os.path.abspath(__file__)), "dong_geo.json"),
+                     mimetype="application/json", max_age=86400 * 7)
+
+
 @portal.route("/")
 
 def home():
