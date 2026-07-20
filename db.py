@@ -110,17 +110,22 @@ class _Cursor:
 
 
 def _pg8000_connect(url):
-    """pg8000으로 Postgres 연결. Supabase 풀러는 자체 CA를 써서 공개 CA로는 검증 불가."""
+    """pg8000으로 Postgres 연결. Supabase 풀러는 자체 CA를 써서 공개 CA로는 검증 불가.
+
+    URL 쿼리에 sslmode=disable 이면 SSL 없이 접속(내부 pg·SSH 터널용 — SSL 미지원 서버)."""
     u = urllib.parse.urlparse(url)
-    ca = os.environ.get('DB_SSL_CA')
-    if ca:
-        ctx = ssl.create_default_context(cafile=ca)   # CA 파일 지정 시 정식 검증
+    qs = urllib.parse.parse_qs(u.query or '')
+    if (qs.get('sslmode') or [''])[0] == 'disable':
+        ctx = None   # 평문 접속(SSL 미지원 로컬 pg / 터널 경유)
     else:
-        # psycopg2 기본 sslmode와 동일하게 '암호화하되 CA 검증 생략'.
-        # 정식 검증을 원하면 환경변수 DB_SSL_CA 에 Supabase CA 인증서 경로를 지정.
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
+        ca = os.environ.get('DB_SSL_CA')
+        if ca:
+            ctx = ssl.create_default_context(cafile=ca)   # CA 파일 지정 시 정식 검증
+        else:
+            # psycopg2 기본 sslmode와 동일하게 '암호화하되 CA 검증 생략'.
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
     return pg8000.dbapi.connect(
         user=urllib.parse.unquote(u.username or ''),
         password=urllib.parse.unquote(u.password or ''),

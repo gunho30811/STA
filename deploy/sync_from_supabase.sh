@@ -21,14 +21,11 @@ with open('/home/ubuntu/.supa_pgenv', 'w') as f:
 os.chmod('/home/ubuntu/.supa_pgenv', 0o600)
 PY
 
-TABLES="listings naver_listings regions crawl_state net_profit kv_cache samsam_listings samsam_snapshots samsam_churn samsam_live samsam_booking_events"
+# 네이버 계열만 Supabase에서 동기화. 삼삼(samsam_*)과 파생(net_profit·kv_cache)은
+# 로컬 PC 크롤이 오라클 pg에 직접 쓰는 '오라클 원본'이므로 여기서 덮으면 안 됨(2026-07-20~).
+TABLES="listings naver_listings regions crawl_state"
 TFLAGS=""
 for t in $TABLES; do TFLAGS="$TFLAGS -t public.$t"; done
-
-# 새 테이블(예약 이벤트)이 로컬에 아직 없으면 생성 — TRUNCATE가 실패하지 않게.
-docker exec pg psql -U postgres -d rendit -q -c "CREATE TABLE IF NOT EXISTS samsam_booking_events(
-  id BIGSERIAL PRIMARY KEY, room_id BIGINT, detected_at TEXT, stay_date TEXT, change TEXT, lead_days INT);
-  CREATE INDEX IF NOT EXISTS ix_sbe_detected ON samsam_booking_events(detected_at);"
 
 # 덤프는 Supabase env-file로, 복원은 '깨끗한' exec로 (PGHOST 누출로 복원이
 # Supabase를 향했던 과거 사고 재발 방지 — 복원 단계엔 env를 절대 주입하지 않음)
