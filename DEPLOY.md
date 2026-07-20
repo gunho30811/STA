@@ -1,55 +1,56 @@
-# rendit 배포 가이드 (Docker)
+# rendit 배포 가이드
 
-Flask 포털을 어느 서버에서든 `docker compose up` 한 방으로 띄운다. DB는 Supabase(관리형)를
-그대로 쓰므로 컨테이너화하지 않고 `.env` 의 `DATABASE_URL` 로 연결한다.
+**프로덕션: <https://rendits.duckdns.org>** — Oracle Cloud Free VM(춘천, ARM Ampere 4코어/24GB)
+`~/STA` 에 clone + Docker Compose. Caddy가 80/443을 받아 web(:8000)으로 프록시하고
+Let's Encrypt HTTPS 자동 갱신. DuckDNS 무료 도메인(IP 갱신은 DuckDNS API).
 
-**왜 Docker/자체서버:** Vercel(미국 리전)↔Supabase(서울)의 태평양 왕복이 페이지당 ~1초 +
-서버리스 콜드스타트. 한국 서버(예: Oracle Cloud 춘천, 상시 VM)에 올리면 DB 왕복 10ms·콜드스타트 0.
+**왜 자체서버:** Vercel(미국 리전)↔DB의 태평양 왕복이 페이지당 ~1초 + 서버리스 콜드스타트.
+한국 VM + **서버 내부 Postgres**로 페이지 35~55ms.
 
-## 준비물
+## 구성 요약 (2026-07 현재)
 
-- Docker + Docker Compose 가 깔린 리눅스 서버 (Oracle Cloud Free 등)
-- `.env` 파일 (레포에 없음 — 시크릿). 최소: `DATABASE_URL`, `SECRET_KEY`, `ADMIN_USERNAME/PASSWORD`.
-  선택: `DATA_GO_KR_KEY`, `DATA_SGIS_KR_ID/KEY`, `SAMSAM_EMAIL/PASSWORD`, `CF_TUNNEL_TOKEN`.
+| 구성요소 | 내용 |
+|---|---|
+| web | `docker compose` 의 `web` 서비스(gunicorn, :8000 내부 전용) |
+| caddy | 서버 로컬 `docker-compose.override.yml`(레포 미포함)로 80/443 담당 |
+| DB(서빙) | 서버 내부 `pg` 컨테이너(Postgres 17, 포트 미노출) — 웹의 `DATABASE_URL` |
+| DB(크롤 원본) | Supabase — 크롤러들이 쓰는 곳. `SUPABASE_DATABASE_URL` 로 보존 |
+| 동기화 | `deploy/sync_from_supabase.sh` — 6시간마다 + 크롤 직후, 크롤 데이터 테이블만 로컬로 |
+| 회원·채팅 | **로컬 pg가 원본**(동기화 불가침) — `deploy/backup_users.sh` 가 매일 백업 |
+| 크론 | `/etc/cron.d/rendit-sync`, `/etc/cron.d/rendit-crawl` |
 
-## 배포
-
-```bash
-git clone https://github.com/gunho30811/STA.git
-cd STA
-# .env 를 이 폴더에 복사(scp 등)
-
-docker compose up -d --build      # web 상시 가동 (:8000)
-docker compose logs -f web        # 로그 확인
-```
-
-`http://<서버IP>:8000` 접속. Oracle 은 **보안목록(Ingress)에서 8000(또는 80/443) 포트 개방** 필요.
-
-## 외부 노출 / HTTPS
-
-**옵션 A — Cloudflare Tunnel(추천, 무료·공유기설정 불필요):**
-1. Cloudflare 대시보드 → Zero Trust → Tunnels → 터널 생성 → 토큰 복사
-2. `.env` 에 `CF_TUNNEL_TOKEN=<토큰>` 추가
-3. `docker compose --profile tunnel up -d`  → 지정 도메인으로 HTTPS 자동
-
-**옵션 B — Caddy 리버스프록시(도메인 있으면):** 별도 Caddy 컨테이너로 `:443 → web:8000`,
-Let's Encrypt 자동. (compose 에 caddy 서비스 추가하면 됨.)
-
-## 운영
+## 코드 배포 (main 머지 후)
 
 ```bash
-docker compose pull && docker compose up -d --build   # 코드 갱신 후 재배포
-docker compose --profile crawl run --rm insights      # 대시보드·추천 캐시 수동 갱신
-docker compose restart web                            # 재시작
+ssh ubuntu@<서버IP>
+cd ~/STA && git pull && sudo docker compose up -d --build web
 ```
 
-- `restart: unless-stopped` 라 VM 재부팅·크래시 시 자동 복구.
-- 크롤(삼삼/네이버)은 기존대로 GitHub Actions(한국 IP 필요분은 로컬 GUI)에서. 이 컨테이너는 웹만.
-- 대시보드·추천 무거운 계산은 `kv_cache` 테이블에 미리 저장돼 즉시 응답(20초→0.2초).
-  크롤 워크플로가 `refresh_insights.py` 로 갱신.
+## 크롤 일과
+
+- **네이버 수도권 오피스텔(증분)**: 매일 01:00 KST, 서버 크론 `deploy/crawl_naver_opst_daily.sh`
+- **삼삼 전체**: 매일 로컬 PC(윈도우 작업 스케줄러 `rendit-samsam-daily`) —
+  삼삼 **스케줄 API가 데이터센터 IP를 소프트차단**(200+빈 데이터)이라 가정용 IP 필수.
+  `deploy/crawl_samsam_local.bat` 실행 → Supabase 적재 → 서버 동기화 트리거.
+- **네이버 7종 전체(풀 리프레시)**: 매주 월요일, GitHub Actions `crawl.yml`.
+- GHA `crawl-samsam.yml` 은 수동 실행 전용(데이터센터 IP 차단으로 스케줄 중단).
+
+## 신규 서버에 처음 깔 때
+
+```bash
+git clone https://github.com/gunho30811/STA.git ~/STA
+cd ~/STA   # .env 를 이 폴더에 복사(scp 등) — DATABASE_URL, SECRET_KEY, KAKAO_* 등
+docker compose up -d --build
+# Caddy/override, pg 컨테이너, 크론은 diary/2026-07-19~20.md 세팅 기록 참조
+```
+
+- Oracle은 **OCI 콘솔 보안목록(Ingress)** 이 실질 방화벽 — 80/443만 개방(5432 절대 금지).
+- `restart: unless-stopped` 라 재부팅·크래시 자동 복구.
+- 대시보드·추천 무거운 계산은 `kv_cache` 에 미리 저장(20초→0.2초), 크롤 후처리
+  `pipeline/refresh_insights.py` 가 갱신.
 
 ## 아키텍처 참고
 
-- `python:3.11-slim` 공식 이미지라 **ARM64(Oracle Ampere A1)·x86 자동 대응**.
-- gunicorn 워커 3개(기본). Ampere 4코어면 `Dockerfile` 의 `--workers` 를 5~9로 올려도 됨.
-- 크롬/playwright 는 이미지에 없음(웹만). 크롤은 별도.
+- `python:3.11-slim` 공식 이미지 — ARM64(Ampere)·x86 자동 대응.
+- gunicorn 워커 3개(기본). 필요 시 `Dockerfile` 의 `--workers` 조정.
+- 서버 크롤용 playwright는 컨테이너가 아니라 호스트 `~/crawlenv` venv에 설치(ubuntu 유저).
