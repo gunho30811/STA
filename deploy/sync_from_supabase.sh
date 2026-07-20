@@ -21,9 +21,14 @@ with open('/home/ubuntu/.supa_pgenv', 'w') as f:
 os.chmod('/home/ubuntu/.supa_pgenv', 0o600)
 PY
 
-TABLES="listings naver_listings regions crawl_state net_profit kv_cache samsam_listings samsam_snapshots samsam_churn samsam_live"
+TABLES="listings naver_listings regions crawl_state net_profit kv_cache samsam_listings samsam_snapshots samsam_churn samsam_live samsam_booking_events"
 TFLAGS=""
 for t in $TABLES; do TFLAGS="$TFLAGS -t public.$t"; done
+
+# 새 테이블(예약 이벤트)이 로컬에 아직 없으면 생성 — TRUNCATE가 실패하지 않게.
+docker exec pg psql -U postgres -d rendit -q -c "CREATE TABLE IF NOT EXISTS samsam_booking_events(
+  id BIGSERIAL PRIMARY KEY, room_id BIGINT, detected_at TEXT, stay_date TEXT, change TEXT, lead_days INT);
+  CREATE INDEX IF NOT EXISTS ix_sbe_detected ON samsam_booking_events(detected_at);"
 
 # 덤프는 Supabase env-file로, 복원은 '깨끗한' exec로 (PGHOST 누출로 복원이
 # Supabase를 향했던 과거 사고 재발 방지 — 복원 단계엔 env를 절대 주입하지 않음)
