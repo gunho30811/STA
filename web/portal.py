@@ -477,11 +477,18 @@ border:1px solid rgba(96,165,250,.3);padding:6px 14px;border-radius:999px;margin
 .btn{text-decoration:none;font-weight:800;font-size:15px;padding:14px 28px;border-radius:11px}
 .btn-primary{background:#4321F3;color:#fff;box-shadow:0 8px 24px rgba(67,33,243,.4)}
 .btn-ghost{background:rgba(255,255,255,.06);color:#e2e8f0;border:1px solid rgba(255,255,255,.14)}
+.free{margin-top:16px;font-size:13px;color:#93c5fd;font-weight:600}
+.free b{color:#c7bcff}
 .cards{max-width:1080px;margin:20px auto 0;padding:20px 28px 70px;display:grid;
 grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
 .card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:26px;text-align:left}
-.card .ic{font-size:32px}.card h3{font-size:18px;font-weight:800;color:#fff;margin:12px 0 8px}
+.card .ic{font-size:32px}.card h3{font-size:18px;font-weight:800;color:#fff;margin:12px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .card p{font-size:13.5px;color:#94a3b8;line-height:1.65;margin:0}
+.badge{font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:999px}
+.badge.bfree{background:rgba(52,211,153,.16);color:#6ee7b7;border:1px solid rgba(52,211,153,.3)}
+.badge.bmem{background:rgba(148,163,184,.16);color:#cbd5e1;border:1px solid rgba(148,163,184,.3)}
+.clink{display:inline-block;margin-top:14px;font-size:13px;font-weight:800;color:#8b7dff;text-decoration:none}
+.clink.mut{color:#64748b;font-weight:700}
 .steps{max-width:1080px;margin:0 auto;padding:0 28px 40px;color:#94a3b8;font-size:14px;text-align:center}
 .steps b{color:#cbd5e1}
 .foot{text-align:center;color:#64748b;font-size:12.5px;padding:30px 20px 50px}
@@ -501,21 +508,29 @@ grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
      예약률·순수익까지 한눈에. 임대인·투자자를 위한 수익성 분석 도구입니다.</p>
   <div class=btns>
     <a class="btn btn-primary" href="/auth/signup">무료로 시작하기 →</a>
-    <a class="btn btn-ghost" href="/profit/">🔍 데모 둘러보기</a>
+    <a class="btn btn-ghost" href="/map">🗺️ 지도 미리보기</a>
+    <a class="btn btn-ghost" href="/calc">🧮 수익 계산기</a>
   </div>
+  <div class=free>가입 없이 바로 — <b>계산기는 전체 무료</b>, <b>지도는 강남권 미리보기</b></div>
 </div>
 <div class=cards>
-  <div class=card><div class=ic>{ICON_PROFIT}</div><h3>수익성 분석</h3>
-    <p>단기임대 풀가동 시 부동산 월세 대비 최대수익·기대 월순수익. 동·역별 순위로 어디가 잘 나가는지 바로.</p></div>
-  <div class=card><div class=ic>{ICON_RENT}</div><h3>렌트 데이터</h3>
-    <p>옵션별 예약률 영향, 건물 인기 랭킹, 지역 예약률 트렌드까지 — 실제 단기임대 수요를 데이터로.</p></div>
-  <div class=card><div class=ic>{ICON_ESTATE}</div><h3>부동산 매물</h3>
-    <p>수도권(서울·경기·인천) 월세 매물을 근처 단기임대 수요와 함께. 이 집으로 운영 시 예상 순수익까지.</p></div>
+  <div class=card><div class=ic>{ICON_RENT}</div>
+    <h3>지도 검색 <span class="badge bfree">강남권 무료</span></h3>
+    <p>동별 예약률을 지도에 색으로. 어디가 뜨거운지 한눈에 — 강남권은 가입 없이 바로 둘러보세요.</p>
+    <a class=clink href="/map">지도 미리보기 →</a></div>
+  <div class=card><div class=ic>{ICON_PROFIT}</div>
+    <h3>수익 계산기 <span class="badge bfree">무료</span></h3>
+    <p>이 월세 매물, 단기임대로 돌리면 얼마? 주당 렌트비·예약률로 기대 월순수익을 즉시 계산.</p>
+    <a class=clink href="/calc">계산기 열기 →</a></div>
+  <div class=card><div class=ic>{ICON_ESTATE}</div>
+    <h3>공급부족 스팟 <span class="badge bmem">회원</span></h3>
+    <p>수요는 높은데 단기임대 공급이 없는 동네 + 근처 부동산 매물 매칭. 진입하면 돈 되는 곳을 추천.</p>
+    <a class="clink mut" href="/auth/signup">가입하고 전체 보기 →</a></div>
 </div>
 <div class=steps>
-  처음이신가요? &nbsp;<b>회원가입</b> → <b>수익성 탭</b>에서 순수익 높은 순으로 보기 → 관심 지역을 <b>순위</b>에서 확인하면 됩니다.
+  <b>계산기·지도 미리보기</b>는 지금 바로 무료 · 수도권 전 지역·부동산 매칭·⭐추천 스팟은 <b>가입 후</b>(관리자 승인) 이용.
 </div>
-<div class=foot>회원 전용 서비스 · 가입 후 관리자 승인 시 이용 가능</div>
+<div class=foot>핵심 기능은 회원 전용 · 계산기·강남권 지도는 로그인 없이 체험 가능</div>
 </body></html>"""
 
 
