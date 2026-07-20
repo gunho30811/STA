@@ -34,7 +34,8 @@ import subway
 from auth import current_user, init_auth, latest_listing_churn, online_count
 
 portal = Flask(__name__)
-init_auth(portal)
+# 데모 공개: 계산기(calc)는 완전 무료, 지도(fullmap)는 비로그인 시 강남권만 미리보기.
+init_auth(portal, demo_endpoints={"calc", "fullmap"})
 
 # ── 대시보드 인사이트: 반도체 공장 인근 · 1기 신도시 렌트 예약률 ──────────────────
 # 공장 반경 3km(1km 안은 공단이라 매물이 없음 → 통근 주거권), 신도시 반경 1.5km.
@@ -644,10 +645,7 @@ calc()
 
 @portal.route("/calc")
 def calc():
-    u = current_user()
-    if not u:
-        from flask import redirect as _rd
-        return _rd("/auth/login?next=/calc")
+    # 무료 공개 — 로그인 불필요(수익 계산기는 진입장벽 낮춰 가입 유도).
     from flask import request as _rq
     return render_template_string(CALC_PAGE, dong=_rq.args.get("dong", ""),
                                   rent=_rq.args.get("rent", type=int),
@@ -656,13 +654,11 @@ def calc():
 
 @portal.route("/map")
 def fullmap():
-    """전용 풀스크린 지도(카카오맵) — 행정동 폴리곤·렌트·부동산·추천 스팟."""
-    u = current_user()
-    if not u:
-        from flask import redirect as _rd
-        return _rd("/auth/login?next=/map")
+    """전용 풀스크린 지도(카카오맵) — 행정동 폴리곤·렌트·부동산·추천 스팟.
+    비로그인은 강남권(강남·서초·송파) 미리보기(demo). 부동산·추천은 가입 유도."""
     from map_view import MAP_PAGE
-    return render_template_string(MAP_PAGE, kakao_js_key=os.environ.get("KAKAO_JS_KEY", ""))
+    return render_template_string(MAP_PAGE, kakao_js_key=os.environ.get("KAKAO_JS_KEY", ""),
+                                  demo=(current_user() is None))
 
 
 @portal.route("/og.png")

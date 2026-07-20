@@ -102,9 +102,19 @@ font-size:14px;font-weight:800;cursor:pointer;font-family:inherit}
 .rbtn2{width:100%;margin-top:8px;padding:10px;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;
 color:#64748b;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
 @media(max-width:640px){.bar{left:12px;top:10px}.sbox input{width:100px}}
+#demobar{display:none;position:absolute;left:0;right:0;bottom:0;z-index:1200;
+align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
+background:rgba(15,23,42,.92);color:#fff;padding:11px 16px;font-size:13px;font-weight:600}
+#demobar b{color:#c7bcff}
+#demobar a{background:#4321F3;color:#fff;font-weight:800;padding:8px 18px;border-radius:8px;
+text-decoration:none;font-size:13px;white-space:nowrap}
 </style></head><body>
 <div id=wrap>
 <div id=map></div>
+<div id=demobar>
+  <span>🔒 지금은 <b>강남권 미리보기</b> — 수도권 전 지역·부동산 매칭·⭐추천 스팟은 회원 전용</span>
+  <a href="/auth/signup">무료로 가입하고 전체 보기</a>
+</div>
 <div class=bar>
   <div class=row>
     <div class=sbox><input id=q placeholder="동 · 역 검색 (예: 역삼동, 강남역)"><button onclick="doSearch()">이동</button></div>
@@ -173,8 +183,22 @@ color:#64748b;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
 <script src="https://unpkg.com/supercluster@8.0.1/dist/supercluster.min.js"></script>
 <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={{ kakao_js_key }}&autoload=false"></script>
 <script>
+var DEMO = {{ 'true' if demo else 'false' }}   // 비로그인: 강남권 미리보기
+var GANGNAM = ['강남구','서초구','송파구']
 var NAVER_ZOOM=15, LIST_MAX=60
 var NAV_TYPE={'오피스텔':'OPST','아파트':'APT','연립빌라':'VL','단독주택':'DDDGG','원룸건물':'OR','상가주택':'SG'}
+function signupNudge(what){
+  var t=document.getElementById('mtitle'), b=document.getElementById('mbody')
+  t.textContent='🔒 '+(what||'이 기능')+'은 회원 전용'
+  b.innerHTML='<div style="padding:18px 10px;text-align:center">'+
+    '<div style="font-size:14px;color:#334155;line-height:1.6;margin-bottom:16px">'+
+    '지금 보시는 건 <b>강남권 미리보기</b>예요.<br>무료 가입하면 <b>수도권 전 지역</b> + '+
+    '부동산 매물 매칭 + ⭐추천 스팟까지 전부 열립니다.</div>'+
+    '<a href="/auth/signup" style="display:inline-block;background:#4321F3;color:#fff;font-weight:800;'+
+    'font-size:14px;padding:12px 28px;border-radius:10px;text-decoration:none">무료로 가입하고 전체 보기</a>'+
+    '<div style="margin-top:10px"><a href="/auth/login" style="color:#64748b;font-size:12.5px">이미 회원이세요? 로그인</a></div></div>'
+  document.getElementById('modal').style.display='flex'
+}
 function occColor(o){return o==null?'#94a3b8':o>=60?'#059669':o>=30?'#f59e0b':'#dc2626'}
 function occCls(o){return o==null?'mut':o>=60?'good':o>=30?'midc':'bad'}
 function median(arr){var a=arr.slice().sort(function(x,y){return x-y});var m=a.length>>1;return a.length%2?a[m]:(a[m-1]+a[m])/2}
@@ -680,8 +704,10 @@ document.getElementById('q').addEventListener('keydown',function(e){if(e.key==='
 
 // ── 지도 생성 + 초기 1회 로드: 매물 + 동 경계(정적, 7일 캐시) 병렬 ──
 kakao.maps.load(function(){
-  map=new kakao.maps.Map(document.getElementById('map'),{center:LL(37.5665,126.978),level:7})
+  var center = DEMO ? LL(37.4979,127.0276) : LL(37.5665,126.978)   // 데모는 강남역 중심
+  map=new kakao.maps.Map(document.getElementById('map'),{center:center,level:DEMO?6:7})
   map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.LEFT)
+  if(DEMO) document.getElementById('demobar').style.display='flex'
   Promise.all([
     fetch('/samsam/api/map_all',{credentials:'same-origin'}).then(function(r){return r.json()}),
     fetch('/dong_geo.json').then(function(r){return r.json()}).catch(function(){return null})
@@ -693,6 +719,8 @@ kakao.maps.load(function(){
       .map(function(a){return {type:'Feature',geometry:{type:'Point',coordinates:[a[2],a[1]]},
         properties:{id:a[0],lat:a[1],lng:a[2],occ:a[3],week:a[4],pyeong:a[5],btype:a[6],name:a[7],sigungu:a[8],dong:a[9],net:a[10]}}})
     GEO=res[1]
+    // 데모: 경계 폴리곤도 강남권만 남겨 나머지는 그리지 않음(가입 유도).
+    if(DEMO && GEO) GEO.features=GEO.features.filter(function(f){return GANGNAM.indexOf(f.properties.sgg)>=0})
     if(GEO) initGeo()   // 경계 로드 실패 시에도 나머지 지도는 동작
     applyFilter(); renderPois()
   }).catch(function(){document.getElementById('stat').textContent='로드 실패 — 새로고침 해주세요'})
@@ -718,6 +746,7 @@ document.querySelectorAll('#chips .chip').forEach(function(ch){
 })
 ;['circles','rent','naver'].forEach(function(k){
   document.getElementById('t_'+k).addEventListener('click',function(){
+    if(DEMO && k==='naver'){ signupNudge('부동산 매물'); return }   // 데모: 부동산은 가입 유도
     show[k]=!show[k]; this.classList.toggle('on',show[k])
     if(k==='circles'){ applyGeoVisibility(); renderDongLabels(); renderRent() }
     else if(k==='rent'){ renderRent(); renderDongLabels() }
@@ -730,7 +759,10 @@ document.querySelectorAll('#poirow .ptog').forEach(function(el){
     var k=el.dataset.k; poiShow[k]=!poiShow[k]; el.classList.toggle('on',poiShow[k]); renderPois()
   })
 })
-// ⭐ 추천 스팟: 누르면 설정 모달(지역·유형·순수익·보증금·월세) → 적용하고 보기 / 끄기
-document.getElementById('t_reco').addEventListener('click',openRecoSettings)
+// ⭐ 추천 스팟: 데모는 가입 유도, 로그인은 설정 모달
+document.getElementById('t_reco').addEventListener('click',function(){
+  if(DEMO){ signupNudge('⭐추천 스팟'); return }
+  openRecoSettings()
+})
 </script>
 </body></html>"""
