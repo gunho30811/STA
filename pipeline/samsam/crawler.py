@@ -343,12 +343,20 @@ def _rl_trip(cooldown):
 
 
 # ── API 호출 ───────────────────────────────────────────────────────────────────
-def _get(session, url, params=None, stats=None):
+# 스케줄(예약) API 전용 주거용 프록시 — 데이터센터 IP(오라클/GHA)는 스케줄만 소프트차단이라
+# 이 요청들만 프록시로 태우면 서버에서도 예약률 수집 가능. 목록·상세는 직접(트래픽비 절약).
+# 예: SAMSAM_SCHED_PROXY=http://user:pass@gate.example.com:7777
+_SCHED_PROXY = (os.environ.get('SAMSAM_SCHED_PROXY') or '').strip()
+SCHED_PROXIES = {'http': _SCHED_PROXY, 'https': _SCHED_PROXY} if _SCHED_PROXY else None
+
+
+def _get(session, url, params=None, stats=None, proxies=None):
     """GET 요청 — 403은 BLOCK_WAIT, 429는 공유 쿨다운 후 재시도. 최종 실패 시 None.
 
     stats(dict)를 주면 응답 결과를 분류해 카운트한다(진단용):
       'ok'(200+SCSS_001) / 'http_<code>' / 'code_<code>' / 'nojson' / 'exc' / '429_retry'.
     이렇게 남겨야 "성공했지만 예약 0"과 "차단/에러로 빈값"을 사후에 구분할 수 있다.
+    proxies를 주면 그 요청만 프록시 경유(스케줄 API의 주거용 프록시 우회용).
     """
     def _rec(k):
         if stats is not None:
@@ -358,7 +366,7 @@ def _get(session, url, params=None, stats=None):
     for attempt in range(RL_RETRY + 1):
         _rl_wait()   # 쿨다운 중이면 대기 후 요청
         try:
-            r = session.get(url, params=params, timeout=15)
+            r = session.get(url, params=params, timeout=25 if proxies else 15, proxies=proxies)
         except Exception:
             _rec('exc')
             return None
@@ -451,7 +459,7 @@ def fetch_schedules(session, rid, stats=None):
     ok = True
     for (y, m) in sorted(months):
         d = _get(session, f'{BASE}/v1/use-auth/rooms/{rid}/schedules',
-                 params={'year': y, 'month': m}, stats=stats)
+                 params={'year': y, 'month': m}, stats=stats, proxies=SCHED_PROXIES)
         time.sleep(REQ_SLEEP)
         if d is None:
             ok = False   # 한 달이라도 실패하면 예약수 undercount 위험 → 전체를 신뢰 불가로.
