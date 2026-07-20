@@ -250,9 +250,13 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 10px;
 th{background:#f9fafb;font-weight:700}.danger{color:#dc2626;cursor:pointer;border:none;background:none;font-weight:700}
 .code{font-size:24px;font-weight:800;letter-spacing:4px;color:#4321F3;text-align:center;background:#eff6ff;padding:12px;border-radius:8px;margin:8px 0}
 .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.homelink{position:fixed;top:16px;left:18px;color:#94a3b8;text-decoration:none;font-weight:800;font-size:14px}
+.homelink b{color:#fff}.homelink:hover{color:#cbd5e1}
 @media(max-width:640px){body{padding:12px}.box{padding:22px 16px}
 table{font-size:12px}th,td{padding:7px 8px}input{font-size:16px}}
-</style></head><body><div class="box" style="{{boxstyle|default('')}}">{{body|safe}}</div></body></html>"""
+</style></head><body>
+<a class=homelink href="/">← ren<b>dit</b> 홈</a>
+<div class="box" style="{{boxstyle|default('')}}">{{body|safe}}</div></body></html>"""
 
 
 def _render(title, body, boxstyle=""):
@@ -262,6 +266,13 @@ def _render(title, body, boxstyle=""):
 @bp.route("/login", methods=["GET", "POST"])
 def login():
     msg = ""
+    _kerr = request.args.get("kakao")   # 카카오 콜백 실패 시 사유 표시
+    if _kerr:
+        _kl = {"state": "세션이 만료됐어요. 카카오 버튼을 다시 눌러 주세요.",
+               "token": "카카오 인증에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+               "userinfo": "카카오 사용자 정보를 가져오지 못했습니다.",
+               "err": "카카오 로그인이 취소됐습니다."}
+        msg = f'<div class="msg err">{_kl.get(_kerr, "카카오 로그인에 실패했습니다.")}</div>'
     if request.method == "POST":
         lid = (request.form.get("login_id") or "").strip()
         pw = request.form.get("password") or ""
@@ -657,8 +668,13 @@ def kakao_login():
 
 @bp.route("/kakao/callback")
 def kakao_callback():
-    if request.args.get("error") or request.args.get("state") != session.pop("_kst", None):
-        return redirect(url_for("auth.login"))
+    if request.args.get("error"):
+        print(f"[kakao] error={request.args.get('error')} "
+              f"desc={request.args.get('error_description')}", flush=True)
+        return redirect(url_for("auth.login", kakao="err"))
+    if request.args.get("state") != session.pop("_kst", None):
+        print("[kakao] state 불일치 — 세션 쿠키 유실 가능(SameSite/도메인)", flush=True)
+        return redirect(url_for("auth.login", kakao="state"))
     code = request.args.get("code", "")
 
     # 토큰 교환 (redirect_uri는 인가 요청과 동일해야 함)
@@ -669,16 +685,21 @@ def kakao_callback():
         data["client_secret"] = _KAKAO_CLIENT_SECRET
     tok = _requests.post("https://kauth.kakao.com/oauth/token", data=data, timeout=10)
     if tok.status_code != 200:
-        return redirect(url_for("auth.login"))
+        # 여기서 자주 걸림: 카카오 앱에 Client Secret이 '사용함'인데 KAKAO_CLIENT_SECRET 미설정 →
+        # invalid_client. tok.text에 정확한 사유가 담김.
+        print(f"[kakao] 토큰교환 실패 {tok.status_code}: {tok.text[:300]}", flush=True)
+        return redirect(url_for("auth.login", kakao="token"))
     access_token = tok.json().get("access_token", "")
     if not access_token:
-        return redirect(url_for("auth.login"))
+        print(f"[kakao] access_token 없음: {tok.text[:300]}", flush=True)
+        return redirect(url_for("auth.login", kakao="token"))
 
     # 사용자 정보 조회
     me = _requests.get("https://kapi.kakao.com/v2/user/me",
                        headers={"Authorization": f"Bearer {access_token}"}, timeout=10)
     if me.status_code != 200:
-        return redirect(url_for("auth.login"))
+        print(f"[kakao] userinfo 실패 {me.status_code}: {me.text[:300]}", flush=True)
+        return redirect(url_for("auth.login", kakao="userinfo"))
     info = me.json()
     kakao_id = str(info.get("id") or "")
     ka = info.get("kakao_account") or {}
