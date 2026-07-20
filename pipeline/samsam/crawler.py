@@ -733,7 +733,14 @@ def main():
     ap.add_argument('--limit', type=int, default=0)
     ap.add_argument('--redo', action='store_true', help='기존 수집분 재수집')
     ap.add_argument('--sigungu', default='', help='시군구 필터 예) 강남구')
+    ap.add_argument('--types', default='',
+                    help='건물유형만 수집/갱신(콤마). 영문 OFFICETEL/APARTMENT/VILLA/DETACHED/'
+                         'STUDIO/MIXED_USE 또는 한글(오피스텔 등). 예) OFFICETEL')
     args = ap.parse_args()
+
+    _KO2CODE = {v: k for k, v in BTYPE_KO.items()}
+    type_filter = {(t if t in PROPERTY_TYPES else _KO2CODE.get(t, t))
+                   for t in (x.strip() for x in args.types.split(',') if x.strip())}
 
     accounts = _get_accounts()
     acct_i = 0
@@ -764,6 +771,14 @@ def main():
     before_metro = len(rids)
     rids = {rid: room for rid, room in rids.items() if _room_sido(room) in METRO_SIDO}
     log(f"수도권(서울/경기/인천) 필터: {before_metro} → {len(rids)}건 (그 외 지역은 갱신 대상에서 제외)")
+
+    if type_filter:
+        # 목록 API의 propertyType 은 한글값('오피스텔')이므로 한글로 비교(필터는 영문코드 집합).
+        want_ko = {BTYPE_KO.get(code, code) for code in type_filter}
+        before_t = len(rids)
+        rids = {rid: room for rid, room in rids.items()
+                if (room.get('propertyType') or '') in want_ko}
+        log(f"유형 필터 {sorted(want_ko)}: {before_t} → {len(rids)}건")
 
     targets = [(rid, room) for rid, room in rids.items() if rid not in done]
     refresh_targets = [rid for rid in rids if rid in done]
@@ -968,9 +983,9 @@ def main():
             _flush()       # 이 계정 정상 완료분 커밋
 
     # ── 종료 처리 ────────────────────────────────────────────────────
-    conn.close()
     # 모든 계정이 데이터를 전혀 못 받았으면(전면 소진/차단) 0 오염 방지로 실패 종료.
     if not any_data and refresh_targets:
+        conn.close()
         log(f"★ 전 계정({len(accounts)}개) 스케줄 데이터 0(대상 {len(refresh_targets)}건) — 차단/한도, DB 미반영 종료.")
         log(f"  HTTP 응답 분포: {stats}")
         sys.exit(1)
@@ -981,10 +996,21 @@ def main():
     if refreshed - last_deploy > 0:
         deploy_lab(f"최종 {refreshed}건")   # 남은 갱신분 배포
     # 예약 발생 감지(달력 diff) — 실패해도 크롤 자체는 성공으로 끝낸다.
+    # 크롤이 길면 기존 conn이 만료됐을 수 있어(InterfaceError) 새 연결로 처리.
     try:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        conn = db.connect()
         process_booking_events(conn)
     except Exception as e:
         log(f"예약 이벤트 처리 실패(크롤은 정상): {repr(e)[:150]}")
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
     log(f"완료. 신규 적재 {ok}건 / 실패 {fail}건, 예약률 갱신(DB반영) {refreshed}건 / 실패 {failed}건")
 
 
