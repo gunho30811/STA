@@ -21,3 +21,7 @@ build_exe/
 *.spec
 _selftest_naver.db
 selftest_result.txt
+
+# 개인용 분석 리포트·스크린샷(로컬 전용, 저장소 미포함)
+rendit_*.pdf
+image.png
