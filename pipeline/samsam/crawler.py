@@ -459,7 +459,74 @@ def fetch_schedules(session, rid, stats=None):
         for e in (d.get('data', {}).get('schedules') or []):
             if e.get('date'):
                 out[e['date']] = e.get('status')
+    if ok:
+        CAL_LOG.append((rid, out))   # 예약 발생 감지용(달력 diff) — 성공분만, list.append는 스레드 안전
     return out, ok
+
+
+# ── 예약 발생 감지(일일 달력 diff) ────────────────────────────────────────────
+CAL_LOG = []   # fetch_schedules 성공분 (rid, {date:status})
+
+
+def process_booking_events(conn):
+    """오늘 받은 달력과 지난 크롤 달력(samsam_cal_last)을 비교해 '예약 발생/취소'를 기록.
+
+    삼삼은 예약이 만들어진 시각을 공개하지 않으므로 일일 크롤 간 diff로 근사한다:
+    지난 달력엔 없던 날짜가 booking으로 나타나면 그 사이(보통 하루)에 손님이 예약한 것.
+    - 비교는 두 달력이 공통으로 커버하는 미래 구간만: [오늘, 지난크롤일+88일].
+    - booking이던 날짜가 그 구간에서 사라지면 취소(canceled)로 기록.
+    - lead_days = 투숙일 − 감지일(리드타임 분석용).
+    첫 크롤(이전 달력 없음)은 이벤트 없이 달력만 저장 → 다음날부터 감지 시작.
+    쿨다운(예약有 7일 재방문) 때문에 방별 감지 지연은 최대 7일일 수 있다.
+    """
+    if not CAL_LOG:
+        return
+    conn.execute("CREATE TABLE IF NOT EXISTS samsam_cal_last("
+                 "room_id BIGINT PRIMARY KEY, cal TEXT, crawled_at TEXT)")
+    conn.execute("CREATE TABLE IF NOT EXISTS samsam_booking_events("
+                 "id BIGSERIAL PRIMARY KEY, room_id BIGINT, detected_at TEXT,"
+                 " stay_date TEXT, change TEXT, lead_days INT)")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_sbe_detected"
+                 " ON samsam_booking_events(detected_at)")
+    conn.commit()
+    today_s = TODAY.isoformat()
+    now_s = datetime.now().isoformat(timespec='seconds')
+    cal_map = dict(CAL_LOG)          # 같은 방 중복 수신 시 마지막 달력 사용
+    prev = {}
+    rids = list(cal_map.keys())
+    for i in range(0, len(rids), 500):
+        part = rids[i:i + 500]
+        ph = ','.join(['%s'] * len(part))
+        for r in conn.execute("SELECT room_id, cal, crawled_at FROM samsam_cal_last"
+                              f" WHERE room_id IN ({ph})", part).fetchall():
+            prev[r[0]] = (json.loads(r[1] or '{}'), (r[2] or '')[:10])
+    events, upserts = [], []
+    for rid, cal in cal_map.items():
+        new_booked = {d for d, st in cal.items() if st in BOOKED_STATUSES and d >= today_s}
+        p = prev.get(rid)
+        if p:
+            pcal, pdate = p
+            try:
+                horizon = (date.fromisoformat(pdate) + timedelta(days=88)).isoformat()
+            except ValueError:
+                horizon = today_s
+            old_booked = {d for d, st in pcal.items() if st in BOOKED_STATUSES and d >= today_s}
+            for d in sorted(new_booked - old_booked):
+                events.append((rid, now_s, d, 'booked', (date.fromisoformat(d) - TODAY).days))
+            for d in sorted(old_booked - new_booked):
+                if d <= horizon:
+                    events.append((rid, now_s, d, 'canceled', (date.fromisoformat(d) - TODAY).days))
+        upserts.append((rid, json.dumps(cal, ensure_ascii=False), now_s))
+    if events:
+        conn.executemany("INSERT INTO samsam_booking_events"
+                         "(room_id,detected_at,stay_date,change,lead_days)"
+                         " VALUES(%s,%s,%s,%s,%s)", events)
+    conn.executemany("INSERT INTO samsam_cal_last(room_id,cal,crawled_at) VALUES(%s,%s,%s)"
+                     " ON CONFLICT(room_id) DO UPDATE SET cal=EXCLUDED.cal,"
+                     " crawled_at=EXCLUDED.crawled_at", upserts)
+    conn.commit()
+    nb = sum(1 for e in events if e[3] == 'booked')
+    log(f"예약 이벤트: 신규 {nb}건 · 취소 {len(events) - nb}건 (달력 {len(upserts)}방 저장)")
 
 
 # ── 행 매핑 ────────────────────────────────────────────────────────────────────
@@ -905,6 +972,11 @@ def main():
     log(f"  HTTP 응답 분포: {stats}")
     if refreshed - last_deploy > 0:
         deploy_lab(f"최종 {refreshed}건")   # 남은 갱신분 배포
+    # 예약 발생 감지(달력 diff) — 실패해도 크롤 자체는 성공으로 끝낸다.
+    try:
+        process_booking_events(conn)
+    except Exception as e:
+        log(f"예약 이벤트 처리 실패(크롤은 정상): {repr(e)[:150]}")
     log(f"완료. 신규 적재 {ok}건 / 실패 {fail}건, 예약률 갱신(DB반영) {refreshed}건 / 실패 {failed}건")
 
 
