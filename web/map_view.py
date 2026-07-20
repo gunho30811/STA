@@ -54,6 +54,11 @@ box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer}
 font-size:12px;font-weight:700;color:#94a3b8;background:rgba(255,255,255,.9);cursor:pointer;user-select:none;
 box-shadow:0 1px 4px rgba(0,0,0,.2);opacity:.55}
 .ptog.on{color:#111827;opacity:1;border-color:#f59e0b}
+.wklbl{font-size:11.5px;font-weight:800;color:#e2e8f0;background:rgba(15,23,42,.6);padding:5px 9px;border-radius:8px}
+.wk{border:1.5px solid #cbd5e1;border-radius:999px;padding:5px 11px;font-size:12px;font-weight:700;
+color:#475569;background:rgba(255,255,255,.95);cursor:pointer;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.wk.on{background:#059669;border-color:#059669;color:#fff}
+.wknote{font-size:11px;color:#94a3b8;font-weight:600}
 .pin.nv{width:13px;height:13px;background:#14b8a6}
 .clus{display:flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;font-weight:800;
 border:3px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.35);line-height:1.1;text-align:center;cursor:pointer}
@@ -135,6 +140,12 @@ text-decoration:none;font-size:13px;white-space:nowrap}
     <label class="tog" id=t_rent><span class=dot style="background:#4321F3"></span>렌트</label>
     <label class="tog" id=t_naver><span class=dot style="background:#14b8a6"></span>부동산</label>
     <label class="tog" id=t_reco><span class=dot style="background:#eab308"></span>⭐ 추천 스팟만</label>
+  </div>
+  <div class=row id=weekrow>
+    <span class=wklbl>예약률 기준</span>
+    <button class="wk on" data-w="-1">전체 기간</button>
+    <span id=wkbtns></span>
+    <span class=wknote>주간은 오피스텔 기준</span>
   </div>
   <div class=row id=poirow>
     <span class=poi-lbl>수요시설</span>
@@ -228,6 +239,13 @@ var show={circles:true,rent:false,naver:false}
 var poiShow={hospital:false,university:false,industrial:false,academy:false,transport:false,tour:false}
 var FEATS=[], STATIONS=[], POIS=[], idx=null, DONG_AGG=[], SIG_AGG=[], rentShown=0
 var GEO=null, GEO_STAT=[], GEO_IDX={}, GEOPOLYS=null   // 실제 행정동 경계 폴리곤 + 좌표귀속 통계
+var WEEKS=[], weekSel=-1   // 예약률 기준 주차(-1=전체기간, 0~=해당 주). 주간은 오피스텔만 데이터.
+// 매물의 '기준 예약률' — 전체기간이면 occ, 특정 주면 그 주의 wocc(없으면 null → 집계 제외).
+function occOf(p){
+  if(weekSel<0) return p.occ
+  var w = p.wocc && p.wocc[weekSel]
+  return (w!=null && w>=0) ? w : null
+}
 var filt={btype:'',week:0,occ:0,net:0}
 // ⭐ 추천 설정(모달에서 지정) — 렌트 레이어 필터(filt)와 독립.
 var rset={area:'',btype:'',minp:0,maxdep:0,maxrent:0,mins:0,only:true}
@@ -267,8 +285,8 @@ function applyFilter(){
     GEO_STAT=GEO.features.map(function(){return {occ:0,on:0,n:0,items:null}})
     var pop = filt.btype ? FEATS.filter(function(f){return f.properties.btype===filt.btype}) : FEATS
     pop.forEach(function(f){
-      var p=f.properties
-      if(p.di>=0){var s=GEO_STAT[p.di]; s.occ+=(p.occ||0); s.on++}
+      var p=f.properties, o=occOf(p)     // 주차 선택 시 그 주 예약률(없으면 집계 제외)
+      if(p.di>=0 && o!=null){var s=GEO_STAT[p.di]; s.occ+=o; s.on++}
     })
     fs.forEach(function(f){
       var p=f.properties
@@ -716,9 +734,11 @@ kakao.maps.load(function(){
     var d=res[0]
     STATIONS=d.stations||[]
     POIS=d.pois||[]
+    WEEKS=d.weeks||[]
     FEATS=(d.rent||[]).filter(function(a){return a[1]>=33&&a[1]<=39.5&&a[2]>=124&&a[2]<=132})
       .map(function(a){return {type:'Feature',geometry:{type:'Point',coordinates:[a[2],a[1]]},
-        properties:{id:a[0],lat:a[1],lng:a[2],occ:a[3],week:a[4],pyeong:a[5],btype:a[6],name:a[7],sigungu:a[8],dong:a[9],net:a[10]}}})
+        properties:{id:a[0],lat:a[1],lng:a[2],occ:a[3],week:a[4],pyeong:a[5],btype:a[6],name:a[7],sigungu:a[8],dong:a[9],net:a[10],wocc:a[11]||null}}})
+    buildWeekUI()
     GEO=res[1]
     // 데모: 경계 폴리곤도 강남권만 남겨 나머지는 그리지 않음(가입 유도).
     if(DEMO && GEO) GEO.features=GEO.features.filter(function(f){return GANGNAM.indexOf(f.properties.sgg)>=0})
@@ -765,5 +785,25 @@ document.getElementById('t_reco').addEventListener('click',function(){
   if(DEMO){ signupNudge('⭐추천 스팟'); return }
   openRecoSettings()
 })
+
+// ── 예약률 기준 주차 선택 ──
+function buildWeekUI(){
+  var host=document.getElementById('wkbtns')
+  if(!host || !WEEKS.length) return
+  host.innerHTML=''
+  WEEKS.forEach(function(lbl,i){
+    var b=document.createElement('button')
+    b.className='wk'; b.dataset.w=i
+    b.textContent=(i===0?'이번주':(i+'주뒤'))+' '+lbl
+    host.appendChild(b)
+  })
+  document.querySelectorAll('#weekrow .wk').forEach(function(b){
+    b.addEventListener('click',function(){
+      document.querySelectorAll('#weekrow .wk').forEach(function(x){x.classList.remove('on')})
+      b.classList.add('on'); weekSel=parseInt(b.dataset.w,10)
+      applyFilter()   // 동 폴리곤·라벨을 선택 주차 예약률로 재계산
+    })
+  })
+}
 </script>
 </body></html>"""

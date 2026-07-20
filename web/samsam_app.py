@@ -599,6 +599,60 @@ def api_buildings():
 # /api/map?all=1 응답 캐시(5분) — 22k 매물 배열 직렬화를 매 요청 반복하지 않게.
 _MAPALL = {"t": 0.0, "body": None, "demo": None}
 
+# 주간 예약률용 방별 달력(samsam_cal_last: {date: 'booking'|'disable'}) 캐시.
+_CAL = {"t": 0.0, "data": None}
+WEEK_COUNT = 8   # 지도 주간 선택 범위(오늘부터 8주)
+
+
+def _load_cal():
+    """samsam_cal_last(방별 일자 달력)을 {room_id: {date:status}}로 로드(5분 캐시)."""
+    now = time.time()
+    if _CAL["data"] is not None and now - _CAL["t"] < 300:
+        return _CAL["data"]
+    out = {}
+    try:
+        conn = db.connect()
+        try:
+            for rid, cal in conn.execute("SELECT room_id, cal FROM samsam_cal_last").fetchall():
+                try:
+                    out[int(rid)] = json.loads(cal or "{}")
+                except Exception:
+                    pass
+        finally:
+            conn.close()
+    except Exception:
+        pass
+    _CAL.update(t=now, data=out)
+    return out
+
+
+def _week_windows(n=WEEK_COUNT):
+    """오늘부터 7일 단위 n주 (시작일, 종료일) 리스트."""
+    from datetime import date, timedelta
+    t = date.today()
+    return [(t + timedelta(days=7 * i), t + timedelta(days=7 * i + 6)) for i in range(n)]
+
+
+def _weekly_occ(cal, windows):
+    """방 달력 → 주별 예약률(%) 배열. 예약가능일(7-차단) 대비 예약일. 달력 없거나 가용0 → -1."""
+    from datetime import timedelta
+    if not cal:
+        return [-1] * len(windows)
+    res = []
+    for a, b in windows:
+        booked = blocked = 0
+        d = a
+        while d <= b:
+            s = cal.get(d.isoformat())
+            if s == "booking":
+                booked += 1
+            elif s == "disable":
+                blocked += 1
+            d += timedelta(days=1)
+        avail = 7 - blocked
+        res.append(round(booked / avail * 100) if avail > 0 else -1)
+    return res
+
 
 @app.route("/api/map_all")
 def api_map_all():
@@ -614,6 +668,9 @@ def api_map_all():
     slot = "demo" if demo else "body"
     if _MAPALL.get(slot) is not None and now - _MAPALL["t"] < 300:
         return app.response_class(_MAPALL[slot], mimetype="application/json")
+    cal_map = _load_cal()              # 방별 일자 달력(주간 예약률 원천)
+    windows = _week_windows()
+    week_labels = [f"{a.month}/{a.day}~{b.month}/{b.day}" for a, b in windows]
     rent, agg = [], {}
     for r in L():
         la, ln = r.get("lat"), r.get("lng")
@@ -623,11 +680,14 @@ def api_map_all():
         sg = r.get("sigungu") or ""
         occ = round((r.get("occ") or 0) * 100, 1)
         c = calc_at_deposit(r["room_id"], 1000, 0)   # 월순수익(보증금 1000) — 네이버 매칭분만
+        wocc = _weekly_occ(cal_map.get(r["room_id"]), windows)   # 주별 예약률(%) 또는 -1
+        if all(x < 0 for x in wocc):
+            wocc = None            # 달력 없는 매물(비오피스텔 등) → 응답 축소
         rent.append([r["room_id"], round(la, 5), round(ln, 5), occ,
                      r.get("sam_week_man"), r.get("area_pyeong"),
                      r.get("building_type") or "", r.get("name") or r.get("building_name") or "",
                      sg, r.get("dong") or "",
-                     round(c["net"], 1) if c else None])
+                     round(c["net"], 1) if c else None, wocc])
         g = agg.setdefault((sg, r.get("dong") or ""), [0.0, 0.0, 0.0, 0])
         g[0] += la; g[1] += ln; g[2] += occ; g[3] += 1
 
@@ -635,7 +695,7 @@ def api_map_all():
         circles = [[round(v[0] / v[3], 6), round(v[1] / v[3], 6), round(v[2] / v[3], 1), v[3], d]
                    for (sg, d), v in agg_map.items() if v[3] >= 3]
         payload = {"rent": rent_rows, "circles": circles,
-                   "stations": stations, "pois": pois}
+                   "stations": stations, "pois": pois, "weeks": week_labels}
         payload.update(extra)
         return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
