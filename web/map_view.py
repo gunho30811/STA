@@ -55,9 +55,9 @@ font-size:12px;font-weight:700;color:#94a3b8;background:rgba(255,255,255,.9);cur
 box-shadow:0 1px 4px rgba(0,0,0,.2);opacity:.55}
 .ptog.on{color:#111827;opacity:1;border-color:#f59e0b}
 .wklbl{font-size:11.5px;font-weight:800;color:#e2e8f0;background:rgba(15,23,42,.6);padding:5px 9px;border-radius:8px}
-.wk{border:1.5px solid #cbd5e1;border-radius:999px;padding:5px 11px;font-size:12px;font-weight:700;
-color:#475569;background:rgba(255,255,255,.95);cursor:pointer;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.2)}
-.wk.on{background:#059669;border-color:#059669;color:#fff}
+#weekrow{background:rgba(255,255,255,.95);border-radius:999px;padding:5px 12px;box-shadow:0 1px 4px rgba(0,0,0,.2);gap:10px}
+#wkslider{width:180px;accent-color:#059669;cursor:pointer}
+.wkcur{font-size:12.5px;font-weight:800;color:#059669;min-width:118px}
 .wknote{font-size:11px;color:#94a3b8;font-weight:600}
 .pin.nv{width:13px;height:13px;background:#14b8a6}
 .clus{display:flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;font-weight:800;
@@ -79,8 +79,7 @@ color:#334155;white-space:nowrap;pointer-events:none;
 text-shadow:0 1px 3px #fff,0 -1px 3px #fff,1px 0 3px #fff,-1px 0 3px #fff,1px 1px 3px #fff,-1px -1px 3px #fff}
 .dpl b{display:block;font-size:11.5px}
 .dpl .pct{font-weight:900;font-size:11px}
-.dpl .cnt{color:#94a3b8;font-size:9px;font-weight:600}
-.dpl .rcnt{margin-left:4px;color:#4321F3;font-weight:900;font-size:10.5px}
+.dpl .frac{display:block;color:#475569;font-size:9px;font-weight:700}
 .mback{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:2000;display:flex;align-items:flex-end;justify-content:center}
 .mcard{background:#fff;width:100%;max-width:560px;border-radius:16px 16px 0 0;max-height:78vh;display:flex;flex-direction:column;color:#1f2937}
 @media(min-width:641px){.mback{align-items:center}.mcard{border-radius:16px}}
@@ -142,10 +141,10 @@ text-decoration:none;font-size:13px;white-space:nowrap}
     <label class="tog" id=t_reco><span class=dot style="background:#eab308"></span>⭐ 추천 스팟만</label>
   </div>
   <div class=row id=weekrow>
-    <span class=wklbl>예약률 기준</span>
-    <button class="wk on" data-w="-1">전체 기간</button>
-    <span id=wkbtns></span>
-    <span class=wknote>주간은 오피스텔 기준</span>
+    <span class=wklbl>📅 예약 시점</span>
+    <input type=range id=wkslider min=-1 max=7 value=-1 step=1>
+    <span class=wkcur id=wkcur>전체 기간</span>
+    <span class=wknote>오피스텔 기준</span>
   </div>
   <div class=row id=poirow>
     <span class=poi-lbl>수요시설</span>
@@ -239,7 +238,8 @@ var show={circles:true,rent:false,naver:false}
 var poiShow={hospital:false,university:false,industrial:false,academy:false,transport:false,tour:false}
 var FEATS=[], STATIONS=[], POIS=[], idx=null, DONG_AGG=[], SIG_AGG=[], rentShown=0
 var GEO=null, GEO_STAT=[], GEO_IDX={}, GEOPOLYS=null   // 실제 행정동 경계 폴리곤 + 좌표귀속 통계
-var WEEKS=[], weekSel=-1   // 예약률 기준 주차(-1=전체기간, 0~=해당 주). 주간은 오피스텔만 데이터.
+var WEEKS=[], weekSel=-1   // 예약 시점(-1=전체기간, 0~=해당 주). 주간은 오피스텔만 데이터.
+var BOOK_TH=50             // 예약률 이 %↑ 매물을 '예약된(가동중)'으로 카운트(동 예약/매물 분자)
 // 매물의 '기준 예약률' — 전체기간이면 occ, 특정 주면 그 주의 wocc(없으면 null → 집계 제외).
 function occOf(p){
   if(weekSel<0) return p.occ
@@ -282,11 +282,13 @@ function applyFilter(){
   // 동 폴리곤 통계(예약률·건수). 예약률은 매물 필터와 무관하게 항상 '전체' 기준 — 예약률 50%↑
   // 필터를 걸면 남은 매물 평균이라 모든 동이 높아 보이는 선택 편향 방지. 유형 칩만 세그먼트 반영.
   if(GEO){
-    GEO_STAT=GEO.features.map(function(){return {occ:0,on:0,n:0,items:null}})
+    // on=데이터 있는 매물수(=분모 '매물'), bk=예약된(예약률 BOOK_TH%↑) 매물수(=분자 '예약').
+    // 예약률 = bk/on → "동 매물 N개 중 M개 예약(가동중) = P%" 로 직관 표기.
+    GEO_STAT=GEO.features.map(function(){return {bk:0,on:0,n:0,items:null}})
     var pop = filt.btype ? FEATS.filter(function(f){return f.properties.btype===filt.btype}) : FEATS
     pop.forEach(function(f){
-      var p=f.properties, o=occOf(p)     // 주차 선택 시 그 주 예약률(없으면 집계 제외)
-      if(p.di>=0 && o!=null){var s=GEO_STAT[p.di]; s.occ+=o; s.on++}
+      var p=f.properties, o=occOf(p)     // 시점 선택 시 그 주 예약률(없으면 집계 제외)
+      if(p.di>=0 && o!=null){var s=GEO_STAT[p.di]; s.on++; if(o>=BOOK_TH) s.bk++}
     })
     fs.forEach(function(f){
       var p=f.properties
@@ -437,7 +439,7 @@ function dongOf(lat,lng){
 function geoStyle(i){
   var s=GEO_STAT[i]
   if(!s||s.on<3) return {c:'#c3c8d4',w:.5,fc:'#94a3b8',fo:.02}   // 표본<3: 사실상 안 칠함
-  var occ=s.occ/s.on
+  var occ=s.bk/s.on*100                                          // 예약된 매물 비율(%)
   if(occ>=70) return {c:'#4321F3',w:1,fc:'#4321F3',fo:.32}
   if(occ>=55) return {c:'#6d5ef2',w:.8,fc:'#6d5ef2',fo:.20}
   if(occ>=40) return {c:'#8b7dff',w:.6,fc:'#8b7dff',fo:.11}
@@ -491,13 +493,14 @@ function renderDongLabels(){
       var p=f.properties
       if(!b.contains([p.cy,p.cx])) return
       // 키에 렌트 상태 포함 — 렌트 토글 시 라벨(건수 표시)이 diff 렌더에서 새로 그려지게.
-      wanted.set('l'+f._i+(show.rent?'r':''), function(){
-        var s=GEO_STAT[f._i]||{on:0}
-        var occ=s.on?Math.round(s.occ/s.on*10)/10:null
+      wanted.set('l'+f._i, function(){
+        var s=GEO_STAT[f._i]||{on:0,bk:0}
+        var pct=s.on?Math.round(s.bk/s.on*100):null   // 예약된 매물 / 전체 매물
         var h='<div class=dpl><b>'+p.name+'</b>'
-        // 렌트 켜면 건수(rcnt)가 뜨므로 표본 수(·on)는 숨김 — "·354 354개" 중복 방지.
-        if(occ!=null) h+='<span class=pct style="color:'+occColor(occ)+'">'+occ+'%</span>'+(show.rent?'':'<span class=cnt>·'+s.on+'</span>')
-        if(show.rent&&s.n) h+='<span class=rcnt>'+s.n+'개</span>'
+        if(pct!=null){
+          h+='<span class=pct style="color:'+occColor(pct)+'">'+pct+'%</span>'
+          h+='<span class=frac>예약 '+s.bk+'/매물 '+s.on+'</span>'
+        }
         h+='</div>'
         return mkOv(p.cy,p.cx,h,null,5)
       })
@@ -786,24 +789,22 @@ document.getElementById('t_reco').addEventListener('click',function(){
   openRecoSettings()
 })
 
-// ── 예약률 기준 주차 선택 ──
+// ── 예약 시점 슬라이더: 왼쪽 끝=전체 기간, 오른쪽으로 이번주→N주뒤 ──
+function weekLabel(v){
+  if(v<0) return '전체 기간'
+  return (v===0?'이번주':(v+'주 뒤'))+' '+(WEEKS[v]||'')
+}
 function buildWeekUI(){
-  var host=document.getElementById('wkbtns')
-  if(!host || !WEEKS.length) return
-  host.innerHTML=''
-  WEEKS.forEach(function(lbl,i){
-    var b=document.createElement('button')
-    b.className='wk'; b.dataset.w=i
-    b.textContent=(i===0?'이번주':(i+'주뒤'))+' '+lbl
-    host.appendChild(b)
-  })
-  document.querySelectorAll('#weekrow .wk').forEach(function(b){
-    b.addEventListener('click',function(){
-      document.querySelectorAll('#weekrow .wk').forEach(function(x){x.classList.remove('on')})
-      b.classList.add('on'); weekSel=parseInt(b.dataset.w,10)
-      applyFilter()   // 동 폴리곤·라벨을 선택 주차 예약률로 재계산
-    })
-  })
+  var sl=document.getElementById('wkslider'), cur=document.getElementById('wkcur')
+  if(!sl || !WEEKS.length) return
+  sl.max=WEEKS.length-1
+  var upd=function(commit){
+    weekSel=parseInt(sl.value,10)
+    cur.textContent=weekLabel(weekSel)
+    if(commit) applyFilter()   // 동 폴리곤·라벨을 선택 시점 예약률로 재계산
+  }
+  sl.addEventListener('input',function(){upd(false)})   // 드래그 중 라벨만
+  sl.addEventListener('change',function(){upd(true)})   // 놓으면 지도 갱신
 }
 </script>
 </body></html>"""
