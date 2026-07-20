@@ -100,6 +100,9 @@ def main():
     env = dict(os.environ)
     env["DATABASE_URL"] = db_url
     env["SAMSAM_BOOKED_COOLDOWN_DAYS"] = "0"    # 매일 전량 갱신(쿨다운 해제)
+    # 계정당 하루 예약조회 한도(~5,000건 실측) 아래로 분배 — 안 넣으면 1계정이 전량 시도→차단.
+    # 오피스텔(6.7k)은 계정 2개면 계정당 ~3.4k. 유형/매물 늘리면 이 값과 계정 수를 함께 키운다.
+    env.setdefault("SAMSAM_REFRESH_DAILY_LIMIT", "4000")
     env["PYTHONPATH"] = ROOT + os.pathsep + os.path.join(ROOT, "pipeline", "samsam")
 
     py = sys.executable
