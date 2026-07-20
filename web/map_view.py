@@ -54,10 +54,16 @@ box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer}
 font-size:12px;font-weight:700;color:#94a3b8;background:rgba(255,255,255,.9);cursor:pointer;user-select:none;
 box-shadow:0 1px 4px rgba(0,0,0,.2);opacity:.55}
 .ptog.on{color:#111827;opacity:1;border-color:#f59e0b}
-.wklbl{font-size:11.5px;font-weight:800;color:#e2e8f0;background:rgba(15,23,42,.6);padding:5px 9px;border-radius:8px}
-#weekrow{background:rgba(255,255,255,.95);border-radius:999px;padding:5px 12px;box-shadow:0 1px 4px rgba(0,0,0,.2);gap:10px}
-#wkslider{width:180px;accent-color:#059669;cursor:pointer}
-.wkcur{font-size:12.5px;font-weight:800;color:#059669;min-width:118px}
+.wkbox{display:inline-flex;align-items:center;gap:7px;flex-wrap:wrap;background:rgba(255,255,255,.95);
+border-radius:12px;padding:6px 12px;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.wklbl{font-size:12px;font-weight:800;color:#334155}
+.wkdate{border:1.5px solid #cbd5e1;border-radius:8px;padding:4px 7px;font-size:12px;font-weight:700;
+color:#111827;font-family:inherit;background:#fff}
+.wkdate:focus{outline:none;border-color:#059669}
+.wktil{color:#94a3b8;font-weight:800}
+.wkq{border:1.5px solid #cbd5e1;border-radius:999px;padding:4px 10px;font-size:11.5px;font-weight:700;
+color:#475569;background:#fff;cursor:pointer;white-space:nowrap}
+.wkq.on{background:#059669;border-color:#059669;color:#fff}
 .wknote{font-size:11px;color:#94a3b8;font-weight:600}
 .pin.nv{width:13px;height:13px;background:#14b8a6}
 .clus{display:flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;font-weight:800;
@@ -141,10 +147,16 @@ text-decoration:none;font-size:13px;white-space:nowrap}
     <label class="tog" id=t_reco><span class=dot style="background:#eab308"></span>⭐ 추천 스팟만</label>
   </div>
   <div class=row id=weekrow>
-    <span class=wklbl>📅 예약 시점</span>
-    <input type=range id=wkslider min=-1 max=7 value=-1 step=1>
-    <span class=wkcur id=wkcur>전체 기간</span>
-    <span class=wknote>오피스텔 기준</span>
+    <span class=wkbox>
+      <span class=wklbl>📅 예약 기간</span>
+      <input type=date id=wkfrom class=wkdate>
+      <span class=wktil>~</span>
+      <input type=date id=wkto class=wkdate>
+      <button class="wkq on" data-p=all>전체</button>
+      <button class=wkq data-p=m0>이번달</button>
+      <button class=wkq data-p=m1>다음달</button>
+      <span class=wknote>오피스텔 기준</span>
+    </span>
   </div>
   <div class=row id=poirow>
     <span class=poi-lbl>수요시설</span>
@@ -238,13 +250,23 @@ var show={circles:true,rent:false,naver:false}
 var poiShow={hospital:false,university:false,industrial:false,academy:false,transport:false,tour:false}
 var FEATS=[], STATIONS=[], POIS=[], idx=null, DONG_AGG=[], SIG_AGG=[], rentShown=0
 var GEO=null, GEO_STAT=[], GEO_IDX={}, GEOPOLYS=null   // 실제 행정동 경계 폴리곤 + 좌표귀속 통계
-var WEEKS=[], weekSel=-1   // 예약 시점(-1=전체기간, 0~=해당 주). 주간은 오피스텔만 데이터.
-var BOOK_TH=50             // 예약률 이 %↑ 매물을 '예약된(가동중)'으로 카운트(동 예약/매물 분자)
-// 매물의 '기준 예약률' — 전체기간이면 occ, 특정 주면 그 주의 wocc(없으면 null → 집계 제외).
+var CAL_START=null, CAL_DAYS=0     // 달력 시작일(오늘 ISO)·일수. 매물 cal 문자열(b/x/.)의 기준.
+var rangeI0=-1, rangeI1=-1         // 선택 기간의 달력 인덱스(-1,-1 = 전체 기간)
+var BOOK_TH=50                     // 예약률 이 %↑ 매물을 '예약된(가동중)'으로 카운트(동 예약/매물 분자)
+// 매물의 '기준 예약률' — 전체기간이면 occ(1달), 기간 지정 시 그 기간 달력에서 계산(없으면 null).
 function occOf(p){
-  if(weekSel<0) return p.occ
-  var w = p.wocc && p.wocc[weekSel]
-  return (w!=null && w>=0) ? w : null
+  if(rangeI0<0) return p.occ
+  if(!p.cal) return null
+  var seg=p.cal.slice(rangeI0, rangeI1+1), bk=0, bl=0
+  for(var k=0;k<seg.length;k++){var ch=seg[k]; if(ch==='b')bk++; else if(ch==='x')bl++}
+  var avail=seg.length-bl
+  return avail>0 ? bk/avail*100 : null
+}
+// 날짜(ISO) → 달력 인덱스(0=CAL_START). 범위 밖은 클램프.
+function dateIdx(iso){
+  if(!CAL_START) return -1
+  var ms=(new Date(iso+'T00:00:00')-new Date(CAL_START+'T00:00:00'))/86400000
+  return Math.max(0, Math.min(CAL_DAYS-1, Math.round(ms)))
 }
 var filt={btype:'',week:0,occ:0,net:0}
 // ⭐ 추천 설정(모달에서 지정) — 렌트 레이어 필터(filt)와 독립.
@@ -737,11 +759,11 @@ kakao.maps.load(function(){
     var d=res[0]
     STATIONS=d.stations||[]
     POIS=d.pois||[]
-    WEEKS=d.weeks||[]
+    CAL_START=d.cal_start||null; CAL_DAYS=d.cal_days||0
     FEATS=(d.rent||[]).filter(function(a){return a[1]>=33&&a[1]<=39.5&&a[2]>=124&&a[2]<=132})
       .map(function(a){return {type:'Feature',geometry:{type:'Point',coordinates:[a[2],a[1]]},
-        properties:{id:a[0],lat:a[1],lng:a[2],occ:a[3],week:a[4],pyeong:a[5],btype:a[6],name:a[7],sigungu:a[8],dong:a[9],net:a[10],wocc:a[11]||null}}})
-    buildWeekUI()
+        properties:{id:a[0],lat:a[1],lng:a[2],occ:a[3],week:a[4],pyeong:a[5],btype:a[6],name:a[7],sigungu:a[8],dong:a[9],net:a[10],cal:a[11]||null}}})
+    buildRangeUI()
     GEO=res[1]
     // 데모: 경계 폴리곤도 강남권만 남겨 나머지는 그리지 않음(가입 유도).
     if(DEMO && GEO) GEO.features=GEO.features.filter(function(f){return GANGNAM.indexOf(f.properties.sgg)>=0})
@@ -789,22 +811,34 @@ document.getElementById('t_reco').addEventListener('click',function(){
   openRecoSettings()
 })
 
-// ── 예약 시점 슬라이더: 왼쪽 끝=전체 기간, 오른쪽으로 이번주→N주뒤 ──
-function weekLabel(v){
-  if(v<0) return '전체 기간'
-  return (v===0?'이번주':(v+'주 뒤'))+' '+(WEEKS[v]||'')
+// ── 예약 기간 지정: 시작~종료 날짜 자유 선택(달력 범위 내) + 빠른 프리셋 ──
+function iso(d){return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)}
+function calEndISO(){var s=new Date(CAL_START+'T00:00:00'); s.setDate(s.getDate()+CAL_DAYS-1); return iso(s)}
+function applyRange(){
+  var f=document.getElementById('wkfrom').value, t=document.getElementById('wkto').value
+  if(f && t){
+    if(f>t){var tmp=f;f=t;t=tmp; document.getElementById('wkfrom').value=f; document.getElementById('wkto').value=t}
+    rangeI0=dateIdx(f); rangeI1=dateIdx(t)
+  }else{ rangeI0=-1; rangeI1=-1 }   // 한쪽만 비면 전체 기간
+  applyFilter()
 }
-function buildWeekUI(){
-  var sl=document.getElementById('wkslider'), cur=document.getElementById('wkcur')
-  if(!sl || !WEEKS.length) return
-  sl.max=WEEKS.length-1
-  var upd=function(commit){
-    weekSel=parseInt(sl.value,10)
-    cur.textContent=weekLabel(weekSel)
-    if(commit) applyFilter()   // 동 폴리곤·라벨을 선택 시점 예약률로 재계산
-  }
-  sl.addEventListener('input',function(){upd(false)})   // 드래그 중 라벨만
-  sl.addEventListener('change',function(){upd(true)})   // 놓으면 지도 갱신
+function buildRangeUI(){
+  if(!CAL_START) return
+  var f=document.getElementById('wkfrom'), t=document.getElementById('wkto'), end=calEndISO()
+  f.min=CAL_START; f.max=end; t.min=CAL_START; t.max=end   // 달력 커버 범위로 제한
+  f.addEventListener('change',function(){setQ(null);applyRange()})
+  t.addEventListener('change',function(){setQ(null);applyRange()})
+  function setQ(el){document.querySelectorAll('#weekrow .wkq').forEach(function(x){x.classList.toggle('on',x===el)})}
+  document.querySelectorAll('#weekrow .wkq').forEach(function(b){
+    b.addEventListener('click',function(){
+      setQ(b)
+      if(b.dataset.p==='all'){ f.value=''; t.value=''; rangeI0=-1; rangeI1=-1; applyFilter(); return }
+      var base=new Date(CAL_START+'T00:00:00'), mo=base.getMonth()+(b.dataset.p==='m1'?1:0)
+      var a=new Date(base.getFullYear(), mo, 1), z=new Date(base.getFullYear(), mo+1, 0)  // 그 달 1일~말일
+      var lo=iso(a)<CAL_START?CAL_START:iso(a), hi=iso(z)>end?end:iso(z)                  // 달력 범위로 클램프
+      f.value=lo; t.value=hi; rangeI0=dateIdx(lo); rangeI1=dateIdx(hi); applyFilter()
+    })
+  })
 }
 </script>
 </body></html>"""
