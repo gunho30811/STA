@@ -40,7 +40,10 @@ SAMPLE = os.path.join(ROOT, "lab", "samsam_sample.jsonl")
 
 app = Flask(__name__)
 from auth import current_user, init_auth  # noqa: E402
-init_auth(app)
+# api_map_all: 비로그인도 허용하되 강남권만 반환(지도 데모). 나머지 API는 로그인 필요.
+init_auth(app, demo_endpoints={"api_map_all"})
+
+DEMO_SIGUNGU = ("강남구", "서초구", "송파구")   # 지도 데모 공개 지역(강남권)
 
 # 삼삼 통합 채팅: 계정 연결(Playwright 1회 로그인) + 폴링 결과 조회.
 # chat_* / crypto_util 은 채팅(실시간 웹 서비스) 코드라 common/ 에 둔다(순수 크롤은 pipeline).
@@ -594,7 +597,7 @@ def api_buildings():
 
 
 # /api/map?all=1 응답 캐시(5분) — 22k 매물 배열 직렬화를 매 요청 반복하지 않게.
-_MAPALL = {"t": 0.0, "body": None}
+_MAPALL = {"t": 0.0, "body": None, "demo": None}
 
 
 @app.route("/api/map_all")
@@ -607,26 +610,35 @@ def api_map_all():
     circles: [lat, lng, occ%, n, dong]
     """
     now = time.time()
-    if _MAPALL["body"] is not None and now - _MAPALL["t"] < 300:
-        return app.response_class(_MAPALL["body"], mimetype="application/json")
+    demo = current_user() is None   # 비로그인 = 강남권 미리보기
+    slot = "demo" if demo else "body"
+    if _MAPALL.get(slot) is not None and now - _MAPALL["t"] < 300:
+        return app.response_class(_MAPALL[slot], mimetype="application/json")
     rent, agg = [], {}
     for r in L():
         la, ln = r.get("lat"), r.get("lng")
         # 불량 좌표(0,0 등 한국 밖) 제외 — 평균 좌표를 끌고 가 동 원이 엉뚱한 데 그려짐(역삼동 lng=0 사례).
         if la is None or ln is None or not (33.0 <= la <= 39.5 and 124.0 <= ln <= 132.0):
             continue
+        sg = r.get("sigungu") or ""
         occ = round((r.get("occ") or 0) * 100, 1)
         c = calc_at_deposit(r["room_id"], 1000, 0)   # 월순수익(보증금 1000) — 네이버 매칭분만
         rent.append([r["room_id"], round(la, 5), round(ln, 5), occ,
                      r.get("sam_week_man"), r.get("area_pyeong"),
                      r.get("building_type") or "", r.get("name") or r.get("building_name") or "",
-                     r.get("sigungu") or "", r.get("dong") or "",
+                     sg, r.get("dong") or "",
                      round(c["net"], 1) if c else None])
-        key = (r.get("sigungu") or "", r.get("dong") or "")
-        g = agg.setdefault(key, [0.0, 0.0, 0.0, 0])
+        g = agg.setdefault((sg, r.get("dong") or ""), [0.0, 0.0, 0.0, 0])
         g[0] += la; g[1] += ln; g[2] += occ; g[3] += 1
-    circles = [[round(g[0] / g[3], 6), round(g[1] / g[3], 6), round(g[2] / g[3], 1), g[3], d]
-               for (sg, d), g in agg.items() if g[3] >= 3]
+
+    def _build(rent_rows, agg_map, extra):
+        circles = [[round(v[0] / v[3], 6), round(v[1] / v[3], 6), round(v[2] / v[3], 1), v[3], d]
+                   for (sg, d), v in agg_map.items() if v[3] >= 3]
+        payload = {"rent": rent_rows, "circles": circles,
+                   "stations": stations, "pois": pois}
+        payload.update(extra)
+        return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
     # 역/지역 검색용 지하철역 좌표(589역, 작음)
     try:
         import subway
@@ -639,9 +651,15 @@ def api_map_all():
         pois = [[k, n, round(y, 5), round(x, 5)] for k, n, y, x in poi_mod.load_poi()]
     except Exception:
         pois = []
-    body = json.dumps({"rent": rent, "circles": circles, "stations": stations, "pois": pois},
-                      ensure_ascii=False, separators=(",", ":"))
-    _MAPALL.update(t=now, body=body)
+
+    if demo:
+        rent_d = [x for x in rent if x[8] in DEMO_SIGUNGU]
+        agg_d = {k: v for k, v in agg.items() if k[0] in DEMO_SIGUNGU}
+        body = _build(rent_d, agg_d, {"demo": True, "demo_area": "강남권"})
+        _MAPALL.update(t=now, demo=body)
+    else:
+        body = _build(rent, agg, {})
+        _MAPALL.update(t=now, body=body)
     return app.response_class(body, mimetype="application/json")
 
 
