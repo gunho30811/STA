@@ -672,7 +672,8 @@ def fullmap():
     """전용 풀스크린 지도(카카오맵) — 행정동 폴리곤·렌트·부동산·추천 스팟.
     비로그인은 강남권(강남·서초·송파) 미리보기(demo). 부동산·추천은 가입 유도."""
     from map_view import MAP_PAGE
-    return render_template_string(MAP_PAGE, kakao_js_key=os.environ.get("KAKAO_JS_KEY", ""),
+    # 지도용 JS 키는 로그인 앱(KAKAO_CLIENT_ID)과 별개 앱 → KAKAO_MAP_CLIENT_ID로 분리(이름 충돌 방지).
+    return render_template_string(MAP_PAGE, kakao_js_key=os.environ.get("KAKAO_MAP_CLIENT_ID", ""),
                                   demo=(current_user() is None))
 
 

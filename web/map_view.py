@@ -2,7 +2,8 @@
 """전용 풀스크린 지도(/map) 페이지 템플릿.
 
 v6 — 바탕지도 카카오맵 전환 (Leaflet/OSM → Kakao Maps JS SDK):
-- 같은 카카오 앱의 JavaScript 키 사용({{ kakao_js_key }} — portal이 env KAKAO_JS_KEY 주입).
+- 지도 전용 카카오 앱의 JavaScript 키 사용({{ kakao_js_key }} — portal이 env KAKAO_MAP_CLIENT_ID 주입,
+  로그인 앱 KAKAO_CLIENT_ID와 별개).
 - 줌 변환: 카카오 level ↔ 기존 줌 임계값은 z = 20 - level 로 매핑해 로직 그대로 재사용.
 - 마커류는 전부 CustomOverlay(앵커 0,0 + CSS transform), 폴리곤은 kakao.maps.Polygon.
 - 행정동 폴리곤 1,183개는 뷰포트 밖 setMap(null) 컬링(idle마다) — 팬/줌 성능 확보.
