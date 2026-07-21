@@ -45,6 +45,20 @@ init_auth(app, demo_endpoints={"api_map_all"})
 
 DEMO_SIGUNGU = ("강남구", "서초구", "송파구")   # 지도 데모 공개 지역(강남권)
 
+# 지하성 매물 제외 패턴 — 반지하·지하층·지층 (단기임대 부적합). '지하'만 쓰면 '지하철'까지
+# 걸러버려 위험하므로 안전한 표기만. summary/summary_tags 양쪽에 적용.
+_BASEMENT_PATS = ("%반지하%", "%지하층%", "%지층%")
+
+
+def _basement_exclude():
+    """(SQL 절, 파라미터 리스트) — summary·summary_tags에서 지하성 표기 제외."""
+    conds, params = [], []
+    for col in ("summary", "summary_tags"):
+        for p in _BASEMENT_PATS:
+            conds.append(f"COALESCE({col}, '') NOT LIKE %s")
+            params.append(p)
+    return " AND " + " AND ".join(conds), params
+
 # 삼삼 통합 채팅: 계정 연결(Playwright 1회 로그인) + 폴링 결과 조회.
 # chat_* / crypto_util 은 채팅(실시간 웹 서비스) 코드라 common/ 에 둔다(순수 크롤은 pipeline).
 sys.path.insert(0, os.path.join(ROOT, "common"))
@@ -921,11 +935,12 @@ def api_recommend():
     type_ph = ",".join(["%s"] * len(types))
     dep_sql = " AND deposit <= %s" if max_dep > 0 else ""
     rent_hi = max_rent if max_rent > 0 else 200   # 월세 상한(사용자 설정, 기본 200)
+    bx_sql, bx_p = _basement_exclude()
     spots = []
     for c in cands:
         try:
             params = [c["lat"] - 0.014, c["lat"] + 0.014, c["lon"] - 0.017, c["lon"] + 0.017,
-                      rent_hi, *types, "%반지하%", "%반지층%", "%반지하%", "%반지층%"]
+                      rent_hi, *types, *bx_p]
             if max_dep > 0:
                 params.append(max_dep)
             params.append(RECO_FETCH)
@@ -936,8 +951,7 @@ def api_recommend():
                 " WHERE lat BETWEEN %s AND %s AND lng BETWEEN %s AND %s"
                 "   AND rent_monthly BETWEEN 1 AND %s"
                 f"   AND building_type_code IN ({type_ph})"
-                "   AND COALESCE(summary, '') NOT LIKE %s AND COALESCE(summary, '') NOT LIKE %s"
-                "   AND COALESCE(summary_tags, '') NOT LIKE %s AND COALESCE(summary_tags, '') NOT LIKE %s"
+                + bx_sql +
                 f"{dep_sql}"
                 " ORDER BY rent_monthly ASC LIMIT %s",
                 tuple(params)).fetchall()
@@ -1037,17 +1051,16 @@ def api_map():
                     conn = db.connect()
                     # nl_live(뷰 조인+정렬)는 bbox당 수 초 걸림 → 상세 테이블 직접 + (lat,lng) 인덱스
                     # (ix_nl_latlng) + 정렬 제거로 ~0.5s. 지도는 '그 화면에 뭐가 있나'라 정렬 불필요.
+                    bx_sql, bx_p = _basement_exclude()
                     rows = conn.execute(
                         "SELECT article_no, building_name, building_type_code, deposit, rent_monthly,"
                         " area_exclusive_m2, floor_current, lat, lng"
                         " FROM naver_listings"
                         " WHERE lat BETWEEN %s AND %s AND lng BETWEEN %s AND %s"
                         "   AND rent_monthly BETWEEN 1 AND 5000"
-                        "   AND COALESCE(summary, '') NOT LIKE %s AND COALESCE(summary, '') NOT LIKE %s"
-                        "   AND COALESCE(summary_tags, '') NOT LIKE %s AND COALESCE(summary_tags, '') NOT LIKE %s"
+                        + bx_sql +
                         " LIMIT 1000",
-                        (b["min_lat"], b["max_lat"], b["min_lng"], b["max_lng"],
-                         "%반지하%", "%반지층%", "%반지하%", "%반지층%")).fetchall()
+                        [b["min_lat"], b["max_lat"], b["min_lng"], b["max_lng"]] + bx_p).fetchall()
                     conn.close()
                     last_err = None
                     break

@@ -687,43 +687,88 @@ def deploy_lab(reason):
         log(f"배포 예외({reason}): {repr(e)[:150]}")
 
 
-# ── 매물 변동(추가/삭제) 집계 ─────────────────────────────────────────────────
-def record_churn(conn, rids):
-    """이번 크롤 라이브 매물을 직전(samsam_live)과 비교해 시도별 추가/삭제/총계를 samsam_churn 에
-    적재하고, samsam_live 를 이번 집합으로 교체한다. 첫 실행(직전셋 없음)은 기준선만 저장한다.
-    rids: {room_id: room(목록객체)} — 이미 수도권으로 필터된 라이브 집합."""
-    cur = {}
+# ── 삭제 매물 정리 + 신규 매물 지역 집계 ──────────────────────────────────────
+def _room_dong(room):
+    """목록 room 객체 → (시도, 시군구, 동). province=시군구, town=동."""
+    return (_room_sido(room), (room.get("province") or "").strip(), (room.get("town") or "").strip())
+
+
+def prune_and_track(conn, rids, done):
+    """① 삼삼에서 내려간 매물을 samsam_listings에서 삭제(현재 목록에 없는 수도권 매물).
+    ② 신규 매물(이번에 처음 보인 room)을 동별로 집계 → kv_cache 'samsam_new_by_dong'.
+    ③ 시도별 추가/삭제/총계를 samsam_churn에 적재.
+    rids: 수도권 전유형 현재 목록 {room_id: room}. done: DB에 이미 있던 room_id 집합."""
+    cur_ids = set()
+    cur_meta = {}   # rid → (sido, sigungu, dong)
     for rid, room in rids.items():
         try:
-            cur[int(rid)] = _room_sido(room)
+            r = int(rid)
         except (TypeError, ValueError):
             continue
+        cur_ids.add(r)
+        cur_meta[r] = _room_dong(room)
+
+    # ① 삭제: 현재 목록에 없는 수도권 매물 제거(달력·라이브도 함께)
+    metro_sql = "('서울특별시','경기도','인천광역시')"
+    db_metro = [r[0] for r in conn.execute(
+        f"SELECT room_id FROM samsam_listings WHERE sido IN {metro_sql}").fetchall()]
+    gone = [r for r in db_metro if r not in cur_ids]
+    if gone:
+        for i in range(0, len(gone), 500):
+            part = gone[i:i + 500]
+            ph = ",".join(["%s"] * len(part))
+            conn.execute(f"DELETE FROM samsam_listings WHERE room_id IN ({ph})", part)
+            conn.execute(f"DELETE FROM samsam_cal_last WHERE room_id IN ({ph})", part)
+        conn.commit()
+    log(f"삭제 매물 정리: {len(gone)}건 제거 (현재 목록 {len(cur_ids)}건)")
+
+    # ② 신규 매물(이번에 처음 등장) 동별 집계 → kv_cache
+    new_by_dong = defaultdict(int)
+    for rid in cur_ids:
+        if rid not in done:
+            sido, sgg, dong = cur_meta.get(rid, ("", "", ""))
+            if sgg or dong:
+                new_by_dong[f"{sido}|{sgg}|{dong}"] += 1
+    top = sorted(new_by_dong.items(), key=lambda kv: -kv[1])[:40]
+    payload = {"date": date.today().isoformat(),
+               "total_new": sum(new_by_dong.values()),
+               "top": [{"sido": k.split("|")[0], "sigungu": k.split("|")[1],
+                        "dong": k.split("|")[2], "n": v} for k, v in top]}
+    try:
+        conn.execute("INSERT INTO kv_cache(k,data,updated_at) VALUES(%s,%s,%s) "
+                     "ON CONFLICT (k) DO UPDATE SET data=EXCLUDED.data,updated_at=EXCLUDED.updated_at",
+                     ("samsam_new_by_dong", json.dumps(payload, ensure_ascii=False),
+                      datetime.now().isoformat(timespec="seconds")))
+    except Exception:
+        pass
+    if top:
+        log("신규 매물 많은 동 top3: "
+            + ", ".join(f"{k.split('|')[2]} +{v}" for k, v in top[:3])
+            + f" (신규 총 {payload['total_new']}건)")
+
+    # ③ 시도별 변동 → samsam_churn (직전 라이브셋 대비)
     prev = {r[0]: r[1] for r in conn.execute("SELECT room_id, sido FROM samsam_live").fetchall()}
+    today = date.today().isoformat()
+    added, removed, total = defaultdict(int), defaultdict(int), defaultdict(int)
+    for rid in cur_ids:
+        sido = cur_meta[rid][0]
+        total[sido] += 1
+        if rid not in prev:
+            added[sido] += 1
+    for rid, sido in prev.items():
+        if rid not in cur_ids:
+            removed[sido] += 1
     if prev:
-        today = date.today().isoformat()
-        added, removed, total = defaultdict(int), defaultdict(int), defaultdict(int)
-        for rid, sido in cur.items():
-            total[sido] += 1
-            if rid not in prev:
-                added[sido] += 1
-        for rid, sido in prev.items():
-            if rid not in cur:
-                removed[sido] += 1
         for sido in set(total) | set(removed):
             conn.execute(
                 "INSERT INTO samsam_churn(crawl_date,sido,added,removed,total) VALUES(%s,%s,%s,%s,%s) "
                 "ON CONFLICT (crawl_date,sido) DO UPDATE SET added=EXCLUDED.added,"
                 "removed=EXCLUDED.removed,total=EXCLUDED.total",
                 (today, sido, added[sido], removed[sido], total[sido]))
-        short = lambda s: s.replace('특별시', '').replace('광역시', '').replace('도', '')
-        log("매물 변동 집계(" + today + "): "
-            + ", ".join(f"{short(s)} +{added[s]}/-{removed[s]}" for s in sorted(total)))
-    else:
-        log("매물 변동: 첫 실행 — 기준선만 저장(집계는 다음 회차부터)")
     conn.execute("DELETE FROM samsam_live")
-    if cur:
+    if cur_ids:
         conn.executemany("INSERT INTO samsam_live(room_id,sido) VALUES(%s,%s)",
-                         [[rid, sido] for rid, sido in cur.items()])
+                         [[rid, cur_meta[rid][0]] for rid in cur_ids])
     conn.commit()
 
 
@@ -771,6 +816,17 @@ def main():
     before_metro = len(rids)
     rids = {rid: room for rid, room in rids.items() if _room_sido(room) in METRO_SIDO}
     log(f"수도권(서울/경기/인천) 필터: {before_metro} → {len(rids)}건 (그 외 지역은 갱신 대상에서 제외)")
+
+    # ── 삭제 매물 정리 + 신규 매물 지역 집계 ──────────────────────────────────
+    # 목록 API는 전 유형을 한 번에 주므로(유형 필터 전) 여기서 처리 → --types OFFICETEL 일일 크롤에서도
+    # 전 유형의 삭제/신규가 올바르게 반영된다. 목록이 정상 수신됐을 때만 실행(차단 시 대량삭제 방지).
+    if len(rids) >= 5000:
+        try:
+            prune_and_track(conn, rids, done)
+        except Exception as e:
+            log(f"삭제정리/신규집계 실패(크롤은 계속): {repr(e)[:150]}")
+    else:
+        log(f"목록 {len(rids)}건 — 비정상(차단?)으로 보고 삭제정리 스킵")
 
     if type_filter:
         # 목록 API의 propertyType 은 한글값('오피스텔')이므로 한글로 비교(필터는 영문코드 집합).
