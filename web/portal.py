@@ -482,86 +482,342 @@ PUBLIC_LANDING = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxMDAgMTAwJz48Y2lyY2xlIGN4PSc1MCcgY3k9JzUwJyByPSc1MCcgZmlsbD0nIzQzMjFGMycvPjxnIGZpbGw9J25vbmUnIHN0cm9rZT0nI2ZmZicgc3Ryb2tlLXdpZHRoPScxMycgc3Ryb2tlLWxpbmVjYXA9J3JvdW5kJyBzdHJva2UtbGluZWpvaW49J3JvdW5kJz48cGF0aCBkPSdNNDAgMzRWNjcnLz48cGF0aCBkPSdNNDAgNDdDNDMgMzkgNTIgMzYgNjEgNDAnLz48L2c+PC9zdmc+">
 <link rel=stylesheet href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard-dynamic-subset.css">
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
-background:radial-gradient(1200px 600px at 50% -10%,#1e293b,#0f172a);min-height:100vh;color:#e2e8f0}
-.nav{display:flex;justify-content:space-between;align-items:center;padding:18px 28px;max-width:1080px;margin:0 auto}
-.brand{font-size:20px;font-weight:900;color:#fff;letter-spacing:-.02em}.brand .dot{color:#8b7dff}
-.nav .cta{display:flex;gap:8px}
-.nav a{text-decoration:none;font-weight:700;font-size:14px;padding:9px 16px;border-radius:9px}
-.nav .login{color:#cbd5e1}.nav .signup{background:#4321F3;color:#fff}
-.hero{max-width:1080px;margin:0 auto;padding:60px 28px 40px;text-align:center}
-.hero .tag{display:inline-block;font-size:13px;font-weight:700;color:#93c5fd;background:rgba(67,33,243,.15);
-border:1px solid rgba(96,165,250,.3);padding:6px 14px;border-radius:999px;margin-bottom:24px}
-.hero h1{font-size:44px;line-height:1.2;font-weight:900;margin:0 0 18px;color:#fff;letter-spacing:-.03em}
-.hero h1 .hl{color:#8b7dff}
-.hero p{font-size:17px;line-height:1.7;color:#94a3b8;margin:0 auto 32px;max-width:640px}
-.hero .btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-.btn{text-decoration:none;font-weight:800;font-size:15px;padding:14px 28px;border-radius:11px}
-.btn-primary{background:#4321F3;color:#fff;box-shadow:0 8px 24px rgba(67,33,243,.4)}
-.btn-ghost{background:rgba(255,255,255,.06);color:#e2e8f0;border:1px solid rgba(255,255,255,.14)}
-.free{margin-top:16px;font-size:13px;color:#93c5fd;font-weight:600}
-.free b{color:#c7bcff}
-.cards{max-width:1080px;margin:20px auto 0;padding:20px 28px 70px;display:grid;
-grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
-.card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:26px;text-align:left}
-.card .ic{font-size:32px}.card h3{font-size:18px;font-weight:800;color:#fff;margin:12px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.card p{font-size:13.5px;color:#94a3b8;line-height:1.65;margin:0}
-.badge{font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:999px}
-.badge.bfree{background:rgba(52,211,153,.16);color:#6ee7b7;border:1px solid rgba(52,211,153,.3)}
-.badge.bmem{background:rgba(148,163,184,.16);color:#cbd5e1;border:1px solid rgba(148,163,184,.3)}
-.clink{display:inline-block;margin-top:14px;font-size:13px;font-weight:800;color:#8b7dff;text-decoration:none}
-.clink.mut{color:#64748b;font-weight:700}
-.steps{max-width:1080px;margin:0 auto;padding:0 28px 40px;color:#94a3b8;font-size:14px;text-align:center}
-.steps b{color:#cbd5e1}
-.foot{text-align:center;color:#64748b;font-size:12.5px;padding:30px 20px 50px}
-@media(max-width:640px){.hero h1{font-size:32px}.hero{padding:40px 20px 30px}.nav{padding:14px 18px}}
+:root{--accent:#4D2EE9;--ink:#141824;--sub:#565C6E;--mut:#6B7080;--line:#ECEEF2;--line2:#E5E8EF;--bg-soft:#F7F8FB}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;background:#fff;color:var(--ink);line-height:1.55}
+a{color:var(--accent);text-decoration:none}
+img,svg{max-width:100%}
+
+/* 헤더 */
+.hd{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);
+border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;
+padding:14px 40px;flex-wrap:wrap;gap:10px}
+.brand{font-size:21px;font-weight:900;letter-spacing:-.02em;color:var(--accent)}
+.hd-cta{display:flex;align-items:center;gap:16px}
+.hd-cta .login{font-size:14px;font-weight:600;color:var(--mut)}
+.hd-cta .signup{font-size:14px;font-weight:700;color:var(--accent);border:1px solid #D7DBE4;padding:8px 15px;border-radius:8px}
+@media(max-width:720px){.hd{padding:12px 18px}}
+
+/* 히어로 */
+.hero{background:linear-gradient(180deg,#F4F6FB 0%,#FBFCFE 70%,#fff 100%);border-bottom:1px solid #EEF0F4}
+.hero-in{max-width:1140px;margin:0 auto;padding:68px 40px;text-align:center}
+.tag{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--accent);
+background:#EAEEFB;padding:6px 14px;border-radius:20px;margin-bottom:20px}
+.hero h1{font-size:40px;font-weight:900;line-height:1.18;letter-spacing:-.03em;margin:0 0 18px;white-space:pre-line}
+.hero p{font-size:17px;color:var(--sub);max-width:600px;margin:0 auto 32px;white-space:pre-line}
+.hero .btns{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;align-items:center}
+.btn{font-size:16px;font-weight:700;padding:16px 30px;border-radius:10px;display:inline-block}
+.btn-primary{color:#fff;background:var(--accent);box-shadow:0 6px 16px -8px var(--accent)}
+.hero .signup-link{font-size:15px;font-weight:600;color:var(--mut)}
+.signup-row{margin-top:16px}
+.free-note{margin-top:22px;font-size:13px;color:#8990A0}
+@media(max-width:640px){.hero h1{font-size:29px}.hero-in{padding:44px 20px}}
+
+/* 공통 섹션 헤딩 */
+.kicker{font-size:13px;font-weight:700;margin-bottom:8px}
+.sec-h{text-align:center;margin-bottom:40px}
+.sec-h h2{font-size:28px;font-weight:900;letter-spacing:-.02em;margin:0 0 6px}
+.sec-h p{font-size:16px;color:var(--mut);margin:0}
+@media(max-width:640px){.sec-h h2{font-size:22px}}
+
+/* 2 · 문제 */
+.problems{max-width:1140px;margin:0 auto;padding:70px 40px 68px}
+.problems .kicker{color:#C0392B;text-align:center}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+.pbox{background:var(--bg-soft);border:1px solid var(--line);border-radius:16px;padding:26px}
+.pbox .t{font-size:17px;font-weight:800;margin:14px 0 8px}
+.pbox .d{font-size:14px;color:var(--mut)}
+
+/* 3 · 서비스 3종 */
+.services{max-width:1140px;margin:0 auto;padding:64px 40px 68px}
+.services .kicker{color:var(--accent);text-align:center}
+.sgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+.scard{background:#fff;border:1px solid var(--line2);border-radius:18px;padding:28px;position:relative;
+box-shadow:0 6px 20px -14px rgba(20,24,36,.25)}
+.scard .badge{position:absolute;top:20px;right:20px;font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px}
+.badge-free{background:#E4F3EC;color:#0F9B62}
+.badge-mem{background:#FDF0D9;color:#B7791F}
+.scard .t{font-size:17px;font-weight:800;margin:10px 0 8px}
+.scard .d{font-size:14px;color:var(--mut);margin-bottom:18px}
+.scard .link{font-size:14px;font-weight:700}
+
+/* 4 · 무료 계산기 */
+.calc{max-width:1040px;margin:0 auto;padding:72px 40px 68px}
+.calc-box{background:#fff;border:1px solid var(--line2);border-radius:22px;padding:38px;
+box-shadow:0 30px 70px -34px rgba(20,24,36,.35)}
+.calc-h{display:flex;align-items:center;gap:9px;margin-bottom:26px;flex-wrap:wrap}
+.pill-green{background:#E4F3EC;color:#0F9B62;font-size:14px;font-weight:800;padding:4px 11px;border-radius:12px}
+.calc-h .t{font-size:16px;font-weight:800}
+.calc-cols{display:flex;gap:36px;flex-wrap:wrap}
+.calc-inputs{flex:1 1 300px;min-width:280px;display:flex;flex-direction:column;justify-content:center;gap:26px}
+.slider-row .lbl{display:flex;justify-content:space-between;font-size:14px;font-weight:700;margin-bottom:8px}
+.slider-row .lbl span:last-child{color:var(--accent);font-weight:900}
+.slider-row input[type=range]{width:100%;accent-color:var(--accent)}
+.calc-out{flex:1 1 280px;min-width:260px;background:linear-gradient(160deg,#F1F4FC 0%,#EAF6F0 100%);
+border:1px solid #E1E6F2;border-radius:16px;padding:28px;display:flex;flex-direction:column;
+justify-content:center;text-align:center}
+.calc-out .lbl{font-size:13px;color:var(--sub);margin-bottom:6px}
+.calc-out .num{font-size:42px;font-weight:900;color:#0F9B62;letter-spacing:-.02em;line-height:1.1}
+.calc-out .sub{font-size:13px;color:#7C8090;margin-top:8px}
+.calc-out .sub b{color:#0F9B62}
+.calc-out hr{border:none;height:1px;background:#DCE1EC;margin:20px 0;width:100%}
+.calc-out .match{font-size:13px;color:var(--sub)}
+.calc-out .match b{color:var(--ink)}
+.nudge{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:24px;background:var(--ink);
+border-radius:14px;padding:18px 22px}
+.nudge p{flex:1 1 300px;font-size:14px;font-weight:600;color:#fff;margin:0}
+.nudge a{font-size:14px;font-weight:800;color:var(--ink);background:#fff;padding:11px 20px;border-radius:9px;
+white-space:nowrap}
+@media(max-width:640px){.calc-box{padding:24px}}
+
+/* 5 · 공급부족 스팟 (잠금) */
+.wall{max-width:1140px;margin:0 auto;padding:64px 40px 20px}
+.wall .sec-h span.tag2{background:var(--accent);color:#fff;font-size:12px;font-weight:800;padding:6px 12px;
+border-radius:12px;display:inline-block;margin-bottom:16px}
+.wall-panel{position:relative;border-radius:20px;overflow:hidden;border:1px solid var(--line2)}
+.wall-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line2)}
+.wcell{background:#fff;padding:52px 22px;min-height:210px;box-sizing:border-box}
+.wcell.locked{filter:blur(3.5px);user-select:none}
+.wcell .k{font-size:12px;font-weight:800;margin-bottom:8px}
+.wcell .k.open{color:#0F9B62}
+.wcell .k.lock{color:#B7791F}
+.wcell .name{font-size:17px;font-weight:900;margin-bottom:4px}
+.wcell .n{font-size:13px;color:var(--mut)}
+.wall-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+background:linear-gradient(180deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.72) 55%,rgba(255,255,255,.96) 100%)}
+.wall-card{background:#fff;border:1px solid var(--line2);border-radius:16px;padding:34px 26px;text-align:center;
+box-shadow:0 20px 50px -24px rgba(20,24,36,.35);max-width:380px}
+.wall-card .t{font-size:15px;font-weight:900;margin-bottom:6px}
+.wall-card .d{font-size:13px;color:var(--mut);margin-bottom:16px}
+.wall-card a{display:inline-block;font-size:14px;font-weight:800;color:#fff;background:var(--accent);
+padding:11px 22px;border-radius:9px}
+@media(max-width:720px){.wall-grid{grid-template-columns:1fr}.wcell{padding:32px 20px}}
+
+/* 6 · 신뢰 */
+.trust{background:var(--bg-soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+margin-top:64px;padding:72px 40px}
+.trust-in{max-width:1140px;margin:0 auto}
+.trust .sec-h span.tag3{background:#E6F1FB;color:#185FA5;font-size:12px;font-weight:800;padding:4px 12px;
+border-radius:12px;display:inline-block;margin-bottom:16px}
+.tgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+.tcard{background:#fff;border:1px solid var(--line);border-radius:16px;padding:26px}
+.tcard .ic{font-size:22px;margin-bottom:12px}
+.tcard .t{font-size:16px;font-weight:900;margin-bottom:6px}
+.tcard .d{font-size:14px;color:var(--mut)}
+.trust-note{text-align:center;font-size:13px;color:#8990A0;margin-top:28px}
+
+/* 7 · 회원가입 CTA */
+.signup-sec{max-width:1140px;margin:0 auto;padding:80px 40px}
+.signup-card{background:var(--accent);border-radius:24px;padding:45px 40px;text-align:center}
+.signup-card h2{font-size:28px;font-weight:900;color:#fff;letter-spacing:-.02em;margin:0 0 12px}
+.signup-card p{font-size:16px;color:#E7ECFB;margin:0 auto 28px;max-width:600px}
+.signup-card .btn{color:var(--accent);background:#fff;font-weight:900;padding:16px 36px;border-radius:11px}
+.signup-card .fine{font-size:13px;color:#D3DBF7;margin-top:16px}
+
+/* 푸터 */
+.foot{padding:32px 40px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;
+gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
+.foot .brand{font-size:21px}
 </style></head><body>
-<div class=nav>
-  <div class=brand>ren<span class=dot>dit</span></div>
-  <div class=cta>
+
+<!-- 헤더 : 무료 도구가 1순위, 회원가입은 2순위 -->
+<header class=hd>
+  <div class=brand>rendit</div>
+  <div class=hd-cta>
     <a class=login href="/auth/login">로그인</a>
     <a class=signup href="/auth/signup">회원가입</a>
   </div>
-</div>
-<div class=hero>
-  <span class=tag>🏠 부동산 단기임대 수익 분석</span>
-  <h1>부동산 월세 매물,<br><span class=hl>단기임대로 돌리면 얼마 벌까?</span></h1>
-  <p>네이버부동산 매물을 렌트(단기임대) 데이터와 매칭해, <b>월세로 줄 때 대비 얼마나 더 버는지</b>
-     예약률·순수익까지 한눈에. 임대인·투자자를 위한 수익성 분석 도구입니다.</p>
+</header>
+
+<!-- 1 · 히어로 -->
+<section class=hero><div class=hero-in>
+  <span class=tag>🏠 단기임대용 매물 찾기</span>
+  <h1>단기임대로 돈 되는 매물,
+어디서 찾아야 할까?</h1>
+  <p>가입 없이 지도와 계산기부터 사용해보세요.
+수요는 높은데 공급이 부족한 스팟과 수익이 나는 매물을 rendit이 골라드립니다.</p>
   <div class=btns>
-    <a class="btn btn-primary" href="/auth/signup">무료로 시작하기 →</a>
-    <a class="btn btn-ghost" href="/map">🗺️ 지도 미리보기</a>
-    <a class="btn btn-ghost" href="/calc">🧮 수익 계산기</a>
+    <a class="btn btn-primary" href="#calc">🧮 무료 계산기 써보기</a>
+    <a class="btn btn-primary" href="/map">🗺️ 지도 미리보기</a>
   </div>
-  <div class=free>가입 없이 바로 — <b>계산기는 전체 무료</b>, <b>지도는 강남권 미리보기</b></div>
-</div>
-<div class=cards>
-  <div class=card><div class=ic>{ICON_RENT}</div>
-    <h3>지도 검색 <span class="badge bfree">강남권 무료</span></h3>
-    <p>동별 예약률을 지도에 색으로. 어디가 뜨거운지 한눈에 — 강남권은 가입 없이 바로 둘러보세요.</p>
-    <a class=clink href="/map">지도 미리보기 →</a></div>
-  <div class=card><div class=ic>{ICON_PROFIT}</div>
-    <h3>수익 계산기 <span class="badge bfree">무료</span></h3>
-    <p>이 월세 매물, 단기임대로 돌리면 얼마? 주당 렌트비·예약률로 기대 월순수익을 즉시 계산.</p>
-    <a class=clink href="/calc">계산기 열기 →</a></div>
-  <div class=card><div class=ic>{ICON_ESTATE}</div>
-    <h3>공급부족 스팟 <span class="badge bmem">회원</span></h3>
-    <p>수요는 높은데 단기임대 공급이 없는 동네 + 근처 부동산 매물 매칭. 진입하면 돈 되는 곳을 추천.</p>
-    <a class="clink mut" href="/auth/signup">가입하고 전체 보기 →</a></div>
-</div>
-<div class=steps>
-  <b>계산기·지도 미리보기</b>는 지금 바로 무료 · 수도권 전 지역·부동산 매칭·⭐추천 스팟은 <b>가입 후</b>(관리자 승인) 이용.
-</div>
-<div class=foot>핵심 기능은 회원 전용 · 계산기·강남권 지도는 로그인 없이 체험 가능</div>
+  <div class=signup-row><a class=signup-link href="#signup">또는 회원가입 →</a></div>
+  <div class=free-note>가입 없이 바로 — <b>계산기는 전체 무료</b>, <b>지도는 강남권 무료 미리보기</b></div>
+</div></section>
+
+<!-- 2 · 문제상황 -->
+<section class=problems>
+  <div class=sec-h>
+    <div class=kicker>이런 고민, 있으셨죠?</div>
+    <h2>매물은 많은데, 어디가 돈 되는지 모르시죠</h2>
+  </div>
+  <div class=pgrid>
+    <div class=pbox>{ICON_LOST}<div class=t>어디부터 봐야 할지 막막</div>
+      <div class=d>지역·예산 기준이 없어 매물 표만 뒤지다 시간을 보냅니다.</div></div>
+    <div class=pbox>{ICON_SCATTER}<div class=t>데이터가 흩어져 있어요</div>
+      <div class=d>매물 정보와 실제 예약 수요가 따로 놀아 비교가 어렵습니다.</div></div>
+    <div class=pbox>{ICON_WARN}<div class=t>공급 과잉 지역이 걱정</div>
+      <div class=d>이미 숙소가 넘치는 동네에 잘못 들어가면 예약이 안 들어옵니다.</div></div>
+  </div>
+</section>
+
+<!-- 3 · 서비스 3종 -->
+<section class=services>
+  <div class=sec-h>
+    <div class=kicker>rendit이 해결합니다</div>
+    <h2>3가지 도구로 매물의 답을 봅니다</h2>
+    <p>계산기와 지도는 지금 바로 무료로, 좋은 매물 후보를 보고 싶다면 가입하면 열립니다.</p>
+  </div>
+  <div class=sgrid>
+    <div class=scard><span class="badge badge-free">무료</span>{ICON_CALC}
+      <div class=t>수익 계산기</div>
+      <div class=d>월세 대비 단기임대 전환 시 기대 순수익과 영업이익률을 즉시 계산.</div>
+      <a class=link href="#calc">지금 계산하기 →</a></div>
+    <div class=scard><span class="badge badge-free">무료</span>{ICON_MAP}
+      <div class=t>지역 수익 지도</div>
+      <div class=d>동·역별 평균 순수익과 예약률을 지도에서 색으로 비교(강남권 무료).</div>
+      <a class=link href="/map">지도 열기 →</a></div>
+    <div class=scard><span class="badge badge-mem">회원</span>{ICON_SPOT}
+      <div class=t>공급부족 스팟 파인더</div>
+      <div class=d>수요 대비 공급이 부족한 스팟을 점수화해 근처 매물까지 매칭.</div>
+      <a class=link style="color:#B7791F" href="#signup">가입하고 열기 →</a></div>
+  </div>
+</section>
+
+<!-- 4 · 무료 계산기 (실시간) -->
+<section class=calc id=calc>
+  <div class=calc-box>
+    <div class=calc-h><span class=pill-green>무료 체험</span><span class=t>지금 슬라이더를 움직여 보세요</span></div>
+    <div class=calc-cols>
+      <div class=calc-inputs>
+        <div class=slider-row>
+          <div class=lbl><span>현재 월 임차료</span><span id=rentLabel>90만원</span></div>
+          <input type=range id=i-rent min=50 max=300 step=10 value=90>
+        </div>
+        <div class=slider-row>
+          <div class=lbl><span>주 임대료 (단기임대)</span><span id=weeklyLabel>45만원</span></div>
+          <input type=range id=i-weekly min=20 max=90 step=5 value=45>
+        </div>
+        <div class=slider-row>
+          <div class=lbl><span>예상 예약률</span><span id=occLabel>70%</span></div>
+          <input type=range id=i-occ min=40 max=95 step=5 value=70>
+        </div>
+      </div>
+      <div class=calc-out>
+        <div class=lbl>단기임대 전환 시 기대 월순수익</div>
+        <div class=num id=o-profit>+0만원</div>
+        <div class=sub>월세 대비 <b id=o-uplift>-</b>배 · 영업이익률 <b id=o-margin>-</b></div>
+        <hr>
+        <div class=match>이 조건에 맞는 매물이<br>강남권에 <b id=o-match>-</b>개 있어요</div>
+      </div>
+    </div>
+    <div class=nudge>
+      <p>💡 매물마다 일일이 계산하기 귀찮다면? 수익 나는 <b>추천 스팟</b>을 rendit이 골라드려요.</p>
+      <a href="#wall">추천 스팟 보기 →</a>
+    </div>
+  </div>
+</section>
+
+<!-- 5 · 공급부족 스팟 파인더 (잠금 미리보기) -->
+<section class=wall id=wall>
+  <div class=sec-h>
+    <span class=tag2>⭐ 공급부족 스팟 파인더</span>
+    <h2>단기임대 수요는 높은데 공급이 없는 동네,<br>지도에서 바로 찾으세요</h2>
+    <p>계산기·지도는 강남권까지 무료. 수도권 전 지역과 공급부족 스팟 + 근처 매물 매칭은 가입하면 열려요.</p>
+  </div>
+  <div class=wall-panel>
+    <div class=wall-grid>
+      <div class=wcell>
+        <div class="k open">✓ 무료로 열림</div>
+        <div class=name>강남권</div>
+        <div class=n>평균 순수익 +164만원 · 매물 12개</div>
+      </div>
+      <div class="wcell locked">
+        <div class=k>수도권 전체</div>
+        <div class=name>마포·성동·송파…</div>
+        <div class=n>평균 순수익 +███만원 · 매물 ███개</div>
+      </div>
+      <div class="wcell locked">
+        <div class="k lock">🔒 ⭐ 공급부족 스팟</div>
+        <div class=name>██동 · 추천점수 ██점</div>
+        <div class=n>순수익 +███만원 · 매칭 매물 ██개</div>
+      </div>
+    </div>
+    <div class=wall-overlay>
+      <div class=wall-card>
+        <div class=t>🔓 전체 지도·추천 스팟 잠금 해제</div>
+        <div class=d>수도권 전체 순위와 공급부족 추천 스팟을 지도에서 한눈에.</div>
+        <a href="#signup">가입하고 전체 열기 →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 · 신뢰 -->
+<section class=trust id=trust><div class=trust-in>
+  <div class=sec-h>
+    <span class=tag3>데이터 근거</span>
+    <h2>"이 숫자에 내 돈 걸어도 되나?"</h2>
+    <p>추정이 아니라 실제 데이터로 계산합니다.</p>
+  </div>
+  <div class=tgrid>
+    <div class=tcard><div class=ic>🗂️</div><div class=t>데이터 출처</div>
+      <div class=d>네이버부동산 실매물을 실제 단기임대 예약 데이터와 매칭해 계산합니다.</div></div>
+    <div class=tcard><div class=ic>🧮</div><div class=t>계산 근거·방법</div>
+      <div class=d>주 임대료 × 예약률로 연 매출을 산출(÷52 환산), 연 임차원가를 빼 월 순수익을 계산.</div></div>
+    <div class=tcard><div class=ic>🔄</div><div class=t>최신 갱신일</div>
+      <div class=d>매물·예약 데이터를 주기적으로 갱신하고 화면마다 기준일을 표기합니다.</div></div>
+  </div>
+  <p class=trust-note>최신 갱신일: {% if churn %}{{ churn.date }}{% else %}-{% endif %} · 네이버부동산 매물 및 단기임대 예약 데이터 기준</p>
+</div></section>
+
+<!-- 7 · 마지막 후킹 + 회원가입 -->
+<section class=signup-sec id=signup>
+  <div class=signup-card>
+    <h2>계산해 봤다면, 이제 전체를 열어보세요</h2>
+    <p>수도권 전 지역 순위, 공급부족 추천 스팟 지도, 상세 수익 리포트까지 회원에게 열립니다.</p>
+    <a class=btn href="/auth/signup">가입하고 전체 열기</a>
+    <p class=fine>가입 후 간단한 승인 절차(보통 하루 이내)를 거쳐 바로 이용하실 수 있어요.</p>
+  </div>
+</section>
+
+<footer class=foot>
+  <div class=brand>rendit</div>
+  <div>© 2026 rendit. All rights reserved.</div>
+</footer>
+
+<script>
+(function(){
+  var rent=document.getElementById('i-rent'), weekly=document.getElementById('i-weekly'), occEl=document.getElementById('i-occ');
+  function calc(){
+    var r=+rent.value, w=+weekly.value, occ=+occEl.value;
+    var weeklyRev=w*(occ/100), annualRev=weeklyRev*52, annualCost=r*12;
+    var profit=Math.max(0, Math.round((annualRev-annualCost)/12));
+    var margin=annualRev>0 ? Math.round((annualRev-annualCost)/annualRev*100) : 0;
+    var uplift=(annualRev/12/r).toFixed(1);
+    var match=8+Math.round((occ-40)/8);
+    document.getElementById('rentLabel').textContent=r+'만원';
+    document.getElementById('weeklyLabel').textContent=w+'만원';
+    document.getElementById('occLabel').textContent=occ+'%';
+    document.getElementById('o-profit').textContent='+'+profit+'만원';
+    document.getElementById('o-uplift').textContent=uplift;
+    document.getElementById('o-margin').textContent=margin+'%';
+    document.getElementById('o-match').textContent=match;
+  }
+  [rent, weekly, occEl].forEach(function(el){ el.addEventListener('input', calc); });
+  calc();
+})();
+</script>
 </body></html>"""
 
 
-# rendit 아이콘 타일(퍼플 라운드 사각 + 흰 글리프, 로고의 둥근 기하학 톤). 다크/라이트 배경 공통.
-def _tile(glyph):
+# rendit 아이콘 타일(라운드 사각 + 흰 글리프, 로고의 둥근 기하학 톤). 다크/라이트 배경 공통.
+# fill 기본값은 로그인 후 대시보드(LANDING)의 기존 브랜드색 유지 — 신규 브랜드색(#4D2EE9)은
+# 공개 랜딩(PUBLIC_LANDING) 전용 아이콘에만 명시적으로 넘긴다.
+def _tile(glyph, fill='#4321F3'):
     return (
         '<svg width="46" height="46" viewBox="0 0 46 46" fill="none" '
         'style="display:block">'
-        '<rect width="46" height="46" rx="13" fill="#4321F3"/>'
+        f'<rect width="46" height="46" rx="13" fill="{fill}"/>'
         '<g stroke="#fff" stroke-width="2.5" stroke-linecap="round" '
         'stroke-linejoin="round">' + glyph + '</g></svg>'
     )
@@ -573,8 +829,30 @@ ICON_RENT = _tile('<rect x="14" y="16" width="18" height="16" rx="3"/>'
 # 부동산 매물: 건물/집 + 문
 ICON_ESTATE = _tile('<path d="M16 32V20l7-6 7 6v12"/><path d="M20 32v-6h6v6"/>')
 
-for _k, _v in {"ICON_PROFIT": ICON_PROFIT, "ICON_RENT": ICON_RENT,
-               "ICON_ESTATE": ICON_ESTATE}.items():
+_BRAND = '#4D2EE9'
+# 계산기: 화면 + 버튼 그리드
+ICON_CALC = _tile('<rect x="15" y="11" width="16" height="24" rx="3"/>'
+                  '<path d="M18 16h10M18 22h2M22 22h2M26 22h2M18 27h2M22 27h2M26 27h2"/>', _BRAND)
+# 지도: 접힌 지도 + 경계선
+ICON_MAP = _tile('<path d="M14 18l7-3 8 3 7-3v19l-7 3-8-3-7 3z"/><path d="M21 15v19M29 18v19"/>', _BRAND)
+# 공급부족 스팟: 별
+ICON_SPOT = _tile('<path d="M23 13l3.5 7.2 7.9 1.1-5.7 5.6 1.3 7.9L23 31l-7 3.8 1.3-7.9-5.7-5.6 7.9-1.1z"/>', _BRAND)
+# 문제1 - 막막함: 돋보기 + 물음표
+ICON_LOST = _tile('<circle cx="19" cy="19" r="8"/><path d="M25 25l7 7"/>'
+                  '<path d="M16.3 16.3c0-2 1.6-3.3 3-3.3 1.6 0 3 1 3 2.5 0 2.1-3 2.3-3 4.8"/>'
+                  '<path d="M19.2 23.6v.2"/>', _BRAND)
+# 문제2 - 흩어진 데이터: 연결 안 된 막대·점
+ICON_SCATTER = _tile('<path d="M15 30v-8M23 30V13M31 30v-13"/>'
+                     '<circle cx="15" cy="19" r="1.6"/><circle cx="23" cy="10" r="1.6"/>'
+                     '<circle cx="31" cy="14" r="1.6"/>', _BRAND)
+# 문제3 - 공급과잉 경고: 삼각 느낌표
+ICON_WARN = _tile('<path d="M23 13l11 19H12z"/><path d="M23 20v6"/>'
+                  '<circle cx="23" cy="29.3" r="0.8"/>', _BRAND)
+
+_ICONS = {"ICON_PROFIT": ICON_PROFIT, "ICON_RENT": ICON_RENT, "ICON_ESTATE": ICON_ESTATE,
+          "ICON_CALC": ICON_CALC, "ICON_MAP": ICON_MAP, "ICON_SPOT": ICON_SPOT,
+          "ICON_LOST": ICON_LOST, "ICON_SCATTER": ICON_SCATTER, "ICON_WARN": ICON_WARN}
+for _k, _v in _ICONS.items():
     LANDING = LANDING.replace("{" + _k + "}", _v)
     PUBLIC_LANDING = PUBLIC_LANDING.replace("{" + _k + "}", _v)
 
@@ -721,7 +999,7 @@ def home():
     u = current_user()
     if not u:
         # 미로그인: 로그인 창 대신 서비스 소개 랜딩(무슨 서비스인지 보이게 → 이탈 방지).
-        return render_template_string(PUBLIC_LANDING)
+        return render_template_string(PUBLIC_LANDING, churn=latest_listing_churn())
     # 매물 변동·인사이트는 모든 로그인 사용자에게, 접속자수는 관리자에게만.
     online = online_count() if u["role"] == "admin" else None
     return render_template_string(LANDING, user=u, churn=latest_listing_churn(),
