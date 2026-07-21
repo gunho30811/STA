@@ -265,6 +265,13 @@ def dashboard_insights():
                 conn.commit()
             except Exception:
                 pass
+        # 신규 매물 급증 동네(크롤 prune_and_track이 kv_cache에 적재) — 별도 키라 여기서 병합.
+        try:
+            nr = conn.execute("SELECT data FROM kv_cache WHERE k = %s",
+                              ("samsam_new_by_dong",)).fetchone()
+            data["newlistings"] = json.loads(nr[0]) if nr and nr[0] else None
+        except Exception:
+            data["newlistings"] = None
         conn.close()
         _INS_CACHE.update(t=now, data=data)
         return data
@@ -388,6 +395,21 @@ padding:14px;text-align:center}
     {% endfor %}
   </div>
   <div class=spot-note>회전율=최근7일 신규등록÷활성매물(월세 수요 신호, 삼삼 데이터 없이 계산) · 렌트 매물 2개 이하만 · 아직 아무도 안 뛰어든 곳일 수 있음</div>
+</div>
+{% endif %}
+{% if ins.newlistings and ins.newlistings.top %}
+<div class="churn spot-panel" style="border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.05)">
+  <div class=churn-h>🆕 신규 매물 급증 동네 <span class=churn-d>어제 대비 삼삼엠투 신규 등록이 많은 동 (오늘 총 {{ins.newlistings.total_new}}건)</span></div>
+  <div class=ins-grid>
+    {% for nl in ins.newlistings.top[:12] %}
+    <a class="ins-cell spot-cell" href="/calc?dong={{nl.dong}}">
+      <div class=ins-name>{{nl.sigungu}} <b>{{nl.dong}}</b></div>
+      <div class="ins-occ hi">+{{nl.n}}</div>
+      <div class=ins-sub>신규 등록 매물</div>
+    </a>
+    {% endfor %}
+  </div>
+  <div class=spot-note>새로 등록된 단기임대 매물이 몰리는 동네 = 공급이 늘고 있는 곳(경쟁↑) 또는 뜨는 지역 신호 · 매일 갱신</div>
 </div>
 {% endif %}
 <div class=churn>
