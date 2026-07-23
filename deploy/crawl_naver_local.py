@@ -92,6 +92,15 @@ def main():
     env["PYTHONPATH"] = ROOT + os.pathsep + os.path.join(ROOT, "pipeline", "naver")
     py = sys.executable
 
+    # crawl_state 리셋 — 안 하면 'done' 표시된 동을 전부 건너뛰어(0건) 재크롤이 안 된다.
+    # 로컬은 오라클에 쓰므로 오라클 crawl_state만 비움(Supabase/GHA와 무관).
+    reset = subprocess.run(
+        [py, "-c", "import db; c=db.connect(); c.execute('DELETE FROM crawl_state'); "
+         "c.commit(); print('crawl_state 리셋 완료')"],
+        cwd=ROOT, env=env)
+    if reset.returncode != 0:
+        print("[warn] crawl_state 리셋 실패 — 그래도 진행", flush=True)
+
     steps = [
         [py, "pipeline/naver/crawler.py", "--sidos", "서울시,경기도,인천시",
          "--types", TYPES, "--dongs-file", DONGS_FILE],
