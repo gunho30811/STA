@@ -344,7 +344,7 @@ def main():
     ap.add_argument("--sidos", default="", help="콤마구분 시/도 정확매칭 복수(예: 서울시,경기도,인천시)")
     ap.add_argument("--gu", help="특정 구/시 이름 필터 (예: 강남구)")
     ap.add_argument("--dongs-file", default="",
-                    help="동명 목록 파일(한 줄에 동명 하나)이면 그 동만 크롤(예약률 30%+ 타겟용)")
+                    help="동명 목록 파일(한 줄에 동명 하나)이면 그 동만 크롤(예약률 30퍼센트 이상 타겟용)")
     ap.add_argument("--limit-dongs", type=int, default=0, help="동 N개만 (테스트)")
     ap.add_argument("--max-per-type", type=int, default=0,
                     help="각 매물종류당 최대 N건만 수집(TOP N 샘플). 예: 10 → 아파트10·오피스텔10…")
