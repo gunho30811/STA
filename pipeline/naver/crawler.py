@@ -220,8 +220,9 @@ class NaverLand:
 
 # ----------------------------------------------------------------------------- region tree
 
-def build_region_tree(nl, roots, only_sido=None, only_gu=None):
-    """동(leaf) 목록을 [(cortarNo, sido, sigungu, dong, lat, lon)] 로 반환."""
+def build_region_tree(nl, roots, only_sido=None, only_gu=None, only_dongs=None):
+    """동(leaf) 목록을 [(cortarNo, sido, sigungu, dong, lat, lon)] 로 반환.
+    only_dongs: 동명 집합(set)이면 그 동만 남긴다(예약률 30%+ 동네 타겟 크롤용)."""
     dongs = []
 
     def walk(cortarNo, path):
@@ -234,6 +235,8 @@ def build_region_tree(nl, roots, only_sido=None, only_gu=None):
             if ctype == "sec":  # 동
                 sido = path[0]
                 sigungu = " ".join(path[1:]) if len(path) > 1 else ""
+                if only_dongs is not None and name not in only_dongs:
+                    continue
                 dongs.append((cno, sido, sigungu, name,
                               ch.get("centerLat"), ch.get("centerLon")))
             else:               # city / dvsn -> 재귀
@@ -340,6 +343,8 @@ def main():
     ap.add_argument("--sido", help="서울시 / 경기도 / 인천시 중 하나만 (부분일치)")
     ap.add_argument("--sidos", default="", help="콤마구분 시/도 정확매칭 복수(예: 서울시,경기도,인천시)")
     ap.add_argument("--gu", help="특정 구/시 이름 필터 (예: 강남구)")
+    ap.add_argument("--dongs-file", default="",
+                    help="동명 목록 파일(한 줄에 동명 하나)이면 그 동만 크롤(예약률 30%+ 타겟용)")
     ap.add_argument("--limit-dongs", type=int, default=0, help="동 N개만 (테스트)")
     ap.add_argument("--max-per-type", type=int, default=0,
                     help="각 매물종류당 최대 N건만 수집(TOP N 샘플). 예: 10 → 아파트10·오피스텔10…")
@@ -350,6 +355,11 @@ def main():
     ap.add_argument("--trade-types", default="B2",
                     help="콤마구분 거래유형(B2월세/B1전세/A1매매) 또는 'all'. 기본 B2(월세).")
     args = ap.parse_args()
+    only_dongs = None
+    if args.dongs_file:
+        with open(args.dongs_file, encoding="utf-8") as _f:
+            only_dongs = {ln.strip() for ln in _f if ln.strip()}
+        print(f"[{now()}] 동 화이트리스트 {len(only_dongs)}개 적용(--dongs-file)")
     type_codes = list(TYPES) if args.types == "all" else [c.strip() for c in args.types.split(",") if c.strip()]
     unknown = [c for c in type_codes if c not in TYPES]
     if unknown:
@@ -389,11 +399,13 @@ def main():
     try:
         if dongs_db:
             dongs = dongs_db
+            if only_dongs is not None:   # 동명(인덱스 3) 화이트리스트로 축소
+                dongs = [d for d in dongs if d[3] in only_dongs]
             print(f"[{now()}] DB에서 동 목록 로드: {len(dongs)}개 (트리 재탐색 생략)")
         else:
             # --sidos 지정 시 해당 시/도 루트만 탐색(전국 중 선택분). 미지정이면 수도권(ROOTS).
             roots_to_walk = [(n, c) for n, c in ALL_ROOTS if n in sidos] if sidos else ROOTS
-            dongs = build_region_tree(nl, roots_to_walk, args.sido, args.gu)
+            dongs = build_region_tree(nl, roots_to_walk, args.sido, args.gu, only_dongs)
             save_regions(dongs)
         print(f"[{now()}] 대상 동 수: {len(dongs)}")
         if args.limit_dongs:

@@ -60,7 +60,8 @@ FROM listings l
 LEFT JOIN naver_listings n ON n.article_no = l.articleno::bigint
 WHERE l.sido IN ('서울시','경기도','인천시')
   AND l.tradetype = '월세'
-  AND l.crawled_at >= to_char(now() - interval '7 days','YYYY-MM-DD')
+  AND l.crawled_at >= (SELECT to_char((MAX(substr(crawled_at,1,10)))::date - 7, 'YYYY-MM-DD')
+                     FROM listings WHERE sido IN ('서울시','경기도','인천시') AND tradetype = '월세')
 """
 
 # 집계/카운트 전용: 조인 없는 listings-only(같은 컬럼명, 상세 컬럼은 NULL). index-only로 빠름.
@@ -85,7 +86,8 @@ SELECT
 FROM listings l
 WHERE l.sido IN ('서울시','경기도','인천시')
   AND l.tradetype = '월세'
-  AND l.crawled_at >= to_char(now() - interval '7 days','YYYY-MM-DD')
+  AND l.crawled_at >= (SELECT to_char((MAX(substr(crawled_at,1,10)))::date - 7, 'YYYY-MM-DD')
+                     FROM listings WHERE sido IN ('서울시','경기도','인천시') AND tradetype = '월세')
 """
 
 
