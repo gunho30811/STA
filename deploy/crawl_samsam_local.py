@@ -109,6 +109,8 @@ def main():
     steps = [
         [py, "pipeline/samsam/crawler.py", "--types", TYPES],
         [py, "pipeline/samsam/snapshot.py"],
+        # 최신 예약률로 네이버 크롤 대상 동(예약률 30%+ 수도권) 재생성 → 다음 네이버 02:00 실행이 사용
+        [py, "pipeline/samsam/gen_naver_dongs.py"],
         [py, "pipeline/integrate/build_integrated.py"],
         [py, "pipeline/refresh_insights.py"],
     ]
