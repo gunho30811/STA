@@ -863,16 +863,16 @@ CALC_PAGE = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
 <style>
 *{box-sizing:border-box}
 :root{--brand:#4D2EE9;--brand-hover:#3A1FC9;--brand-tint:#ECEAF8;--profit:#148A5E;--loss:#D24545;
---bg:#F7F6F3;--text:#1C1830;--text-sub:#6E6D68;--line:#E7E5DE;--gold:#D89700}
+--bg:#fff;--text:#1C1830;--text-sub:#6E6D68;--line:#E7E5DE;--gold:#D89700}
 body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
 background:var(--bg);min-height:100vh;color:var(--text);padding:20px 14px 60px}
 .wrap{max-width:900px;margin:0 auto}
 .back{display:inline-block;margin-bottom:14px;color:var(--text-sub);text-decoration:none;font-size:13px;font-weight:700}
 .back:hover{color:var(--brand)}
 h1{font-size:22px;font-weight:900;margin:4px 0 2px;letter-spacing:-.01em}
-.sub{color:var(--text-sub);font-size:13px;margin:0 0 22px;line-height:1.6}
-.sec-label{font-size:13px;font-weight:800;color:var(--text-sub);margin:0 0 10px}
-.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.sub{color:var(--text-sub);font-size:13px;margin:0 0 28px;line-height:1.6}
+.sec-label{font-size:13px;font-weight:800;color:var(--text-sub);margin:0 0 12px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px}
 @media(max-width:700px){.cols{grid-template-columns:1fr}}
 .box{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px}
 .card-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px}
@@ -903,33 +903,29 @@ details.more:not([open]) summary::before{transform:rotate(180deg)}
 .slider-row .lbl b{color:var(--brand);font-size:14px}
 .slider-row input[type=range]{width:100%;accent-color:var(--brand)}
 .slider-row .scale{display:flex;justify-content:space-between;font-size:11px;color:var(--text-sub);margin-top:2px}
-.row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:7px 0}
-.row label{font-size:12.5px;color:var(--text-sub)}
-.out b{font-size:15px}
-.pos{color:var(--profit)}.neg{color:var(--loss)}.big{font-size:18px!important}
-.vac{margin-top:14px}
+.pos{color:var(--profit)}.pos-brand{color:var(--brand)}.neg{color:var(--loss)}
+.vac{margin-top:28px}
 .vac table{width:100%;border-collapse:collapse;font-size:12.5px}
 .vac th,.vac td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--line)}
 .vac th{color:var(--text-sub);font-weight:700}.vac td:first-child,.vac th:first-child{text-align:left}
-.kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
-.kpi>div{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
-.kpi .l{font-size:11px;color:var(--text-sub)}.kpi .v{font-size:17px;font-weight:800;margin-top:3px;color:var(--text)}
-.hero-card{padding:24px 22px}
+.hero-card{padding:24px 22px;border:none;box-shadow:0 2px 10px rgba(28,24,48,.06)}
 .hero-sub{font-size:14px;color:var(--text-sub);margin:0 0 10px}
 .hero-sub b{color:var(--text);font-weight:800}
 .hero-row{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
 .hero-num{font-size:34px;font-weight:900;letter-spacing:-.02em}
 .hero-annual{font-size:14px;color:var(--text-sub);font-weight:600}
-.kpi3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+.kpi3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}
 @media(max-width:700px){.kpi3{grid-template-columns:1fr}}
 .kpi3-cell{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px}
 .kpi3-cell.warn{border-color:#F0DCA0;background:#FDF8ED}
 .kpi3-cell .l{font-size:12.5px;color:var(--text-sub);margin-bottom:6px}
 .kpi3-cell.warn .l{color:var(--gold);font-weight:700}
-.kpi3-cell .v{font-size:20px;font-weight:800;color:var(--text)}
+.kpi3-cell .v{font-size:20px;font-weight:800}
 .kpi3-paren{font-size:13px;font-weight:600;color:var(--text-sub)}
 .kpi3-sub{font-size:11.5px;color:var(--text-sub);margin-top:4px}
-.calc-detail{margin-top:14px}
+.calc-detail{margin-top:20px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px}
+.calc-detail summary{margin:0}
+.calc-detail[open] summary{margin-bottom:4px}
 .calc-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;margin-top:14px}
 @media(max-width:480px){.calc-detail-grid{grid-template-columns:1fr}}
 .calc-detail-grid>div{display:flex;justify-content:space-between;font-size:13px}
@@ -940,7 +936,7 @@ padding:9px 12px;border-radius:9px;margin-bottom:12px}
 .be-row td{border-top:1px dashed var(--gold);border-bottom:none;color:var(--gold);font-size:11px;
 font-weight:700;text-align:center;padding:6px 4px}
 .cta-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
-margin-top:16px;padding:20px 22px;background:#fff;border:1px solid var(--line);border-radius:16px}
+margin-top:24px;padding:20px 22px;background:#fff;border:1px solid var(--line);border-radius:16px}
 .cta-h1{font-size:14.5px;font-weight:800;color:var(--text);margin:0 0 4px}
 .cta-h2{font-size:12.5px;color:var(--text-sub);margin:0}
 .cta-btn{flex:0 0 auto;white-space:nowrap;background:var(--brand);color:#fff;font-weight:800;font-size:13.5px;
@@ -1064,7 +1060,7 @@ function calc(){
   var heroYear=revY*(1-p/100)-leaseY, heroMonth=heroYear/12
   var heroEl=document.getElementById('o_heromonth')
   heroEl.textContent='월 순수익 '+signed(heroMonth)+'원'
-  heroEl.className='hero-num '+(heroMonth>=0?'pos':'neg')
+  heroEl.className='hero-num '+(heroMonth>=0?'pos-brand':'neg')
   document.getElementById('o_heroyear').textContent='연 '+signed(heroYear)+'원'
   // 손익분기를 일 단위로 환산(1주=7일) — 30일 기준 월 예약일수·공실률로도 같이 표시(표시 전환일 뿐, be 값 자체는 그대로).
   var beDaysRaw=be*7
@@ -1083,7 +1079,7 @@ function calc(){
       beShown=true
     }
     var days=Math.round(30*(1-p/100)), daysTxt=(p===0?'':'약 ')+days+'일'
-    var ry=revY*(1-p/100), ny=ry-leaseY, cls=ny>=0?'pos':'neg'
+    var ry=revY*(1-p/100), ny=ry-leaseY, cls=ny>=0?'pos-brand':'neg'
     h+='<tr><td>'+p+'%</td><td>'+daysTxt+'</td><td class='+cls+'><b>'+signed(ny)+'</b></td>'+
        '<td class='+cls+'>'+signed(ny/12)+'</td></tr>'
   })
