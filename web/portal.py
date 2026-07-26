@@ -863,9 +863,17 @@ CALC_PAGE = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
 <style>
 *{box-sizing:border-box}
 :root{--brand:#4D2EE9;--brand-hover:#3A1FC9;--brand-tint:#ECEAF8;--profit:#148A5E;--loss:#D24545;
---bg:#fff;--text:#1C1830;--text-sub:#6E6D68;--line:#E7E5DE;--gold:#D89700}
+--bg:#F4F6FB;--text:#1C1830;--text-sub:#6E6D68;--line:#E7E5DE;--gold:#D89700}
 body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
 background:var(--bg);min-height:100vh;color:var(--text);padding:20px 14px 60px}
+.hd{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);
+border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;
+padding:14px 40px;margin:-20px -14px 20px}
+.hd .brand{font-size:21px;font-weight:900;letter-spacing:-.02em;color:var(--brand);text-decoration:none}
+.hd-cta{display:flex;align-items:center;gap:16px}
+.hd-cta .login{font-size:14px;font-weight:600;color:var(--text-sub);text-decoration:none}
+.hd-cta .signup{font-size:14px;font-weight:700;color:var(--brand);border:1px solid var(--line);
+padding:8px 15px;border-radius:8px;text-decoration:none}
 .wrap{max-width:900px;margin:0 auto}
 .back{display:inline-block;margin-bottom:14px;color:var(--text-sub);text-decoration:none;font-size:13px;font-weight:700}
 .back:hover{color:var(--brand)}
@@ -905,6 +913,7 @@ details.more:not([open]) summary::before{transform:rotate(180deg)}
 .slider-row .scale{display:flex;justify-content:space-between;font-size:11px;color:var(--text-sub);margin-top:2px}
 .pos{color:var(--profit)}.pos-brand{color:var(--brand)}.neg{color:var(--loss)}
 .vac{margin-top:28px}
+.vac h2{margin-top:0}
 .vac table{width:100%;border-collapse:collapse;font-size:12.5px}
 .vac th,.vac td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--line)}
 .vac th{color:var(--text-sub);font-weight:700}.vac td:first-child,.vac th:first-child{text-align:left}
@@ -942,7 +951,17 @@ margin-top:24px;padding:20px 22px;background:#fff;border:1px solid var(--line);b
 .cta-btn{flex:0 0 auto;white-space:nowrap;background:var(--brand);color:#fff;font-weight:800;font-size:13.5px;
 padding:12px 20px;border-radius:10px;text-decoration:none}
 .cta-btn:hover{background:var(--brand-hover)}
-</style></head><body><div class=wrap>
+</style></head><body>
+{% if not user %}
+<header class=hd>
+  <a class=brand href="/">rendit</a>
+  <div class=hd-cta>
+    <a class=login href="/auth/login">로그인</a>
+    <a class=signup href="/auth/signup">회원가입</a>
+  </div>
+</header>
+{% endif %}
+<div class=wrap>
 <a class=back href="/">← 대시보드</a>
 <h1>🧮 단기임대 수익 계산기{% if dong %} — {{dong}}{% endif %}</h1>
 <p class=sub>임차(내가 내는 비용)와 임대(투숙객에게 받는 돈)를 넣으면 월 순수익·손익분기·공실률별 시나리오를 계산합니다. 연↔주 환산은 ÷52.{% if rent %} <b style="color:var(--brand)">{{dong}} 시세(월세 {{rent}}만·보증금 {{dep}}만)를 자동 입력했어요.</b>{% endif %}</p>
@@ -1094,8 +1113,9 @@ calc()
 @portal.route("/calc")
 def calc():
     # 무료 공개 — 로그인 불필요(수익 계산기는 진입장벽 낮춰 가입 유도).
+    # 로그인 상태면 auth._inject_nav가 공통 네비바를 자동 주입하므로, 여기 헤더는 비로그인일 때만 렌더.
     from flask import request as _rq
-    return render_template_string(CALC_PAGE, dong=_rq.args.get("dong", ""),
+    return render_template_string(CALC_PAGE, user=current_user(), dong=_rq.args.get("dong", ""),
                                   rent=_rq.args.get("rent", type=int),
                                   dep=_rq.args.get("dep", type=int))
 
