@@ -501,8 +501,6 @@ padding:14px 40px;flex-wrap:wrap;gap:10px}
 /* 히어로 */
 .hero{background:linear-gradient(180deg,#F4F6FB 0%,#FBFCFE 70%,#fff 100%);border-bottom:1px solid #EEF0F4}
 .hero-in{max-width:1140px;margin:0 auto;padding:68px 40px;text-align:center}
-.tag{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--accent);
-background:#EAEEFB;padding:6px 14px;border-radius:20px;margin-bottom:20px}
 .hero h1{font-size:40px;font-weight:900;line-height:1.18;letter-spacing:-.03em;margin:0 0 18px;white-space:pre-line}
 .hero p{font-size:17px;color:var(--sub);max-width:600px;margin:0 auto 32px;white-space:pre-line}
 .hero .btns{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;align-items:center}
@@ -608,11 +606,12 @@ border-radius:12px;display:inline-block;margin-bottom:16px}
 
 /* 7 · 회원가입 CTA */
 .signup-sec{max-width:1140px;margin:0 auto;padding:80px 40px}
-.signup-card{background:var(--accent);border-radius:24px;padding:45px 40px;text-align:center}
-.signup-card h2{font-size:28px;font-weight:900;color:#fff;letter-spacing:-.02em;margin:0 0 12px}
-.signup-card p{font-size:16px;color:#E7ECFB;margin:0 auto 28px;max-width:600px}
-.signup-card .btn{color:var(--accent);background:#fff;font-weight:900;padding:16px 36px;border-radius:11px}
-.signup-card .fine{font-size:13px;color:#D3DBF7;margin-top:16px}
+.signup-card{background:#181430;border-radius:24px;padding:45px 40px;text-align:center}
+.signup-card h2{font-size:28px;font-weight:900;color:#fff;margin:0 0 12px}
+.signup-card p{font-size:16px;color:#A9A4C9;margin:0 auto 28px;max-width:600px}
+.signup-card .btn{color:#fff;background:var(--accent);font-weight:900;padding:16px 36px;border-radius:11px;
+transition:.15s}
+.signup-card .btn:hover{color:var(--accent);background:#fff}
 
 /* 푸터 */
 .foot{padding:32px 40px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;
@@ -631,16 +630,15 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
 
 <!-- 1 · 히어로 -->
 <section class=hero><div class=hero-in>
-  <span class=tag>🏠 단기임대용 매물 찾기</span>
   <h1>단기임대로 돈 되는 매물,
 어디서 찾아야 할까?</h1>
   <p>가입 없이 지도와 계산기부터 사용해보세요.
 수요는 높은데 공급이 부족한 스팟과 수익이 나는 매물을 rendit이 골라드립니다.</p>
   <div class=btns>
-    <a class="btn btn-primary" href="#calc">🧮 무료 계산기 써보기</a>
+    <a class="btn btn-primary" href="/calc">🧮 무료 계산기 써보기</a>
     <a class="btn btn-primary" href="/map">🗺️ 지도 미리보기</a>
   </div>
-  <div class=signup-row><a class=signup-link href="#signup">또는 회원가입 →</a></div>
+  <div class=signup-row><a class=signup-link href="/auth/signup">또는 회원가입 →</a></div>
   <div class=free-note>가입 없이 바로 — <b>계산기는 전체 무료</b>, <b>지도는 강남권 무료 미리보기</b></div>
 </div></section>
 
@@ -671,7 +669,7 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
     <div class=scard><span class="badge badge-free">무료</span>{ICON_CALC}
       <div class=t>수익 계산기</div>
       <div class=d>월세 대비 단기임대 전환 시 기대 순수익과 영업이익률을 즉시 계산.</div>
-      <a class=link href="#calc">지금 계산하기 →</a></div>
+      <a class=link href="/calc">지금 계산하기 →</a></div>
     <div class=scard><span class="badge badge-free">무료</span>{ICON_MAP}
       <div class=t>지역 수익 지도</div>
       <div class=d>동·역별 평균 순수익과 예약률을 지도에서 색으로 비교(강남권 무료).</div>
@@ -712,7 +710,7 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
     </div>
     <div class=nudge>
       <p>💡 매물마다 일일이 계산하기 귀찮다면? 수익 나는 <b>추천 스팟</b>을 rendit이 골라드려요.</p>
-      <a href="#wall">추천 스팟 보기 →</a>
+      <a href="/auth/signup">추천 스팟 보기 →</a>
     </div>
   </div>
 </section>
@@ -746,7 +744,7 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
       <div class=wall-card>
         <div class=t>🔓 전체 지도·추천 스팟 잠금 해제</div>
         <div class=d>수도권 전체 순위와 공급부족 추천 스팟을 지도에서 한눈에.</div>
-        <a href="#signup">가입하고 전체 열기 →</a>
+        <a href="/auth/signup">가입하고 전체 열기 →</a>
       </div>
     </div>
   </div>
@@ -761,13 +759,13 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
   </div>
   <div class=tgrid>
     <div class=tcard><div class=ic>🗂️</div><div class=t>데이터 출처</div>
-      <div class=d>네이버부동산 실매물을 실제 단기임대 예약 데이터와 매칭해 계산합니다.</div></div>
+      <div class=d>부동산 실매물을 실제 단기임대 예약 데이터와 매칭해 계산합니다.</div></div>
     <div class=tcard><div class=ic>🧮</div><div class=t>계산 근거·방법</div>
       <div class=d>주 임대료 × 예약률로 연 매출을 산출(÷52 환산), 연 임차원가를 빼 월 순수익을 계산.</div></div>
     <div class=tcard><div class=ic>🔄</div><div class=t>최신 갱신일</div>
       <div class=d>매물·예약 데이터를 주기적으로 갱신하고 화면마다 기준일을 표기합니다.</div></div>
   </div>
-  <p class=trust-note>최신 갱신일: {% if churn %}{{ churn.date }}{% else %}-{% endif %} · 네이버부동산 매물 및 단기임대 예약 데이터 기준</p>
+  <p class=trust-note>출처: 부동산 매물 및 단기임대 예약 데이터 기준</p>
 </div></section>
 
 <!-- 7 · 마지막 후킹 + 회원가입 -->
@@ -776,7 +774,6 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
     <h2>계산해 봤다면, 이제 전체를 열어보세요</h2>
     <p>수도권 전 지역 순위, 공급부족 추천 스팟 지도, 상세 수익 리포트까지 회원에게 열립니다.</p>
     <a class=btn href="/auth/signup">가입하고 전체 열기</a>
-    <p class=fine>가입 후 간단한 승인 절차(보통 하루 이내)를 거쳐 바로 이용하실 수 있어요.</p>
   </div>
 </section>
 
@@ -999,7 +996,7 @@ def home():
     u = current_user()
     if not u:
         # 미로그인: 로그인 창 대신 서비스 소개 랜딩(무슨 서비스인지 보이게 → 이탈 방지).
-        return render_template_string(PUBLIC_LANDING, churn=latest_listing_churn())
+        return render_template_string(PUBLIC_LANDING)
     # 매물 변동·인사이트는 모든 로그인 사용자에게, 접속자수는 관리자에게만.
     online = online_count() if u["role"] == "admin" else None
     return render_template_string(LANDING, user=u, churn=latest_listing_churn(),
