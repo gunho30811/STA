@@ -914,6 +914,27 @@ details.more:not([open]) summary::before{transform:rotate(180deg)}
 .kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
 .kpi>div{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
 .kpi .l{font-size:11px;color:var(--text-sub)}.kpi .v{font-size:17px;font-weight:800;margin-top:3px;color:var(--text)}
+.hero-card{padding:24px 22px}
+.hero-sub{font-size:14px;color:var(--text-sub);margin:0 0 10px}
+.hero-sub b{color:var(--text);font-weight:800}
+.hero-row{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.hero-num{font-size:34px;font-weight:900;letter-spacing:-.02em}
+.hero-annual{font-size:14px;color:var(--text-sub);font-weight:600}
+.kpi3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+@media(max-width:700px){.kpi3{grid-template-columns:1fr}}
+.kpi3-cell{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.kpi3-cell.warn{border-color:#F0DCA0;background:#FDF8ED}
+.kpi3-cell .l{font-size:12.5px;color:var(--text-sub);margin-bottom:6px}
+.kpi3-cell.warn .l{color:var(--gold);font-weight:700}
+.kpi3-cell .v{font-size:20px;font-weight:800;color:var(--text)}
+.kpi3-paren{font-size:13px;font-weight:600;color:var(--text-sub)}
+.kpi3-sub{font-size:11.5px;color:var(--text-sub);margin-top:4px}
+.calc-detail{margin-top:14px}
+.calc-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;margin-top:14px}
+@media(max-width:480px){.calc-detail-grid{grid-template-columns:1fr}}
+.calc-detail-grid>div{display:flex;justify-content:space-between;font-size:13px}
+.cd-l{color:var(--text-sub)}
+.cd-v{font-weight:700;color:var(--text)}
 </style></head><body><div class=wrap>
 <a class=back href="/">← 대시보드</a>
 <h1>🧮 단기임대 수익 계산기{% if dong %} — {{dong}}{% endif %}</h1>
@@ -955,18 +976,42 @@ details.more:not([open]) summary::before{transform:rotate(180deg)}
       <input type=range id=i_vacancy min=0 max=30 step=5 value=10>
       <div class=scale><span>0%</span><span>30%</span></div>
     </div>
-    <div class=kpi>
-      <div><div class=l>주 매출</div><div class=v id=o_wrev>-</div></div>
-      <div><div class=l>주 임대원가</div><div class=v id=o_wcost>-</div></div>
-      <div><div class=l>주 순익</div><div class=v id=o_wnet>-</div></div>
-    </div>
-    <div class=kpi>
-      <div><div class=l>손익주</div><div class=v id=o_be>-</div></div>
-      <div><div class=l>영업이익률</div><div class=v id=o_margin>-</div></div>
-      <div><div class=l>연 임차원가</div><div class=v id=o_ycost>-</div></div>
-    </div>
   </div>
 </div>
+
+<div class=sec-label>② 결과</div>
+<div class="box hero-card">
+  <p class=hero-sub>이 매물, 단기임대로 돌리면 <b id=o_herobadge>공실 10% 기준</b></p>
+  <div class=hero-row>
+    <span class=hero-num id=o_heromonth>월 순수익 -</span>
+    <span class=hero-annual id=o_heroyear>연 -</span>
+  </div>
+</div>
+<div class=kpi3>
+  <div class=kpi3-cell>
+    <div class=l>영업이익률</div>
+    <div class=v id=o_margin>-</div>
+  </div>
+  <div class="kpi3-cell warn">
+    <div class=l>⚠ 손익분기</div>
+    <div class=v>월 약 <b id=o_bedays>-</b>일 <span class=kpi3-paren>(공실 <span id=o_bepct>-</span>%)</span></div>
+    <div class=kpi3-sub>이 아래로 채우면 적자</div>
+  </div>
+  <div class=kpi3-cell>
+    <div class=l>주 순익</div>
+    <div class=v id=o_wnet>-</div>
+  </div>
+</div>
+<details class="more calc-detail">
+  <summary>계산 내역 · 검증용</summary>
+  <div class=calc-detail-grid>
+    <div><span class=cd-l>주 매출</span><span class=cd-v id=o_wrev>-</span></div>
+    <div><span class=cd-l>주 임대원가</span><span class=cd-v id=o_wcost>-</span></div>
+    <div><span class=cd-l>연 임차원가</span><span class=cd-v id=o_ycost>-</span></div>
+    <div><span class=cd-l>손익분기 예약 주수</span><span class=cd-v id=o_be>-</span></div>
+  </div>
+</details>
+
 <div class="box vac"><h2>📉 공실률 시나리오 (연 매출 × (1−공실률) − 연 임차원가)</h2>
   <table><thead><tr><th>공실률</th><th>연 매출</th><th>연 순수익</th><th>월 순수익</th></tr></thead>
   <tbody id=o_vac></tbody></table>
@@ -974,6 +1019,7 @@ details.more:not([open]) summary::before{transform:rotate(180deg)}
 <script>
 function won(x){return '₩'+Math.round(x).toLocaleString()}
 function man(x){return (Math.round(x*10)/10).toLocaleString()+'만'}
+function signed(x){return (x>=0?'+':'')+Math.round(x).toLocaleString()}
 function calc(){
   var v=function(id){return parseFloat(document.getElementById(id).value)||0}
   var rentY=v('i_rent')*10000*12, depFee=v('i_dep')*10000*(v('i_deprate')/100),
@@ -990,10 +1036,23 @@ function calc(){
   var set=function(id,txt,cls){var e=document.getElementById(id);e.textContent=txt;
     e.className='v'+(cls?' '+cls:'')}
   set('o_wrev',won(revW)); set('o_wcost',won(costW))
-  set('o_wnet',won(netW),netW>=0?'pos':'neg')
-  set('o_be',be?be.toFixed(2)+'주':'-'); set('o_margin',margin.toFixed(1)+'%',margin>=0?'pos':'neg')
+  set('o_wnet',signed(netW)+'원',netW>=0?'pos':'neg')
+  set('o_be',be?be.toFixed(2)+'주':'-'); set('o_margin',margin.toFixed(1)+'%')
   set('o_ycost',won(costY))
-  document.getElementById('o_vacpct').textContent=v('i_vacancy')+'%'
+  var p=v('i_vacancy')
+  document.getElementById('o_vacpct').textContent=p+'%'
+  document.getElementById('o_herobadge').textContent='공실 '+p+'% 기준'
+  var heroYear=revY*(1-p/100)-leaseY, heroMonth=heroYear/12
+  var heroEl=document.getElementById('o_heromonth')
+  heroEl.textContent='월 순수익 '+signed(heroMonth)+'원'
+  heroEl.className='hero-num '+(heroMonth>=0?'pos':'neg')
+  document.getElementById('o_heroyear').textContent='연 '+signed(heroYear)+'원'
+  // 손익분기를 일 단위로 환산(1주=7일) — 30일 기준 월 예약일수·공실률로도 같이 표시(표시 전환일 뿐, be 값 자체는 그대로).
+  var beDaysRaw=be*7
+  var beDays=Math.max(0,Math.min(30,Math.round(beDaysRaw)))
+  var bePct=Math.max(0,Math.min(100,Math.round(100*(1-beDaysRaw/30))))
+  document.getElementById('o_bedays').textContent=revW>0?beDays:'-'
+  document.getElementById('o_bepct').textContent=revW>0?bePct:'-'
   var tb=document.getElementById('o_vac'),h=''
   ;[0,10,15,20,30].forEach(function(p){
     var ry=revY*(1-p/100), ny=ry-leaseY, cls=ny>=0?'pos':'neg'
