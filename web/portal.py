@@ -935,6 +935,17 @@ details.more:not([open]) summary::before{transform:rotate(180deg)}
 .calc-detail-grid>div{display:flex;justify-content:space-between;font-size:13px}
 .cd-l{color:var(--text-sub)}
 .cd-v{font-weight:700;color:var(--text)}
+.vac-notice{background:#FDF8ED;border:1px solid #F0DCA0;color:var(--gold);font-size:12.5px;font-weight:700;
+padding:9px 12px;border-radius:9px;margin-bottom:12px}
+.be-row td{border-top:1px dashed var(--gold);border-bottom:none;color:var(--gold);font-size:11px;
+font-weight:700;text-align:center;padding:6px 4px}
+.cta-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+margin-top:16px;padding:20px 22px;background:#fff;border:1px solid var(--line);border-radius:16px}
+.cta-h1{font-size:14.5px;font-weight:800;color:var(--text);margin:0 0 4px}
+.cta-h2{font-size:12.5px;color:var(--text-sub);margin:0}
+.cta-btn{flex:0 0 auto;white-space:nowrap;background:var(--brand);color:#fff;font-weight:800;font-size:13.5px;
+padding:12px 20px;border-radius:10px;text-decoration:none}
+.cta-btn:hover{background:var(--brand-hover)}
 </style></head><body><div class=wrap>
 <a class=back href="/">← 대시보드</a>
 <h1>🧮 단기임대 수익 계산기{% if dong %} — {{dong}}{% endif %}</h1>
@@ -1013,8 +1024,16 @@ details.more:not([open]) summary::before{transform:rotate(180deg)}
 </details>
 
 <div class="box vac"><h2>📉 공실률 시나리오 (연 매출 × (1−공실률) − 연 임차원가)</h2>
-  <table><thead><tr><th>공실률</th><th>연 매출</th><th>연 순수익</th><th>월 순수익</th></tr></thead>
+  <div class=vac-notice id=o_vacnotice>⚠ 손익분기 · 월 약 -일 예약(공실 -%) · 이 아래로 채우면 적자</div>
+  <table><thead><tr><th>공실률</th><th>월 예약(환산)</th><th>연 순수익</th><th>월 순수익</th></tr></thead>
   <tbody id=o_vac></tbody></table>
+</div>
+<div class=cta-row>
+  <div class=cta-text>
+    <p class=cta-h1 id=o_ctahead>이 매물은 한 달 약 -일까지 채우면 흑자예요.</p>
+    <p class=cta-h2>그럼 애초에 공실 걱정 적은 — 수요 높고 공급 부족한 자리는 어디일까요?</p>
+  </div>
+  <a class=cta-btn href="/auth/signup">★ 공급부족 스팟 보기</a>
 </div>
 <script>
 function won(x){return '₩'+Math.round(x).toLocaleString()}
@@ -1053,11 +1072,20 @@ function calc(){
   var bePct=Math.max(0,Math.min(100,Math.round(100*(1-beDaysRaw/30))))
   document.getElementById('o_bedays').textContent=revW>0?beDays:'-'
   document.getElementById('o_bepct').textContent=revW>0?bePct:'-'
-  var tb=document.getElementById('o_vac'),h=''
+  var beLabel=revW>0?('월 약 '+beDays+'일 예약(공실 '+bePct+'%)'):'월 순익이 나지 않음'
+  document.getElementById('o_vacnotice').textContent='⚠ 손익분기 · '+beLabel+' · 이 아래로 채우면 적자'
+  document.getElementById('o_ctahead').textContent=revW>0?
+    ('이 매물은 한 달 약 '+beDays+'일까지 채우면 흑자예요.'):'이 매물은 지금 조건으로는 흑자가 나지 않아요.'
+  var tb=document.getElementById('o_vac'),h='', beShown=false
   ;[0,10,15,20,30].forEach(function(p){
+    if(!beShown && revW>0 && p>bePct){
+      h+='<tr class=be-row><td colspan=4>손익분기 (공실 '+bePct+'% · '+beDays+'일)</td></tr>'
+      beShown=true
+    }
+    var days=Math.round(30*(1-p/100)), daysTxt=(p===0?'':'약 ')+days+'일'
     var ry=revY*(1-p/100), ny=ry-leaseY, cls=ny>=0?'pos':'neg'
-    h+='<tr><td>'+p+'%</td><td>'+won(ry)+'</td><td class='+cls+'><b>'+won(ny)+'</b></td>'+
-       '<td class='+cls+'>'+won(ny/12)+'</td></tr>'
+    h+='<tr><td>'+p+'%</td><td>'+daysTxt+'</td><td class='+cls+'><b>'+signed(ny)+'</b></td>'+
+       '<td class='+cls+'>'+signed(ny/12)+'</td></tr>'
   })
   tb.innerHTML=h
 }
