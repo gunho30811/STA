@@ -861,48 +861,100 @@ CALC_PAGE = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
 <meta name=viewport content="width=device-width,initial-scale=1"><title>rendit · 수익 계산기</title>
 <link rel=stylesheet href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard-dynamic-subset.css">
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
-background:linear-gradient(140deg,#0f172a,#1e293b);min-height:100vh;color:#e2e8f0;padding:20px 14px 60px}
+*{box-sizing:border-box}
+:root{--brand:#4D2EE9;--brand-hover:#3A1FC9;--brand-tint:#ECEAF8;--profit:#148A5E;--loss:#D24545;
+--bg:#F7F6F3;--text:#1C1830;--text-sub:#6E6D68;--line:#E7E5DE;--gold:#D89700}
+body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
+background:var(--bg);min-height:100vh;color:var(--text);padding:20px 14px 60px}
 .wrap{max-width:900px;margin:0 auto}
-h1{font-size:20px;font-weight:800;margin:4px 0 2px}
-.sub{color:#94a3b8;font-size:12.5px;margin:0 0 18px}
-.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.back{display:inline-block;margin-bottom:14px;color:var(--text-sub);text-decoration:none;font-size:13px;font-weight:700}
+.back:hover{color:var(--brand)}
+h1{font-size:22px;font-weight:900;margin:4px 0 2px;letter-spacing:-.01em}
+.sub{color:var(--text-sub);font-size:13px;margin:0 0 22px;line-height:1.6}
+.sec-label{font-size:13px;font-weight:800;color:var(--text-sub);margin:0 0 10px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:700px){.cols{grid-template-columns:1fr}}
-.box{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:16px 18px}
-.box h2{font-size:13.5px;font-weight:800;margin:0 0 12px;color:#cbd5e1}
+.box{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px}
+.card-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px}
+.card-head h2{font-size:15px;font-weight:800;margin:0;color:var(--text)}
+.card-head .unit-badge{font-size:11px;font-weight:700;color:var(--text-sub)}
+.hint{font-size:12px;color:var(--text-sub);margin:0 0 16px}
+.field-primary{margin:14px 0}
+.field-primary label{display:block;font-size:13px;color:var(--text-sub);margin-bottom:6px}
+.field-box{display:flex;align-items:center;justify-content:flex-end;gap:6px;border:1.5px solid var(--line);
+border-radius:10px;padding:12px 14px;background:#fff}
+.field-box:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-tint)}
+.field-box input{border:none;outline:none;background:transparent;font-size:22px;font-weight:800;
+color:var(--text);text-align:right;width:100%;font-family:inherit}
+.field-box .unit{font-size:13px;color:var(--text-sub);font-weight:600;white-space:nowrap}
+details.more{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
+details.more summary{cursor:pointer;font-size:13px;font-weight:800;color:var(--text);list-style:none;
+display:flex;align-items:center;gap:6px}
+details.more summary::-webkit-details-marker{display:none}
+details.more summary::before{content:'⌃';display:inline-block;transition:transform .15s}
+details.more:not([open]) summary::before{transform:rotate(180deg)}
+.field-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+@media(max-width:480px){.field-grid{grid-template-columns:1fr}}
+.field-sm label{display:block;font-size:12px;color:var(--text-sub);margin-bottom:5px}
+.field-sm .field-box{padding:8px 10px}
+.field-sm .field-box input{font-size:14px;font-weight:700}
+.slider-row{margin-top:18px}
+.slider-row .lbl{display:flex;justify-content:space-between;font-size:13px;color:var(--text-sub);margin-bottom:8px}
+.slider-row .lbl b{color:var(--brand);font-size:14px}
+.slider-row input[type=range]{width:100%;accent-color:var(--brand)}
+.slider-row .scale{display:flex;justify-content:space-between;font-size:11px;color:var(--text-sub);margin-top:2px}
 .row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:7px 0}
-.row label{font-size:12.5px;color:#94a3b8}
-.row input{width:110px;padding:8px 10px;border:1px solid #334155;border-radius:8px;background:#0f172a;
-color:#e2e8f0;font-size:14px;text-align:right;font-weight:700}
-.row .unit{font-size:11px;color:#64748b;width:34px}
-.out .row{border-bottom:1px solid rgba(255,255,255,.05);padding:7px 0;margin:0}
+.row label{font-size:12.5px;color:var(--text-sub)}
 .out b{font-size:15px}
-.pos{color:#34d399}.neg{color:#f87171}.big{font-size:18px!important}
+.pos{color:var(--profit)}.neg{color:var(--loss)}.big{font-size:18px!important}
 .vac{margin-top:14px}
 .vac table{width:100%;border-collapse:collapse;font-size:12.5px}
-.vac th,.vac td{padding:7px 6px;text-align:right;border-bottom:1px solid rgba(255,255,255,.06)}
-.vac th{color:#94a3b8;font-weight:700}.vac td:first-child,.vac th:first-child{text-align:left}
-.back{display:inline-block;margin-bottom:14px;color:#93c5fd;text-decoration:none;font-size:13px;font-weight:700}
+.vac th,.vac td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--line)}
+.vac th{color:var(--text-sub);font-weight:700}.vac td:first-child,.vac th:first-child{text-align:left}
 .kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
-.kpi>div{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px;text-align:center}
-.kpi .l{font-size:11px;color:#64748b}.kpi .v{font-size:17px;font-weight:800;margin-top:3px}
+.kpi>div{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+.kpi .l{font-size:11px;color:var(--text-sub)}.kpi .v{font-size:17px;font-weight:800;margin-top:3px;color:var(--text)}
 </style></head><body><div class=wrap>
 <a class=back href="/">← 대시보드</a>
 <h1>🧮 단기임대 수익 계산기{% if dong %} — {{dong}}{% endif %}</h1>
-<p class=sub>임차(내가 내는 비용)와 임대(투숙객에게 받는 돈)를 넣으면 주간 순익·손익주·영업이익률·공실률별 시나리오를 계산합니다. 연↔주 환산은 ÷52.{% if rent %} <b style="color:#93c5fd">{{dong}} 시세(월세 {{rent}}만·보증금 {{dep}}만)를 자동 입력했어요.</b>{% endif %}</p>
+<p class=sub>임차(내가 내는 비용)와 임대(투숙객에게 받는 돈)를 넣으면 월 순수익·손익분기·공실률별 시나리오를 계산합니다. 연↔주 환산은 ÷52.{% if rent %} <b style="color:var(--brand)">{{dong}} 시세(월세 {{rent}}만·보증금 {{dep}}만)를 자동 입력했어요.</b>{% endif %}</p>
+<div class=sec-label>① 입력 — 내가 넣는 값</div>
 <div class=cols>
-  <div class=box><h2>💸 임차 원가 (내가 내는 돈)</h2>
-    <div class=row><label>월 임차료</label><div><input id=i_rent type=number value={{rent or 85}}><span class=unit>만원</span></div></div>
-    <div class=row><label>보증금</label><div><input id=i_dep type=number value={{dep or 1000}}><span class=unit>만원</span></div></div>
-    <div class=row><label>보증금 이자율(연)</label><div><input id=i_deprate type=number value=5 step=0.5><span class=unit>%</span></div></div>
-    <div class=row><label>월 관리비</label><div><input id=i_mgmt type=number value=30><span class=unit>만원</span></div></div>
-    <div class=row><label>월 통신비</label><div><input id=i_net type=number value=3.3 step=0.1><span class=unit>만원</span></div></div>
-    <div class=row><label>주당 청소 소모품</label><div><input id=i_clean type=number value=1000 step=100><span class=unit>원</span></div></div>
-    <div class=row><label>주당 임대 소모품</label><div><input id=i_supply type=number value=1000 step=100><span class=unit>원</span></div></div>
+  <div class=box>
+    <div class=card-head><h2>↗ 내가 내는 돈</h2><span class=unit-badge>월 단위</span></div>
+    <p class=hint>핵심 3가지만 넣으면 바로 계산돼요</p>
+    <div class=field-primary><label>월 임차료</label>
+      <div class=field-box><input id=i_rent type=number value={{rent or 85}}><span class=unit>만원</span></div></div>
+    <div class=field-primary><label>보증금</label>
+      <div class=field-box><input id=i_dep type=number value={{dep or 1000}}><span class=unit>만원</span></div></div>
+    <div class=field-primary><label>월 관리비</label>
+      <div class=field-box><input id=i_mgmt type=number value=30><span class=unit>만원</span></div></div>
+    <details class=more>
+      <summary>세부 비용 · 기본값 (바로 수정 가능)</summary>
+      <div class=field-grid>
+        <div class=field-sm><label>보증금 이자율(연)</label>
+          <div class=field-box><input id=i_deprate type=number value=5 step=0.5><span class=unit>%</span></div></div>
+        <div class=field-sm><label>월 통신비</label>
+          <div class=field-box><input id=i_net type=number value=3.3 step=0.1><span class=unit>만원</span></div></div>
+        <div class=field-sm><label>주당 청소 소모품</label>
+          <div class=field-box><input id=i_clean type=number value=1000 step=100><span class=unit>원</span></div></div>
+        <div class=field-sm><label>주당 임대 소모품</label>
+          <div class=field-box><input id=i_supply type=number value=1000 step=100><span class=unit>원</span></div></div>
+      </div>
+    </details>
   </div>
-  <div class=box><h2>💰 임대 매출 (투숙객에게 받는 돈)</h2>
-    <div class=row><label>주 임대료</label><div><input id=i_wrent type=number value=31><span class=unit>만원</span></div></div>
-    <div class=row><label>주 관리비(청소비 등)</label><div><input id=i_wmgmt type=number value=12><span class=unit>만원</span></div></div>
+  <div class=box>
+    <div class=card-head><h2>🗋 받는 돈</h2><span class=unit-badge>주 단위</span></div>
+    <p class=hint>단기임대는 주 단위로 받아요 · 연 환산 ÷52 자동</p>
+    <div class=field-primary><label>주 임대료</label>
+      <div class=field-box><input id=i_wrent type=number value=31><span class=unit>만원</span></div></div>
+    <div class=field-primary><label>주 관리비(청소비 등)</label>
+      <div class=field-box><input id=i_wmgmt type=number value=12><span class=unit>만원</span></div></div>
+    <div class=slider-row>
+      <div class=lbl><span>기대 공실률 · 월 순수익 계산 기준</span><b id=o_vacpct>10%</b></div>
+      <input type=range id=i_vacancy min=0 max=30 step=5 value=10>
+      <div class=scale><span>0%</span><span>30%</span></div>
+    </div>
     <div class=kpi>
       <div><div class=l>주 매출</div><div class=v id=o_wrev>-</div></div>
       <div><div class=l>주 임대원가</div><div class=v id=o_wcost>-</div></div>
@@ -941,6 +993,7 @@ function calc(){
   set('o_wnet',won(netW),netW>=0?'pos':'neg')
   set('o_be',be?be.toFixed(2)+'주':'-'); set('o_margin',margin.toFixed(1)+'%',margin>=0?'pos':'neg')
   set('o_ycost',won(costY))
+  document.getElementById('o_vacpct').textContent=v('i_vacancy')+'%'
   var tb=document.getElementById('o_vac'),h=''
   ;[0,10,15,20,30].forEach(function(p){
     var ry=revY*(1-p/100), ny=ry-leaseY, cls=ny>=0?'pos':'neg'
