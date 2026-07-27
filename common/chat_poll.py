@@ -144,6 +144,11 @@ def _notify_new_chat(conn, acct, room_id, room, nickname, st, prev_in, new_in, f
 
 def poll_account(conn, acct):
     acct_id = acct['id']
+    # 재연결 필요(비번 오류 등)로 표시된 계정은 자동 폴링에서 제외 — 1분 크론이 실패하는
+    # 브라우저 로그인을 무한 반복하지 않게. 사용자가 웹에서 수동 폴링/재연결하면 다시 시도.
+    if (acct.get('status') or '') == 'reauth_needed':
+        log(f"  계정#{acct_id} 재연결 필요 상태 — 자동 재시도 생략")
+        return
     first_poll = not acct['refresh_token_enc']  # 계정 첫 연결(아직 refreshToken 없음)
     tok = None
 
@@ -260,7 +265,7 @@ def poll_all(conn):
     """연결된(비활성 아닌) 전체 계정을 폴링. GH Actions(main)와 Vercel cron 엔드포인트가 공용으로 씀."""
     accounts = conn.execute(
         "SELECT id, member_id, samsam_email, label, password_enc, refresh_token_enc, "
-        "samsam_member_id FROM samsam_accounts WHERE status != 'disabled'").fetchall()
+        "samsam_member_id, status FROM samsam_accounts WHERE status != 'disabled'").fetchall()
     for acct in accounts:
         poll_account(conn, dict(acct))
     return len(accounts)

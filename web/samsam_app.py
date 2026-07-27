@@ -1230,14 +1230,11 @@ def chat_api_add_account():
     label = (data.get("label") or "").strip()
     if not email or not password:
         return jsonify({"error": "이메일/비밀번호를 입력해주세요."}), 400
-    try:
-        res = chat_auth.login_and_get_refresh_token(email, password)
-    except chat_auth.LoginError as e:
-        return jsonify({"error": str(e)}), 400
-    except ModuleNotFoundError:
-        # Vercel 등 서버리스 배포엔 Playwright(브라우저 자동화)가 없어 이 요청 안에서
-        # 로그인을 못 끝낸다. 비번만 암호화해 큐잉해두면 GH Actions 폴링 workflow가
-        # (Playwright 설치된 환경) 다음 주기에 로그인을 대신 완료한다.
+
+    def _queue_pending():
+        # 이 프로세스에서 Playwright 로그인을 못 끝내는 경우(모듈/브라우저 없음 등):
+        # 비번만 암호화해 큐잉해두면 Playwright 있는 환경(서버 크론/GH Actions)이
+        # 다음 폴링 주기에 로그인을 대신 완료한다.
         conn = db.connect()
         conn.execute(
             "INSERT INTO samsam_accounts (member_id, samsam_email, label, password_enc, "
@@ -1249,8 +1246,18 @@ def chat_api_add_account():
         _trigger_chat_poll_workflow()
         return jsonify({"ok": True, "pending": True,
                          "message": "로그인 처리 중입니다. 잠시 후(보통 1분 이내) 새로고침해주세요."})
+
+    if not chat_auth.playwright_available():
+        return _queue_pending()
+    try:
+        res = chat_auth.login_and_get_refresh_token(email, password)
+    except chat_auth.LoginError as e:
+        return jsonify({"error": str(e)}), 400
     except Exception as e:
-        return jsonify({"error": f"로그인 중 오류: {repr(e)[:120]}"}), 500
+        # 브라우저 미설치·실행 실패 등 환경 문제 — 500 대신 큐잉으로 폴백(잘못된 비번은
+        # 위 LoginError로 이미 걸러짐). 예전엔 여기서 500이 떠 계정 연결이 아예 막혔다.
+        print(f"[chat] 로그인 환경 오류 — 큐잉 폴백: {repr(e)[:120]}", flush=True)
+        return _queue_pending()
 
     conn = db.connect()
     conn.execute(
