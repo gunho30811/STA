@@ -26,8 +26,10 @@ sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 import chat_auth
 import crypto_util
 import db
+import kakao_notify
 
 MSG_LIMIT = 50  # 폴링마다 방당 최근 메시지 N개만 조회 — 신규분만 있으면 충분, 전체 이력 아님
+CHAT_URL = f"https://{os.environ.get('RENDIT_DOMAIN', 'rendits.duckdns.org')}/samsam/chat/"
 
 
 def log(m):
@@ -110,8 +112,39 @@ def _poll_messages(conn, room_id, room_key, id_token):
     conn.commit()
 
 
+def _notify_new_chat(conn, acct, room_id, room, nickname, st, prev_in, new_in, first_poll):
+    """방별 첫 신규 수신 메시지에만 카톡 알림. '읽음→안읽음' 전환 순간 1회.
+
+    st: {last_read_at, last_notified_time}(적재 전 상태), prev_in/new_in: 적재 전/후 상대방 최신 시각.
+    first_poll(계정 첫 연결)엔 기준선만 잡고 알림 안 함(기존 대화 무더기 알림 방지)."""
+    if new_in is None:
+        return
+    has_new = prev_in is None or new_in > prev_in
+    if not has_new:
+        return
+    last_read = (st['last_read_at'] if st else None) or 0
+    last_notif = (st['last_notified_time'] if st else None) or 0
+    unread_before = prev_in is not None and prev_in > last_read
+    should = (not first_poll) and (not unread_before) and (new_in > last_notif)
+    if should:
+        label = acct.get('label') or acct.get('samsam_email') or '삼삼 계정'
+        preview = (room.get('last_message') or '').strip().replace('\n', ' ')[:60]
+        text = (f"[rendit] 새 채팅 문의\n계정: {label}\n"
+                f"{nickname or '게스트'}: {preview or '(내용 없음)'}")
+        try:
+            if kakao_notify.send_to_member(conn, acct['member_id'], text, CHAT_URL, "채팅 열기"):
+                log(f"    카톡 알림 발송(room {room_id}, member#{acct['member_id']})")
+        except Exception as e:
+            log(f"    카톡 알림 오류: {repr(e)[:100]}")
+    if new_in > last_notif:
+        conn.execute("UPDATE samsam_chat_rooms SET last_notified_time=%s WHERE id=%s",
+                     (new_in, room_id))
+        conn.commit()
+
+
 def poll_account(conn, acct):
     acct_id = acct['id']
+    first_poll = not acct['refresh_token_enc']  # 계정 첫 연결(아직 refreshToken 없음)
     tok = None
 
     # refresh_token_enc가 아직 없으면(웹에서 Playwright 없이 큐잉만 된 pending_login 계정)
@@ -155,13 +188,25 @@ def poll_account(conn, acct):
     # 임대인(host) 모드 채팅만 저장 — 이 계정이 게스트로 예약한 방(임차인 채팅)은 제외.
     host_rooms = {k: r for k, r in chatlist.items() if r.get('host_or_guest') == 'host'}
     nickname_cache = {}
+    me = str(member_id)
     for room_key, room in host_rooms.items():
         nickname = None
         counterpart = room.get('member')
         if counterpart:
             nickname = _get_nickname(id_token, counterpart, nickname_cache)
         room_id = _upsert_room(conn, acct_id, room_key, room, nickname)
+        # 신규 수신 메시지 감지용 상태(적재 전) — 상대방(sender != 내 member_id) 최신 메시지 시각.
+        st = conn.execute(
+            "SELECT last_read_at, last_notified_time FROM samsam_chat_rooms WHERE id=%s",
+            (room_id,)).fetchone()
+        prev_in = conn.execute(
+            "SELECT MAX(message_time) FROM samsam_chat_messages WHERE room_id=%s AND sender<>%s",
+            (room_id, me)).fetchone()[0]
         _poll_messages(conn, room_id, room_key, id_token)
+        new_in = conn.execute(
+            "SELECT MAX(message_time) FROM samsam_chat_messages WHERE room_id=%s AND sender<>%s",
+            (room_id, me)).fetchone()[0]
+        _notify_new_chat(conn, acct, room_id, room, nickname, st, prev_in, new_in, first_poll)
 
     conn.execute(
         "UPDATE samsam_accounts SET refresh_token_enc=%s, samsam_member_id=%s, "
