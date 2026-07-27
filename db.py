@@ -246,6 +246,9 @@ def init_db(force=False):
             if conn.execute("SELECT to_regclass('public.members')").fetchone()[0]:
                 # 기존 DB: 신규 컬럼 마이그레이션만 실행
                 conn.execute("ALTER TABLE members ADD COLUMN IF NOT EXISTS kakao_id TEXT")
+                conn.execute("ALTER TABLE members ADD COLUMN IF NOT EXISTS kakao_refresh_token_enc TEXT")
+                conn.execute("ALTER TABLE members ADD COLUMN IF NOT EXISTS kakao_notify BOOLEAN DEFAULT FALSE")
+                conn.execute("ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS last_notified_time BIGINT")
                 conn.commit()
                 _INITED = True
                 conn.close()
@@ -478,6 +481,9 @@ def init_db(force=False):
     # 기존 테이블에 신규 컬럼 보강(이미 있으면 무시)
     conn.execute("ALTER TABLE members ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT FALSE")
     conn.execute("ALTER TABLE members ADD COLUMN IF NOT EXISTS kakao_id TEXT")
+    # 카카오톡 '나에게 보내기' 알림용 — talk_message 동의 후 저장한 refreshToken(암호화)과 수신 on/off.
+    conn.execute("ALTER TABLE members ADD COLUMN IF NOT EXISTS kakao_refresh_token_enc TEXT")
+    conn.execute("ALTER TABLE members ADD COLUMN IF NOT EXISTS kakao_notify BOOLEAN DEFAULT FALSE")
     _seed_admin(conn)
 
     # 삼삼엠투 통합 채팅: 회원이 연결한 삼삼 계정(비번·refreshToken은 암호화해 저장).
@@ -518,6 +524,8 @@ def init_db(force=False):
     conn.execute("ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS last_read_at BIGINT")
     # 상대방(counterpart_member) 닉네임 — RTDB live/users/{id}에서 조회해 채팅 목록에 표시.
     conn.execute("ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS counterpart_nickname TEXT")
+    # 카톡 알림을 마지막으로 보낸 수신 메시지 시각(epoch ms) — '방별 첫 신규만' 중복 발송 방지.
+    conn.execute("ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS last_notified_time BIGINT")
     # 채팅방별 메시지(RTDB live/messagelist/{room_key}).
     conn.execute("""
     CREATE TABLE IF NOT EXISTS samsam_chat_messages (

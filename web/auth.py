@@ -663,6 +663,10 @@ def kakao_login():
     params = (f"client_id={_KAKAO_CLIENT_ID}"
               f"&redirect_uri={redirect_uri}"
               f"&response_type=code&state={state}")
+    # ?notify=1 : 채팅 알림 연결용 — '카카오톡 메시지 전송(talk_message)' 동의를 함께 요청.
+    # 이 동의를 마친 회원은 콜백에서 refreshToken을 저장하고 kakao_notify=TRUE가 된다.
+    if request.args.get("notify"):
+        params += "&scope=talk_message"
     return redirect(f"https://kauth.kakao.com/oauth/authorize?{params}")
 
 
@@ -689,7 +693,11 @@ def kakao_callback():
         # invalid_client. tok.text에 정확한 사유가 담김.
         print(f"[kakao] 토큰교환 실패 {tok.status_code}: {tok.text[:300]}", flush=True)
         return redirect(url_for("auth.login", kakao="token"))
-    access_token = tok.json().get("access_token", "")
+    tokj = tok.json()
+    access_token = tokj.get("access_token", "")
+    # 채팅 알림 연결(scope=talk_message)로 들어온 경우에만 존재 — 아래에서 회원에 저장.
+    kakao_refresh_token = tokj.get("refresh_token", "")
+    kakao_scope = tokj.get("scope", "") or ""
     if not access_token:
         print(f"[kakao] access_token 없음: {tok.text[:300]}", flush=True)
         return redirect(url_for("auth.login", kakao="token"))
@@ -739,6 +747,17 @@ def kakao_callback():
                                (kakao_id,)).fetchone()
         if not row:
             return redirect(url_for("auth.login"))
+        # 채팅 알림 연결: talk_message 동의 + refreshToken 확보 시 이 회원 카톡 알림 켜기.
+        if kakao_refresh_token and "talk_message" in kakao_scope:
+            try:
+                import crypto_util
+                conn.execute(
+                    "UPDATE members SET kakao_refresh_token_enc=%s, kakao_notify=TRUE WHERE id=%s",
+                    (crypto_util.encrypt(kakao_refresh_token), row["id"]))
+                conn.commit()
+                print(f"[kakao] 채팅 알림 연결 완료 member#{row['id']}", flush=True)
+            except Exception as e:
+                print(f"[kakao] 알림 토큰 저장 실패: {repr(e)[:120]}", flush=True)
         # 관리자 승인 게이트(이메일 로그인과 동일): 미승인 일반 회원은 로그인 불가.
         st = conn.execute("SELECT role,approved FROM members WHERE id=%s",
                           (row["id"],)).fetchone()
