@@ -10,6 +10,9 @@ ENV TZ=Asia/Seoul PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 # 의존성 먼저(레이어 캐시). requirements.txt + 프로덕션 WSGI 서버 gunicorn.
 COPY requirements.txt .
 RUN pip install -r requirements.txt gunicorn
+# 통합채팅 삼삼 로그인용 크로미움(Playwright) — 계정 연결/재로그인을 서버에서 직접 처리.
+# (없으면 로그인이 큐잉만 되고 GH Actions 대기 → 서버 단독으로 완결되도록 포함. ~300MB)
+RUN python -m playwright install --with-deps chromium
 
 # 앱 소스. .dockerignore 로 불필요한 것(.git, node_modules, __pycache__) 제외.
 COPY . .
