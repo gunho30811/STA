@@ -501,8 +501,6 @@ padding:14px 40px;flex-wrap:wrap;gap:10px}
 /* 히어로 */
 .hero{background:linear-gradient(180deg,#F4F6FB 0%,#FBFCFE 70%,#fff 100%);border-bottom:1px solid #EEF0F4}
 .hero-in{max-width:1140px;margin:0 auto;padding:68px 40px;text-align:center}
-.tag{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--accent);
-background:#EAEEFB;padding:6px 14px;border-radius:20px;margin-bottom:20px}
 .hero h1{font-size:40px;font-weight:900;line-height:1.18;letter-spacing:-.03em;margin:0 0 18px;white-space:pre-line}
 .hero p{font-size:17px;color:var(--sub);max-width:600px;margin:0 auto 32px;white-space:pre-line}
 .hero .btns{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;align-items:center}
@@ -608,11 +606,12 @@ border-radius:12px;display:inline-block;margin-bottom:16px}
 
 /* 7 · 회원가입 CTA */
 .signup-sec{max-width:1140px;margin:0 auto;padding:80px 40px}
-.signup-card{background:var(--accent);border-radius:24px;padding:45px 40px;text-align:center}
-.signup-card h2{font-size:28px;font-weight:900;color:#fff;letter-spacing:-.02em;margin:0 0 12px}
-.signup-card p{font-size:16px;color:#E7ECFB;margin:0 auto 28px;max-width:600px}
-.signup-card .btn{color:var(--accent);background:#fff;font-weight:900;padding:16px 36px;border-radius:11px}
-.signup-card .fine{font-size:13px;color:#D3DBF7;margin-top:16px}
+.signup-card{background:#181430;border-radius:24px;padding:45px 40px;text-align:center}
+.signup-card h2{font-size:28px;font-weight:900;color:#fff;margin:0 0 12px}
+.signup-card p{font-size:16px;color:#A9A4C9;margin:0 auto 28px;max-width:600px}
+.signup-card .btn{color:#fff;background:var(--accent);font-weight:900;padding:16px 36px;border-radius:11px;
+transition:.15s}
+.signup-card .btn:hover{color:var(--accent);background:#fff}
 
 /* 푸터 */
 .foot{padding:32px 40px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;
@@ -631,16 +630,15 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
 
 <!-- 1 · 히어로 -->
 <section class=hero><div class=hero-in>
-  <span class=tag>🏠 단기임대용 매물 찾기</span>
   <h1>단기임대로 돈 되는 매물,
 어디서 찾아야 할까?</h1>
   <p>가입 없이 지도와 계산기부터 사용해보세요.
 수요는 높은데 공급이 부족한 스팟과 수익이 나는 매물을 rendit이 골라드립니다.</p>
   <div class=btns>
-    <a class="btn btn-primary" href="#calc">🧮 무료 계산기 써보기</a>
+    <a class="btn btn-primary" href="/calc">🧮 무료 계산기 써보기</a>
     <a class="btn btn-primary" href="/map">🗺️ 지도 미리보기</a>
   </div>
-  <div class=signup-row><a class=signup-link href="#signup">또는 회원가입 →</a></div>
+  <div class=signup-row><a class=signup-link href="/auth/signup">또는 회원가입 →</a></div>
   <div class=free-note>가입 없이 바로 — <b>계산기는 전체 무료</b>, <b>지도는 강남권 무료 미리보기</b></div>
 </div></section>
 
@@ -671,7 +669,7 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
     <div class=scard><span class="badge badge-free">무료</span>{ICON_CALC}
       <div class=t>수익 계산기</div>
       <div class=d>월세 대비 단기임대 전환 시 기대 순수익과 영업이익률을 즉시 계산.</div>
-      <a class=link href="#calc">지금 계산하기 →</a></div>
+      <a class=link href="/calc">지금 계산하기 →</a></div>
     <div class=scard><span class="badge badge-free">무료</span>{ICON_MAP}
       <div class=t>지역 수익 지도</div>
       <div class=d>동·역별 평균 순수익과 예약률을 지도에서 색으로 비교(강남권 무료).</div>
@@ -712,7 +710,7 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
     </div>
     <div class=nudge>
       <p>💡 매물마다 일일이 계산하기 귀찮다면? 수익 나는 <b>추천 스팟</b>을 rendit이 골라드려요.</p>
-      <a href="#wall">추천 스팟 보기 →</a>
+      <a href="/auth/signup">추천 스팟 보기 →</a>
     </div>
   </div>
 </section>
@@ -746,7 +744,7 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
       <div class=wall-card>
         <div class=t>🔓 전체 지도·추천 스팟 잠금 해제</div>
         <div class=d>수도권 전체 순위와 공급부족 추천 스팟을 지도에서 한눈에.</div>
-        <a href="#signup">가입하고 전체 열기 →</a>
+        <a href="/auth/signup">가입하고 전체 열기 →</a>
       </div>
     </div>
   </div>
@@ -761,13 +759,13 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
   </div>
   <div class=tgrid>
     <div class=tcard><div class=ic>🗂️</div><div class=t>데이터 출처</div>
-      <div class=d>네이버부동산 실매물을 실제 단기임대 예약 데이터와 매칭해 계산합니다.</div></div>
+      <div class=d>부동산 실매물을 실제 단기임대 예약 데이터와 매칭해 계산합니다.</div></div>
     <div class=tcard><div class=ic>🧮</div><div class=t>계산 근거·방법</div>
       <div class=d>주 임대료 × 예약률로 연 매출을 산출(÷52 환산), 연 임차원가를 빼 월 순수익을 계산.</div></div>
     <div class=tcard><div class=ic>🔄</div><div class=t>최신 갱신일</div>
       <div class=d>매물·예약 데이터를 주기적으로 갱신하고 화면마다 기준일을 표기합니다.</div></div>
   </div>
-  <p class=trust-note>최신 갱신일: {% if churn %}{{ churn.date }}{% else %}-{% endif %} · 네이버부동산 매물 및 단기임대 예약 데이터 기준</p>
+  <p class=trust-note>출처: 부동산 매물 및 단기임대 예약 데이터 기준</p>
 </div></section>
 
 <!-- 7 · 마지막 후킹 + 회원가입 -->
@@ -776,7 +774,6 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
     <h2>계산해 봤다면, 이제 전체를 열어보세요</h2>
     <p>수도권 전 지역 순위, 공급부족 추천 스팟 지도, 상세 수익 리포트까지 회원에게 열립니다.</p>
     <a class=btn href="/auth/signup">가입하고 전체 열기</a>
-    <p class=fine>가입 후 간단한 승인 절차(보통 하루 이내)를 거쳐 바로 이용하실 수 있어요.</p>
   </div>
 </section>
 
@@ -864,67 +861,199 @@ CALC_PAGE = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
 <meta name=viewport content="width=device-width,initial-scale=1"><title>rendit · 수익 계산기</title>
 <link rel=stylesheet href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard-dynamic-subset.css">
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
-background:linear-gradient(140deg,#0f172a,#1e293b);min-height:100vh;color:#e2e8f0;padding:20px 14px 60px}
+*{box-sizing:border-box}
+:root{--brand:#4D2EE9;--brand-hover:#3A1FC9;--brand-tint:#ECEAF8;--profit:#148A5E;--loss:#D24545;
+--bg:#F4F6FB;--text:#1C1830;--text-sub:#6E6D68;--line:#E7E5DE;--gold:#D89700}
+body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
+background:var(--bg);min-height:100vh;color:var(--text);padding:20px 14px 60px}
+.hd{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);
+border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;
+padding:14px 40px;margin:-20px -14px 20px}
+.hd .brand{font-size:21px;font-weight:900;letter-spacing:-.02em;color:var(--brand);text-decoration:none}
+.hd-cta{display:flex;align-items:center;gap:16px}
+.hd-cta .login{font-size:14px;font-weight:600;color:var(--text-sub);text-decoration:none}
+.hd-cta .signup{font-size:14px;font-weight:700;color:var(--brand);border:1px solid var(--line);
+padding:8px 15px;border-radius:8px;text-decoration:none}
 .wrap{max-width:900px;margin:0 auto}
-h1{font-size:20px;font-weight:800;margin:4px 0 2px}
-.sub{color:#94a3b8;font-size:12.5px;margin:0 0 18px}
-.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.back{display:inline-block;margin-bottom:14px;color:var(--text-sub);text-decoration:none;font-size:13px;font-weight:700}
+.back:hover{color:var(--brand)}
+h1{font-size:22px;font-weight:900;margin:4px 0 2px;letter-spacing:-.01em}
+.sub{color:var(--text-sub);font-size:13px;margin:0 0 28px;line-height:1.6}
+.sec-label{font-size:13px;font-weight:800;color:var(--text-sub);margin:0 0 12px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px}
 @media(max-width:700px){.cols{grid-template-columns:1fr}}
-.box{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:16px 18px}
-.box h2{font-size:13.5px;font-weight:800;margin:0 0 12px;color:#cbd5e1}
-.row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:7px 0}
-.row label{font-size:12.5px;color:#94a3b8}
-.row input{width:110px;padding:8px 10px;border:1px solid #334155;border-radius:8px;background:#0f172a;
-color:#e2e8f0;font-size:14px;text-align:right;font-weight:700}
-.row .unit{font-size:11px;color:#64748b;width:34px}
-.out .row{border-bottom:1px solid rgba(255,255,255,.05);padding:7px 0;margin:0}
-.out b{font-size:15px}
-.pos{color:#34d399}.neg{color:#f87171}.big{font-size:18px!important}
-.vac{margin-top:14px}
+.box{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px}
+.card-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px}
+.card-head h2{font-size:15px;font-weight:800;margin:0;color:var(--text)}
+.card-head .unit-badge{font-size:11px;font-weight:700;color:var(--text-sub)}
+.hint{font-size:12px;color:var(--text-sub);margin:0 0 16px}
+.field-primary{margin:14px 0}
+.field-primary label{display:block;font-size:13px;color:var(--text-sub);margin-bottom:6px}
+.field-box{display:flex;align-items:center;justify-content:flex-end;gap:6px;border:1.5px solid var(--line);
+border-radius:10px;padding:12px 14px;background:#fff}
+.field-box:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-tint)}
+.field-box input{border:none;outline:none;background:transparent;font-size:22px;font-weight:800;
+color:var(--text);text-align:right;width:100%;font-family:inherit}
+.field-box .unit{font-size:13px;color:var(--text-sub);font-weight:600;white-space:nowrap}
+details.more{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
+details.more summary{cursor:pointer;font-size:13px;font-weight:800;color:var(--text);list-style:none;
+display:flex;align-items:center;gap:6px}
+details.more summary::-webkit-details-marker{display:none}
+details.more summary::before{content:'⌃';display:inline-block;transition:transform .15s}
+details.more:not([open]) summary::before{transform:rotate(180deg)}
+.field-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+@media(max-width:480px){.field-grid{grid-template-columns:1fr}}
+.field-sm label{display:block;font-size:12px;color:var(--text-sub);margin-bottom:5px}
+.field-sm .field-box{padding:8px 10px}
+.field-sm .field-box input{font-size:14px;font-weight:700}
+.slider-row{margin-top:18px}
+.slider-row .lbl{display:flex;justify-content:space-between;font-size:13px;color:var(--text-sub);margin-bottom:8px}
+.slider-row .lbl b{color:var(--brand);font-size:14px}
+.slider-row input[type=range]{width:100%;accent-color:var(--brand)}
+.slider-row .scale{display:flex;justify-content:space-between;font-size:11px;color:var(--text-sub);margin-top:2px}
+.pos{color:var(--profit)}.pos-brand{color:var(--brand)}.neg{color:var(--loss)}
+.vac{margin-top:28px}
+.vac h2{margin-top:0}
 .vac table{width:100%;border-collapse:collapse;font-size:12.5px}
-.vac th,.vac td{padding:7px 6px;text-align:right;border-bottom:1px solid rgba(255,255,255,.06)}
-.vac th{color:#94a3b8;font-weight:700}.vac td:first-child,.vac th:first-child{text-align:left}
-.back{display:inline-block;margin-bottom:14px;color:#93c5fd;text-decoration:none;font-size:13px;font-weight:700}
-.kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
-.kpi>div{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px;text-align:center}
-.kpi .l{font-size:11px;color:#64748b}.kpi .v{font-size:17px;font-weight:800;margin-top:3px}
-</style></head><body><div class=wrap>
+.vac th,.vac td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--line)}
+.vac th{color:var(--text-sub);font-weight:700}.vac td:first-child,.vac th:first-child{text-align:left}
+.hero-card{padding:24px 22px;border:none;box-shadow:0 2px 10px rgba(28,24,48,.06)}
+.hero-sub{font-size:14px;color:var(--text-sub);margin:0 0 10px}
+.hero-sub b{color:var(--text);font-weight:800}
+.hero-row{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.hero-num{font-size:34px;font-weight:900;letter-spacing:-.02em}
+.hero-annual{font-size:14px;color:var(--text-sub);font-weight:600}
+.kpi3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}
+@media(max-width:700px){.kpi3{grid-template-columns:1fr}}
+.kpi3-cell{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.kpi3-cell.warn{border-color:#F0DCA0;background:#FDF8ED}
+.kpi3-cell .l{font-size:12.5px;color:var(--text-sub);margin-bottom:6px}
+.kpi3-cell.warn .l{color:var(--gold);font-weight:700}
+.kpi3-cell .v{font-size:20px;font-weight:800}
+.kpi3-paren{font-size:13px;font-weight:600;color:var(--text-sub)}
+.kpi3-sub{font-size:11.5px;color:var(--text-sub);margin-top:4px}
+.calc-detail{margin-top:20px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px}
+.calc-detail summary{margin:0}
+.calc-detail[open] summary{margin-bottom:4px}
+.calc-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;margin-top:14px}
+@media(max-width:480px){.calc-detail-grid{grid-template-columns:1fr}}
+.calc-detail-grid>div{display:flex;justify-content:space-between;font-size:13px}
+.cd-l{color:var(--text-sub)}
+.cd-v{font-weight:700;color:var(--text)}
+.vac-notice{background:#FDF8ED;border:1px solid #F0DCA0;color:var(--gold);font-size:12.5px;font-weight:700;
+padding:9px 12px;border-radius:9px;margin-bottom:12px}
+.be-row td{border-top:1px dashed var(--gold);border-bottom:none;color:var(--gold);font-size:11px;
+font-weight:700;text-align:center;padding:6px 4px}
+.cta-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+margin-top:24px;padding:20px 22px;background:#fff;border:1px solid var(--line);border-radius:16px}
+.cta-h1{font-size:14.5px;font-weight:800;color:var(--text);margin:0 0 4px}
+.cta-h2{font-size:12.5px;color:var(--text-sub);margin:0}
+.cta-btn{flex:0 0 auto;white-space:nowrap;background:var(--brand);color:#fff;font-weight:800;font-size:13.5px;
+padding:12px 20px;border-radius:10px;text-decoration:none}
+.cta-btn:hover{background:var(--brand-hover)}
+</style></head><body>
+{% if not user %}
+<header class=hd>
+  <a class=brand href="/">rendit</a>
+  <div class=hd-cta>
+    <a class=login href="/auth/login">로그인</a>
+    <a class=signup href="/auth/signup">회원가입</a>
+  </div>
+</header>
+{% endif %}
+<div class=wrap>
 <a class=back href="/">← 대시보드</a>
 <h1>🧮 단기임대 수익 계산기{% if dong %} — {{dong}}{% endif %}</h1>
-<p class=sub>임차(내가 내는 비용)와 임대(투숙객에게 받는 돈)를 넣으면 주간 순익·손익주·영업이익률·공실률별 시나리오를 계산합니다. 연↔주 환산은 ÷52.{% if rent %} <b style="color:#93c5fd">{{dong}} 시세(월세 {{rent}}만·보증금 {{dep}}만)를 자동 입력했어요.</b>{% endif %}</p>
+<p class=sub>임차(내가 내는 비용)와 임대(투숙객에게 받는 돈)를 넣으면 월 순수익·손익분기·공실률별 시나리오를 계산합니다. 연↔주 환산은 ÷52.{% if rent %} <b style="color:var(--brand)">{{dong}} 시세(월세 {{rent}}만·보증금 {{dep}}만)를 자동 입력했어요.</b>{% endif %}</p>
+<div class=sec-label>① 입력 — 내가 넣는 값</div>
 <div class=cols>
-  <div class=box><h2>💸 임차 원가 (내가 내는 돈)</h2>
-    <div class=row><label>월 임차료</label><div><input id=i_rent type=number value={{rent or 85}}><span class=unit>만원</span></div></div>
-    <div class=row><label>보증금</label><div><input id=i_dep type=number value={{dep or 1000}}><span class=unit>만원</span></div></div>
-    <div class=row><label>보증금 이자율(연)</label><div><input id=i_deprate type=number value=5 step=0.5><span class=unit>%</span></div></div>
-    <div class=row><label>월 관리비</label><div><input id=i_mgmt type=number value=30><span class=unit>만원</span></div></div>
-    <div class=row><label>월 통신비</label><div><input id=i_net type=number value=3.3 step=0.1><span class=unit>만원</span></div></div>
-    <div class=row><label>주당 청소 소모품</label><div><input id=i_clean type=number value=1000 step=100><span class=unit>원</span></div></div>
-    <div class=row><label>주당 임대 소모품</label><div><input id=i_supply type=number value=1000 step=100><span class=unit>원</span></div></div>
+  <div class=box>
+    <div class=card-head><h2>↗ 내가 내는 돈</h2><span class=unit-badge>월 단위</span></div>
+    <p class=hint>핵심 3가지만 넣으면 바로 계산돼요</p>
+    <div class=field-primary><label>월 임차료</label>
+      <div class=field-box><input id=i_rent type=number value={{rent or 85}}><span class=unit>만원</span></div></div>
+    <div class=field-primary><label>보증금</label>
+      <div class=field-box><input id=i_dep type=number value={{dep or 1000}}><span class=unit>만원</span></div></div>
+    <div class=field-primary><label>월 관리비</label>
+      <div class=field-box><input id=i_mgmt type=number value=30><span class=unit>만원</span></div></div>
+    <details class=more>
+      <summary>세부 비용 · 기본값 (바로 수정 가능)</summary>
+      <div class=field-grid>
+        <div class=field-sm><label>보증금 이자율(연)</label>
+          <div class=field-box><input id=i_deprate type=number value=5 step=0.5><span class=unit>%</span></div></div>
+        <div class=field-sm><label>월 통신비</label>
+          <div class=field-box><input id=i_net type=number value=3.3 step=0.1><span class=unit>만원</span></div></div>
+        <div class=field-sm><label>주당 청소 소모품</label>
+          <div class=field-box><input id=i_clean type=number value=1000 step=100><span class=unit>원</span></div></div>
+        <div class=field-sm><label>주당 임대 소모품</label>
+          <div class=field-box><input id=i_supply type=number value=1000 step=100><span class=unit>원</span></div></div>
+      </div>
+    </details>
   </div>
-  <div class=box><h2>💰 임대 매출 (투숙객에게 받는 돈)</h2>
-    <div class=row><label>주 임대료</label><div><input id=i_wrent type=number value=31><span class=unit>만원</span></div></div>
-    <div class=row><label>주 관리비(청소비 등)</label><div><input id=i_wmgmt type=number value=12><span class=unit>만원</span></div></div>
-    <div class=kpi>
-      <div><div class=l>주 매출</div><div class=v id=o_wrev>-</div></div>
-      <div><div class=l>주 임대원가</div><div class=v id=o_wcost>-</div></div>
-      <div><div class=l>주 순익</div><div class=v id=o_wnet>-</div></div>
-    </div>
-    <div class=kpi>
-      <div><div class=l>손익주</div><div class=v id=o_be>-</div></div>
-      <div><div class=l>영업이익률</div><div class=v id=o_margin>-</div></div>
-      <div><div class=l>연 임차원가</div><div class=v id=o_ycost>-</div></div>
+  <div class=box>
+    <div class=card-head><h2>🗋 받는 돈</h2><span class=unit-badge>주 단위</span></div>
+    <p class=hint>단기임대는 주 단위로 받아요 · 연 환산 ÷52 자동</p>
+    <div class=field-primary><label>주 임대료</label>
+      <div class=field-box><input id=i_wrent type=number value=31><span class=unit>만원</span></div></div>
+    <div class=field-primary><label>주 관리비(청소비 등)</label>
+      <div class=field-box><input id=i_wmgmt type=number value=12><span class=unit>만원</span></div></div>
+    <div class=slider-row>
+      <div class=lbl><span>기대 공실률 · 월 순수익 계산 기준</span><b id=o_vacpct>10%</b></div>
+      <input type=range id=i_vacancy min=0 max=30 step=5 value=10>
+      <div class=scale><span>0%</span><span>30%</span></div>
     </div>
   </div>
 </div>
+
+<div class=sec-label>② 결과</div>
+<div class="box hero-card">
+  <p class=hero-sub>이 매물, 단기임대로 돌리면 <b id=o_herobadge>공실 10% 기준</b></p>
+  <div class=hero-row>
+    <span class=hero-num id=o_heromonth>월 순수익 -</span>
+    <span class=hero-annual id=o_heroyear>연 -</span>
+  </div>
+</div>
+<div class=kpi3>
+  <div class=kpi3-cell>
+    <div class=l>영업이익률</div>
+    <div class=v id=o_margin>-</div>
+  </div>
+  <div class="kpi3-cell warn">
+    <div class=l>⚠ 손익분기</div>
+    <div class=v>월 약 <b id=o_bedays>-</b>일 <span class=kpi3-paren>(공실 <span id=o_bepct>-</span>%)</span></div>
+    <div class=kpi3-sub>이 아래로 채우면 적자</div>
+  </div>
+  <div class=kpi3-cell>
+    <div class=l>주 순익</div>
+    <div class=v id=o_wnet>-</div>
+  </div>
+</div>
+<details class="more calc-detail">
+  <summary>계산 내역 · 검증용</summary>
+  <div class=calc-detail-grid>
+    <div><span class=cd-l>주 매출</span><span class=cd-v id=o_wrev>-</span></div>
+    <div><span class=cd-l>주 임대원가</span><span class=cd-v id=o_wcost>-</span></div>
+    <div><span class=cd-l>연 임차원가</span><span class=cd-v id=o_ycost>-</span></div>
+    <div><span class=cd-l>손익분기 예약 주수</span><span class=cd-v id=o_be>-</span></div>
+  </div>
+</details>
+
 <div class="box vac"><h2>📉 공실률 시나리오 (연 매출 × (1−공실률) − 연 임차원가)</h2>
-  <table><thead><tr><th>공실률</th><th>연 매출</th><th>연 순수익</th><th>월 순수익</th></tr></thead>
+  <div class=vac-notice id=o_vacnotice>⚠ 손익분기 · 월 약 -일 예약(공실 -%) · 이 아래로 채우면 적자</div>
+  <table><thead><tr><th>공실률</th><th>월 예약(환산)</th><th>연 순수익</th><th>월 순수익</th></tr></thead>
   <tbody id=o_vac></tbody></table>
+</div>
+<div class=cta-row>
+  <div class=cta-text>
+    <p class=cta-h1 id=o_ctahead>이 매물은 한 달 약 -일까지 채우면 흑자예요.</p>
+    <p class=cta-h2>그럼 애초에 공실 걱정 적은 — 수요 높고 공급 부족한 자리는 어디일까요?</p>
+  </div>
+  <a class=cta-btn href="/auth/signup">★ 공급부족 스팟 보기</a>
 </div>
 <script>
 function won(x){return '₩'+Math.round(x).toLocaleString()}
 function man(x){return (Math.round(x*10)/10).toLocaleString()+'만'}
+function signed(x){return (x>=0?'+':'')+Math.round(x).toLocaleString()}
 function calc(){
   var v=function(id){return parseFloat(document.getElementById(id).value)||0}
   var rentY=v('i_rent')*10000*12, depFee=v('i_dep')*10000*(v('i_deprate')/100),
@@ -941,14 +1070,37 @@ function calc(){
   var set=function(id,txt,cls){var e=document.getElementById(id);e.textContent=txt;
     e.className='v'+(cls?' '+cls:'')}
   set('o_wrev',won(revW)); set('o_wcost',won(costW))
-  set('o_wnet',won(netW),netW>=0?'pos':'neg')
-  set('o_be',be?be.toFixed(2)+'주':'-'); set('o_margin',margin.toFixed(1)+'%',margin>=0?'pos':'neg')
+  set('o_wnet',signed(netW)+'원',netW>=0?'pos':'neg')
+  set('o_be',be?be.toFixed(2)+'주':'-'); set('o_margin',margin.toFixed(1)+'%')
   set('o_ycost',won(costY))
-  var tb=document.getElementById('o_vac'),h=''
+  var p=v('i_vacancy')
+  document.getElementById('o_vacpct').textContent=p+'%'
+  document.getElementById('o_herobadge').textContent='공실 '+p+'% 기준'
+  var heroYear=revY*(1-p/100)-leaseY, heroMonth=heroYear/12
+  var heroEl=document.getElementById('o_heromonth')
+  heroEl.textContent='월 순수익 '+signed(heroMonth)+'원'
+  heroEl.className='hero-num '+(heroMonth>=0?'pos-brand':'neg')
+  document.getElementById('o_heroyear').textContent='연 '+signed(heroYear)+'원'
+  // 손익분기를 일 단위로 환산(1주=7일) — 30일 기준 월 예약일수·공실률로도 같이 표시(표시 전환일 뿐, be 값 자체는 그대로).
+  var beDaysRaw=be*7
+  var beDays=Math.max(0,Math.min(30,Math.round(beDaysRaw)))
+  var bePct=Math.max(0,Math.min(100,Math.round(100*(1-beDaysRaw/30))))
+  document.getElementById('o_bedays').textContent=revW>0?beDays:'-'
+  document.getElementById('o_bepct').textContent=revW>0?bePct:'-'
+  var beLabel=revW>0?('월 약 '+beDays+'일 예약(공실 '+bePct+'%)'):'월 순익이 나지 않음'
+  document.getElementById('o_vacnotice').textContent='⚠ 손익분기 · '+beLabel+' · 이 아래로 채우면 적자'
+  document.getElementById('o_ctahead').textContent=revW>0?
+    ('이 매물은 한 달 약 '+beDays+'일까지 채우면 흑자예요.'):'이 매물은 지금 조건으로는 흑자가 나지 않아요.'
+  var tb=document.getElementById('o_vac'),h='', beShown=false
   ;[0,10,15,20,30].forEach(function(p){
-    var ry=revY*(1-p/100), ny=ry-leaseY, cls=ny>=0?'pos':'neg'
-    h+='<tr><td>'+p+'%</td><td>'+won(ry)+'</td><td class='+cls+'><b>'+won(ny)+'</b></td>'+
-       '<td class='+cls+'>'+won(ny/12)+'</td></tr>'
+    if(!beShown && revW>0 && p>bePct){
+      h+='<tr class=be-row><td colspan=4>손익분기 (공실 '+bePct+'% · '+beDays+'일)</td></tr>'
+      beShown=true
+    }
+    var days=Math.round(30*(1-p/100)), daysTxt=(p===0?'':'약 ')+days+'일'
+    var ry=revY*(1-p/100), ny=ry-leaseY, cls=ny>=0?'pos-brand':'neg'
+    h+='<tr><td>'+p+'%</td><td>'+daysTxt+'</td><td class='+cls+'><b>'+signed(ny)+'</b></td>'+
+       '<td class='+cls+'>'+signed(ny/12)+'</td></tr>'
   })
   tb.innerHTML=h
 }
@@ -961,8 +1113,9 @@ calc()
 @portal.route("/calc")
 def calc():
     # 무료 공개 — 로그인 불필요(수익 계산기는 진입장벽 낮춰 가입 유도).
+    # 로그인 상태면 auth._inject_nav가 공통 네비바를 자동 주입하므로, 여기 헤더는 비로그인일 때만 렌더.
     from flask import request as _rq
-    return render_template_string(CALC_PAGE, dong=_rq.args.get("dong", ""),
+    return render_template_string(CALC_PAGE, user=current_user(), dong=_rq.args.get("dong", ""),
                                   rent=_rq.args.get("rent", type=int),
                                   dep=_rq.args.get("dep", type=int))
 
@@ -999,7 +1152,7 @@ def home():
     u = current_user()
     if not u:
         # 미로그인: 로그인 창 대신 서비스 소개 랜딩(무슨 서비스인지 보이게 → 이탈 방지).
-        return render_template_string(PUBLIC_LANDING, churn=latest_listing_churn())
+        return render_template_string(PUBLIC_LANDING)
     # 매물 변동·인사이트는 모든 로그인 사용자에게, 접속자수는 관리자에게만.
     online = online_count() if u["role"] == "admin" else None
     return render_template_string(LANDING, user=u, churn=latest_listing_churn(),
