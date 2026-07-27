@@ -748,6 +748,7 @@ def kakao_callback():
         if not row:
             return redirect(url_for("auth.login"))
         # 채팅 알림 연결: talk_message 동의 + refreshToken 확보 시 이 회원 카톡 알림 켜기.
+        notify_connected = False
         if kakao_refresh_token and "talk_message" in kakao_scope:
             try:
                 import crypto_util
@@ -755,6 +756,7 @@ def kakao_callback():
                     "UPDATE members SET kakao_refresh_token_enc=%s, kakao_notify=TRUE WHERE id=%s",
                     (crypto_util.encrypt(kakao_refresh_token), row["id"]))
                 conn.commit()
+                notify_connected = True
                 print(f"[kakao] 채팅 알림 연결 완료 member#{row['id']}", flush=True)
             except Exception as e:
                 print(f"[kakao] 알림 토큰 저장 실패: {repr(e)[:120]}", flush=True)
@@ -767,6 +769,18 @@ def kakao_callback():
             session["uid"] = row["id"]
             session["role"] = row["role"]
             session.permanent = True
+        # 알림 연결 직후 테스트 메시지 발송 — 담당자가 카톡에서 바로 연결을 확인할 수 있게.
+        test_sent = False
+        if notify_connected and not pending:
+            try:
+                import kakao_notify
+                chat_url = f"https://{os.environ.get('RENDIT_DOMAIN', 'rendits.duckdns.org')}/samsam/chat/"
+                test_sent = kakao_notify.send_to_member(
+                    conn, row["id"],
+                    "[rendit] 카톡 알림 연결 완료! 🎉\n이제 통합채팅에 새 문의가 오면 이 카톡으로 알려드립니다.",
+                    chat_url, "채팅 열기")
+            except Exception as e:
+                print(f"[kakao] 테스트 발송 오류: {repr(e)[:120]}", flush=True)
     finally:
         conn.close()
     if pending:
@@ -783,6 +797,16 @@ def kakao_callback():
                 f'승인이 끝나면 이 버튼으로 바로 로그인됩니다. 조금만 기다려 주세요!</div>'
                 f'<div class=lnk><a href="{url_for("auth.login")}">로그인 화면으로</a></div>')
         return _render("승인 대기 중", body)
+    if notify_connected:
+        if test_sent:
+            msg = ('<div class="msg ok"><b>테스트 메시지를 방금 카카오톡으로 보냈어요.</b><br>'
+                   '카톡(나와의 채팅)을 확인해 보세요. 이제 통합채팅에 새 문의가 오면 알림이 갑니다.</div>')
+        else:
+            msg = ('<div class="msg err">연결은 저장됐지만 테스트 메시지 발송에 실패했습니다.<br>'
+                   '카카오 동의항목(카카오톡 메시지 전송)이 켜져 있는지 확인 후 다시 시도해 주세요.</div>')
+        body = (f'<h1>🔔 카톡 알림 연결</h1><p class="sub">{name}님</p>{msg}'
+                f'<div class=lnk><a href="/samsam/chat/">통합채팅으로</a> · <a href="/">홈으로</a></div>')
+        return _render("카톡 알림 연결", body)
     return redirect(request.args.get("next") or "/")
 
 
@@ -864,6 +888,7 @@ def _nav_html():
       <a href="/calc">계산기</a>
       <a href="/gangnam/">부동산매물</a>
       <a href="/samsam/chat/">통합채팅</a>
+      <a href="/auth/kakao?notify=1" title="새 채팅이 오면 내 카카오톡으로 알림">🔔 카톡알림</a>
       {admin}
       <a href="/auth/logout" class=__logout>로그아웃</a>
     </div>
