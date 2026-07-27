@@ -1309,10 +1309,38 @@ def chat_api_cron_poll():
     key = request.args.get("key", "")
     if not secret or not hmac.compare_digest(key, secret):
         return jsonify({"error": "unauthorized"}), 403
-    conn = db.connect()
-    n = chat_poll.poll_all(conn)
-    conn.close()
-    return jsonify({"ok": True, "polled": n})
+
+    # 폴링은 계정 수·재로그인(Playwright)에 따라 1분을 넘길 수 있어 동기로 돌리면
+    # 크론 curl이 타임아웃(그리고 워커 점유)된다 → 백그라운드 스레드로 돌리고 즉시 응답.
+    # 중복 방지: 워커 프로세스가 여러 개라 pg advisory lock(DB 전역)으로 1회 실행 보장.
+    def _run():
+        conn = db.connect()
+        locked = False
+        try:
+            try:
+                locked = bool(conn.execute(
+                    "SELECT pg_try_advisory_lock(823401)").fetchone()[0])
+            except Exception:
+                locked = True    # SQLite 등 락 미지원 — 그냥 진행
+            if not locked:
+                print("[chat] cron-poll 스킵: 이미 실행 중", flush=True)
+                return
+            n = chat_poll.poll_all(conn)
+            s = chat_poll.process_outbox(conn)
+            print(f"[chat] cron-poll 완료: {n}계정 폴링, 답장 {s}건", flush=True)
+        except Exception as e:
+            print(f"[chat] cron-poll 오류: {repr(e)[:150]}", flush=True)
+        finally:
+            if locked:
+                try:
+                    conn.execute("SELECT pg_advisory_unlock(823401)")
+                except Exception:
+                    pass
+            conn.close()
+
+    import threading
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"ok": True, "started": True})
 
 
 @app.route("/chat/api/rooms")
