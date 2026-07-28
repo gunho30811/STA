@@ -1,4 +1,5 @@
-// 네이버 매물 근처(같은 동)·같은 평수 렌트 오피스텔 수요·순수익 박스. 기존 samAreaHtml 이식.
+// 네이버 매물 근처(같은 동)·같은 유형·같은 평수(동일조건) 렌트 시세 수요·순수익 박스.
+// 백엔드(_area_of)가 유형·정수평수 완전 동일 비교군만 내려줌 — 없으면 sa 자체가 null.
 const occColor = (v) => (v >= 60 ? '#059669' : v < 30 ? '#dc2626' : '#0369a1')
 
 function Line({ o, label, emoji }) {
@@ -19,7 +20,7 @@ export default function SamArea({ sa }) {
   return (
     <div style={{ marginTop: 8, padding: '7px 10px', background: '#eff6ff', border: '1px solid #dbeafe', borderRadius: 8, fontSize: 12, color: '#1e3a5f', lineHeight: 1.5 }}>
       <div>
-        🛋️ 근처 {sa.same_pyeong ? '같은 평수' : '같은 동'} 렌트 오피스텔 <b>{sa.n}실</b>
+        🛋️ 근처 동일조건(<b>{sa.pyeong}평 {sa.btype}</b>) 렌트 <b>{sa.n}실</b>
         {sa.avg_week != null && <> · 주당 평균 <b style={{ color: '#0369a1' }}>{sa.avg_week}만</b></>}
       </div>
       {sa.n >= 2 ? (
