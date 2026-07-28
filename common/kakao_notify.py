@@ -24,11 +24,20 @@ def _refresh_access_token(refresh_token):
     """refreshToken으로 accessToken 갱신. (access, new_refresh_or_None) 반환.
 
     카카오는 refreshToken 잔여기간이 1개월 미만일 때만 새 refreshToken을 함께 준다."""
-    data = {"grant_type": "refresh_token",
-            "client_id": os.environ.get("KAKAO_CLIENT_ID", ""),
-            "refresh_token": refresh_token}
-    if os.environ.get("KAKAO_CLIENT_SECRET"):
-        data["client_secret"] = os.environ["KAKAO_CLIENT_SECRET"]
+    # 알림 전용 앱(KAKAO_MSG_*) 우선 — 토큰이 그 앱에서 발급되므로 짝이 맞아야 한다.
+    # (미설정이면 로그인 앱으로 폴백 — 초기 단일앱 구성 호환)
+    if os.environ.get("KAKAO_MSG_CLIENT_ID"):
+        data = {"grant_type": "refresh_token",
+                "client_id": os.environ["KAKAO_MSG_CLIENT_ID"],
+                "refresh_token": refresh_token}
+        if os.environ.get("KAKAO_MSG_CLIENT_SECRET"):
+            data["client_secret"] = os.environ["KAKAO_MSG_CLIENT_SECRET"]
+    else:
+        data = {"grant_type": "refresh_token",
+                "client_id": os.environ.get("KAKAO_CLIENT_ID", ""),
+                "refresh_token": refresh_token}
+        if os.environ.get("KAKAO_CLIENT_SECRET"):
+            data["client_secret"] = os.environ["KAKAO_CLIENT_SECRET"]
     r = requests.post(TOKEN_URL, data=data, timeout=10)
     r.raise_for_status()
     j = r.json()
