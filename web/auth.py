@@ -35,6 +35,10 @@ DAILY_SIGNUP_LIMIT = int(os.environ.get("DAILY_SIGNUP_LIMIT", 10))  # 하루 가
 _KAKAO_CLIENT_ID = os.environ.get("KAKAO_CLIENT_ID", "")
 _KAKAO_CLIENT_SECRET = os.environ.get("KAKAO_CLIENT_SECRET", "")
 _KAKAO_REDIRECT_URI = os.environ.get("KAKAO_REDIRECT_URI", "")
+# 카톡 알림(나에게 보내기) 전용 앱 — 로그인 앱과 분리(로그인 앱은 심사중·팀원 관리라
+# talk_message 동의항목을 못 켬 → 우리가 관리하는 비즈 승인 앱으로 알림만 처리).
+_KAKAO_MSG_CLIENT_ID = os.environ.get("KAKAO_MSG_CLIENT_ID", "")
+_KAKAO_MSG_CLIENT_SECRET = os.environ.get("KAKAO_MSG_CLIENT_SECRET", "")
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -659,15 +663,84 @@ def member_delete():
 def kakao_login():
     state = secrets.token_urlsafe(16)
     session["_kst"] = state
+    # ?notify=1 : 채팅 카톡알림 연결 — 알림 전용 앱(KAKAO_MSG_CLIENT_ID)으로 talk_message
+    # 동의만 받는다(로그인 앱과 별개 앱 — 카카오 회원ID가 앱마다 달라 로그인과 섞지 않음).
+    # 이미 rendit에 로그인된 회원에게 토큰을 붙이므로 로그인 상태가 전제.
+    if request.args.get("notify"):
+        if not session.get("uid"):
+            return redirect(url_for("auth.login", next="/auth/kakao?notify=1"))
+        if not _KAKAO_MSG_CLIENT_ID:
+            return _render("카톡 알림", '<h1>🔔 카톡 알림</h1>'
+                           '<div class="msg err">KAKAO_MSG_CLIENT_ID 미설정 — 관리자에게 문의하세요.</div>')
+        redirect_uri = url_for("auth.kakao_msg_callback", _external=True, _scheme="https")
+        params = (f"client_id={_KAKAO_MSG_CLIENT_ID}&redirect_uri={redirect_uri}"
+                  f"&response_type=code&state={state}&scope=talk_message")
+        return redirect(f"https://kauth.kakao.com/oauth/authorize?{params}")
     redirect_uri = _KAKAO_REDIRECT_URI or url_for("auth.kakao_callback", _external=True)
     params = (f"client_id={_KAKAO_CLIENT_ID}"
               f"&redirect_uri={redirect_uri}"
               f"&response_type=code&state={state}")
-    # ?notify=1 : 채팅 알림 연결용 — '카카오톡 메시지 전송(talk_message)' 동의를 함께 요청.
-    # 이 동의를 마친 회원은 콜백에서 refreshToken을 저장하고 kakao_notify=TRUE가 된다.
-    if request.args.get("notify"):
-        params += "&scope=talk_message"
     return redirect(f"https://kauth.kakao.com/oauth/authorize?{params}")
+
+
+@bp.route("/kakao/msg-callback")
+def kakao_msg_callback():
+    """알림 전용 앱 콜백 — 로그인 세션 회원에게 talk_message refreshToken을 저장하고
+    즉시 테스트 카톡('나에게 보내기')을 발송해 연결을 끝까지 검증한다."""
+    if request.args.get("error"):
+        print(f"[kakao-msg] error={request.args.get('error')} "
+              f"desc={request.args.get('error_description')}", flush=True)
+        return _render("카톡 알림 연결 실패", '<h1>🔔 카톡 알림 연결 실패</h1>'
+                       f'<div class="msg err">카카오 오류: {request.args.get("error_description") or request.args.get("error")}</div>'
+                       '<div class=lnk><a href="/auth/kakao?notify=1">다시 시도</a> · <a href="/">홈으로</a></div>')
+    if request.args.get("state") != session.pop("_kst", None):
+        return redirect(url_for("auth.login", kakao="state"))
+    uid = session.get("uid")
+    if not uid:
+        return redirect(url_for("auth.login", next="/auth/kakao?notify=1"))
+    redirect_uri = url_for("auth.kakao_msg_callback", _external=True, _scheme="https")
+    data = {"grant_type": "authorization_code", "client_id": _KAKAO_MSG_CLIENT_ID,
+            "redirect_uri": redirect_uri, "code": request.args.get("code", "")}
+    if _KAKAO_MSG_CLIENT_SECRET:
+        data["client_secret"] = _KAKAO_MSG_CLIENT_SECRET
+    tok = _requests.post("https://kauth.kakao.com/oauth/token", data=data, timeout=10)
+    if tok.status_code != 200:
+        print(f"[kakao-msg] 토큰교환 실패 {tok.status_code}: {tok.text[:300]}", flush=True)
+        return _render("카톡 알림 연결 실패", '<h1>🔔 카톡 알림 연결 실패</h1>'
+                       '<div class="msg err">토큰 교환 실패 — 알림 앱의 Redirect URI/Client Secret 설정을 확인하세요.</div>'
+                       '<div class=lnk><a href="/auth/kakao?notify=1">다시 시도</a></div>')
+    tokj = tok.json()
+    rt, scope = tokj.get("refresh_token", ""), tokj.get("scope", "") or ""
+    if not rt or "talk_message" not in scope:
+        return _render("카톡 알림 연결 실패", '<h1>🔔 카톡 알림 연결 실패</h1>'
+                       '<div class="msg err">메시지 전송 동의가 확인되지 않았습니다. 동의 화면에서 체크 후 진행해주세요.</div>'
+                       '<div class=lnk><a href="/auth/kakao?notify=1">다시 시도</a></div>')
+    test_sent = False
+    conn = db.connect()
+    try:
+        import crypto_util
+        conn.execute("UPDATE members SET kakao_refresh_token_enc=%s, kakao_notify=TRUE WHERE id=%s",
+                     (crypto_util.encrypt(rt), uid))
+        conn.commit()
+        print(f"[kakao-msg] 채팅 알림 연결 완료 member#{uid}", flush=True)
+        try:
+            import kakao_notify
+            chat_url = f"https://{os.environ.get('RENDIT_DOMAIN', 'rendits.duckdns.org')}/samsam/chat/"
+            test_sent = kakao_notify.send_to_member(
+                conn, uid,
+                "[rendit] 카톡 알림 연결 완료! 🎉\n이제 통합채팅에 새 문의가 오면 이 카톡으로 알려드립니다.",
+                chat_url, "채팅 열기")
+        except Exception as e:
+            print(f"[kakao-msg] 테스트 발송 오류: {repr(e)[:120]}", flush=True)
+    finally:
+        conn.close()
+    if test_sent:
+        msg = ('<div class="msg ok"><b>테스트 메시지를 방금 카카오톡으로 보냈어요.</b><br>'
+               '카톡(나와의 채팅)을 확인해 보세요. 이제 통합채팅에 새 문의가 오면 알림이 갑니다.</div>')
+    else:
+        msg = ('<div class="msg err">연결은 저장됐지만 테스트 발송에 실패했습니다. 다시 시도해 주세요.</div>')
+    return _render("카톡 알림 연결", f'<h1>🔔 카톡 알림 연결</h1>{msg}'
+                   '<div class=lnk><a href="/samsam/chat/">통합채팅으로</a> · <a href="/">홈으로</a></div>')
 
 
 @bp.route("/kakao/callback")
