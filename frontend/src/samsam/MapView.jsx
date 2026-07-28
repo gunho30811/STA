@@ -97,7 +97,7 @@ export default function MapView({ filters }) {
             radius: 5, color: '#0d9488', weight: 1.5, fillColor: '#14b8a6', fillOpacity: 0.75,
           }).bindPopup(
             `<b>${n.name || '(이름없음)'}</b><br>보증금 ${n.dep ?? '-'} / 월세 ${n.rent ?? '-'}만` +
-            `${n.m2 ? ` · ${n.m2}㎡` : ''}${n.floor != null ? ` · ${n.floor}층` : ''}` +
+            `${n.m2 ? ` · ${Math.round(n.m2 / 3.30578 * 10) / 10}평(${n.m2}㎡)` : ''}${n.floor != null ? ` · ${n.floor}층` : ''}` +
             `<br><a href="${n.url}" target="_blank" rel="noreferrer">부동산 매물 →</a>`,
           ).addTo(layers.naver)
         }

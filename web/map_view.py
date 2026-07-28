@@ -344,7 +344,7 @@ function openList(items,cls){
       h+='<a class=item href="'+n.url+'" target=_blank rel=noreferrer>'+
         '<div><div class=it-name>'+(n.name||'(이름없음)')+'</div>'+
         '<div class=it-sub>보증금 '+(n.dep!=null?n.dep.toLocaleString():'-')+' / 월세 '+(n.rent!=null?n.rent:'-')+'만'+
-        (n.m2?' · '+n.m2+'㎡':'')+(n.floor!=null?' · '+n.floor+'층':'')+'</div></div>'+
+        (n.m2?' · '+(Math.round(n.m2/3.30578*10)/10)+'평('+n.m2+'㎡)':'')+(n.floor!=null?' · '+n.floor+'층':'')+'</div></div>'+
         '<div class=it-go>매물 보기 →</div></a>'
     })
   }
@@ -685,7 +685,7 @@ function openReco(s){
     h+='<a class=item href="'+m.url+'" target=_blank rel=noreferrer>'+
       '<div><div class=it-name>'+(m.name||'(이름없음)')+(m.btype?' <span style="font-weight:600;color:#94a3b8;font-size:11px">'+m.btype+'</span>':'')+'</div>'+
       '<div class=it-sub>월세 '+(m.rent!=null?m.rent:'-')+'만'+(m.mfee?'+관리 '+m.mfee+'만':'')+' / 보증금 '+(m.dep!=null?m.dep.toLocaleString():'-')+'만'+
-      (m.m2?' · '+m.m2+'㎡':'')+(m.floor!=null?' · '+m.floor+'층':'')+'</div></div>'+
+      (m.m2?' · '+(Math.round(m.m2/3.30578*10)/10)+'평('+m.m2+'㎡)':'')+(m.floor!=null?' · '+m.floor+'층':'')+'</div></div>'+
       '<div style="text-align:right">'+(m.enet!=null?'<div class="it-occ '+(m.enet>=0?'good':'bad')+'">+'+m.enet+'만</div><div style="font-size:9.5px;color:#94a3b8">예상 월순익</div>':'')+
       '<div class=it-go>매물 보기 →</div></div></a>'
   })
