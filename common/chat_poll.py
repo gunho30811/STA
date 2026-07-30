@@ -229,17 +229,59 @@ def _mark_outbox(conn, outbox_id, status, error=None):
     conn.commit()
 
 
+def _verify_room_live(item):
+    """발송 직전, 삼삼 실서버(RTDB)로 방이 살아있고 지정한 상대의 방이 맞는지 교차확인.
+
+    UI 조작(send_message)만으로는 같은 매물명 방이 여러 개일 때 오발송 위험이 있어, 그 전에
+    기계적으로 확실한 신원(room_key·상대 회원ID)으로 한 겹 더 막는다.
+
+    반환: (ok: bool, reason: str)
+      - 방이 채팅목록에서 사라졌으면(삭제) → 발송 보류. 사용자가 원한 정책:
+        "삭제된 방엔 상대가 다시 연락할 때까지 발송하지 않는다".
+      - 방의 상대 회원ID가 DB와 다르면(신원 불일치) → 오발송 방지 위해 중단.
+    """
+    enc = item.get('refresh_token_enc')
+    if not enc:
+        return False, '계정 토큰 없음 — 재연결 필요'
+    try:
+        tok = chat_auth.refresh_id_token(crypto_util.decrypt(enc))
+        id_token, me = tok['id_token'], tok['samsam_member_id']
+    except Exception as e:
+        return False, f'토큰 갱신 실패: {repr(e)[:80]}'
+    try:
+        chatlist = chat_auth.rtdb_get(f'live/chatlist/{me}', id_token) or {}
+    except Exception as e:
+        return False, f'chatlist 조회 실패: {repr(e)[:80]}'
+    room = chatlist.get(str(item['samsam_room_key']))
+    if not room:
+        return False, '방이 삭제됨(채팅목록에 없음) — 상대가 다시 연락할 때까지 발송 보류'
+    if str(room.get('member') or '') != str(item['counterpart_member'] or ''):
+        return False, ('방-상대 불일치(목록 상대 '
+                       f"{room.get('member')} != DB {item['counterpart_member']}) — 발송 중단")
+    if room.get('host_or_guest') != 'host':
+        return False, '임대인(host) 방이 아님 — 발송 중단'
+    return True, 'ok'
+
+
 def process_outbox(conn):
     """대기 중인 답장(samsam_chat_outbox status='pending')을 실제 발송.
 
     로그인과 마찬가지로 브라우저 자동화(Playwright)가 필요해 GH Actions에서만 처리한다
     (Vercel 1분 cron은 poll_all만 돌리고 여긴 안 건드림 — chat_api_cron_poll이 이 함수를
     호출하지 않는 이유).
+
+    오발송 방지가 최우선이라 여러 겹으로 확인한다:
+      1) RTDB 교차확인(_verify_room_live): room_key 생존 + 상대 회원ID 일치.
+      2) send_message: 매물명 + 상대 닉네임으로 방을 '정확히 1개' 특정 + 열린 방 재확인.
+    어느 겹이라도 어긋나면 발송하지 않는다. 삭제된 방은 'blocked'로 남겨(=재시도 안 함)
+    상대가 다시 연락해 방이 되살아나기 전까지 보내지 않는다.
     """
     if not chat_auth.playwright_available():
         return 0
     items = conn.execute(
-        """SELECT o.id, o.room_id, o.message, r.room_name, a.samsam_email, a.password_enc
+        """SELECT o.id, o.room_id, o.message,
+                  r.room_name, r.samsam_room_key, r.counterpart_member, r.counterpart_nickname,
+                  a.samsam_email, a.password_enc, a.refresh_token_enc
            FROM samsam_chat_outbox o
            JOIN samsam_chat_rooms r ON r.id = o.room_id
            JOIN samsam_accounts a ON a.id = r.account_id
@@ -250,11 +292,22 @@ def process_outbox(conn):
         if not item['password_enc']:
             _mark_outbox(conn, item['id'], 'failed', '연결 계정 비밀번호 없음')
             continue
+        # 안전장치 ①: 발송 전 방 생존·상대 신원 교차확인(삭제된 방은 보류).
+        ok, reason = _verify_room_live(item)
+        if not ok:
+            _mark_outbox(conn, item['id'], 'blocked', reason)
+            log(f"  outbox#{item['id']} 발송 보류: {reason}")
+            continue
+        # 안전장치 ②: UI에서 매물명+닉네임으로 방을 정확히 특정해 발송(내부에서 재확인).
         try:
             password = crypto_util.decrypt(item['password_enc'])
-            chat_auth.send_message(item['samsam_email'], password, item['room_name'], item['message'])
+            chat_auth.send_message(
+                item['samsam_email'], password,
+                room_name=item['room_name'], message=item['message'],
+                counterpart_nickname=item['counterpart_nickname'],
+                samsam_room_key=item['samsam_room_key'])
             _mark_outbox(conn, item['id'], 'sent')
-            log(f"  outbox#{item['id']} 방({item['room_name']}) 발송 완료")
+            log(f"  outbox#{item['id']} 방({item['room_name']}/{item['counterpart_nickname']}) 발송 완료")
         except Exception as e:
             log(f"  outbox#{item['id']} 발송 실패: {repr(e)[:120]}")
             _mark_outbox(conn, item['id'], 'failed', repr(e)[:200])
