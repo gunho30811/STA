@@ -13,6 +13,9 @@ rendit 통합 크롤러 — 네이버부동산 + 삼삼엠투, 하나의 .exe
   2) DB URL — 임의의 Postgres URL(예: 예전 Supabase)에 적재.
   3) 로컬 폴더 — 이 PC에 SQLite(naver.db / samsam.db)로 누적. DB 없이도 동작.
 
+CSV 내보내기(선택, 저장 위치와 별개): 폴더를 지정해두면 어느 저장 모드든
+이번 실행에서 수집/갱신된 매물을 그 폴더에 CSV(엑셀용)로도 떨어뜨린다.
+
 탭:
   [네이버 부동산] 지역(전국)·거래유형·매물 7종·수집량·상세수집·CSV. 로그인 불필요.
     "예약률 30%+ 동만" 체크 시 GitHub에서 최신 타겟 동 목록을 내려받아 그 동만 크롤
@@ -178,19 +181,32 @@ class ServerTunnel:
         pw = run("grep '^LOCAL_PG_PASSWORD=' /home/ubuntu/STA/.env | cut -d= -f2-")
         if not pg_ip or not pw:
             raise RuntimeError(f"서버에서 pg 정보 조회 실패 (ip={pg_ip!r})")
-        self.server = ThreadingTCPServer(('127.0.0.1', TUNNEL_PORT),
-                                         _make_handler(c.get_transport(), pg_ip, 5432))
+        # 프로그램을 두 개 띄웠거나 이전 터널이 남아있으면 포트가 차 있을 수 있어 순차 탐색.
+        port, last_err = None, None
+        for cand in range(TUNNEL_PORT, TUNNEL_PORT + 6):
+            try:
+                self.server = ThreadingTCPServer(('127.0.0.1', cand),
+                                                 _make_handler(c.get_transport(), pg_ip, 5432))
+                port = cand
+                break
+            except OSError as e:
+                last_err = e
+        if port is None:
+            raise RuntimeError(f"터널 포트({TUNNEL_PORT}~{TUNNEL_PORT + 5}) 확보 실패: {last_err}")
         self.server.daemon_threads = True
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
         self.db_url = ('postgresql://postgres:%s@127.0.0.1:%d/rendit?sslmode=disable'
-                       % (urllib.parse.quote(pw, safe=''), TUNNEL_PORT))
+                       % (urllib.parse.quote(pw, safe=''), port))
         print(f"[터널] 연결됨: {self.host} → 내부 pg({pg_ip})")
         return self.db_url
 
     def close(self):
+        # shutdown()은 serve 루프만 멈춤 — server_close()로 리스닝 소켓까지 닫아야
+        # 같은 프로세스에서 다음 크롤이 같은 포트를 다시 열 수 있다.
         try:
             if self.server:
                 self.server.shutdown()
+                self.server.server_close()
         except Exception:
             pass
         try:
@@ -285,6 +301,8 @@ def run_naver(opts, log_q, stop_flag):
     old_out, old_err = sys.stdout, sys.stderr
     sys.stdout = sys.stderr = QueueWriter(log_q)
     tunnel = None
+    import datetime as _dt
+    start_ts = _dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')   # crawled_at 과 같은 포맷
     try:
         _ensure_chromium()
         tunnel = _setup_backend(opts, 'naver')
@@ -339,10 +357,11 @@ def run_naver(opts, log_q, stop_flag):
             except Exception as e:
                 print(f"[GUI] 뷰 갱신 스킵({e}) — 다음 운영 크롤이 보완")
 
-        if opts['mode'] == 'local' and opts.get('csv'):
+        if opts.get('csv_on') and opts.get('csv_dir'):
             try:
-                out, n = _export_csv(os.environ['SAMSAM_SQLITE_PATH'], opts['folder'], 'naver_매물.csv')
-                print(f"[GUI] 📄 CSV 저장: {out}  ({n:,}건)")
+                out, n = _export_rows_csv('listings', 'crawled_at', start_ts,
+                                          opts['csv_dir'], 'naver_매물')
+                print(f"[GUI] 📄 CSV 저장: {out}  (이번 실행분 {n:,}건)")
             except Exception as e:
                 print(f"[GUI] CSV 저장 실패: {e}")
 
@@ -375,6 +394,8 @@ def run_samsam(opts, log_q, stop_flag):
     old_out, old_err = sys.stdout, sys.stderr
     sys.stdout = sys.stderr = QueueWriter(log_q)
     tunnel = None
+    import datetime as _dt
+    start_ts = _dt.datetime.now().isoformat(timespec='seconds')   # collected_at 과 같은 포맷
     try:
         tunnel = _setup_backend(opts, 'samsam')
 
@@ -405,6 +426,14 @@ def run_samsam(opts, log_q, stop_flag):
         except Exception as e:
             print(f"[GUI] 스냅샷 스킵({e})")
 
+        if opts.get('csv_on') and opts.get('csv_dir'):
+            try:
+                out, n = _export_rows_csv('samsam_listings', 'collected_at', start_ts,
+                                          opts['csv_dir'], 'samsam_매물')
+                print(f"[GUI] 📄 CSV 저장: {out}  (이번 실행분 {n:,}건)")
+            except Exception as e:
+                print(f"[GUI] CSV 저장 실패: {e}")
+
         print("[GUI] ✅ 삼삼 전체 완료")
     except Exception:
         print("[GUI] ❌ 오류:\n" + traceback.format_exc())
@@ -415,24 +444,36 @@ def run_samsam(opts, log_q, stop_flag):
         log_q.put(('__DONE__',))
 
 
-def _export_csv(dbpath, folder, fname):
+def _export_rows_csv(table, since_col, since_val, folder, prefix):
+    """이번 실행분(since_val 이후 수집/갱신된 행)을 CSV(엑셀용 UTF-8 BOM)로 저장.
+
+    저장 모드와 무관하게 동작 — sys.modules['db'](Postgres든 SQLite든)를 통해 읽는다."""
     import csv
-    import sqlite3
-    out = os.path.join(folder, fname)
-    conn = sqlite3.connect(dbpath)
+    import datetime as _dt
+    dbmod = sys.modules['db']
+    conn = dbmod.connect()
     try:
-        cur = conn.execute("SELECT * FROM listings ORDER BY sido, sigungu, dong")
-        cols = [d[0] for d in cur.description]
-        n = 0
+        cur = conn.execute(
+            f"SELECT * FROM {table} WHERE {since_col} >= ? ORDER BY sido, sigungu, dong",
+            (since_val,))
+        rows = cur.fetchall()
+        if rows and hasattr(rows[0], 'keys'):
+            cols = list(rows[0].keys())
+        elif getattr(cur, 'description', None):
+            cols = [d[0] for d in cur.description]
+        else:
+            cols = []
+        stamp = _dt.datetime.now().strftime('%Y%m%d_%H%M')
+        out = os.path.join(folder, f'{prefix}_{stamp}.csv')
         with open(out, 'w', newline='', encoding='utf-8-sig') as f:
             w = csv.writer(f)
-            w.writerow(cols)
-            for row in cur:
-                w.writerow(row)
-                n += 1
+            if cols:
+                w.writerow(cols)
+            for row in rows:
+                w.writerow([row[c] for c in cols] if hasattr(row, 'keys') else list(row))
+        return out, len(rows)
     finally:
         conn.close()
-    return out, n
 
 
 # ── 자체 점검 ───────────────────────────────────────────────────────────────────
@@ -588,6 +629,24 @@ def launch_gui():
 
     sync_mode()
 
+    # ── 공통: CSV 내보내기(저장 위치와 별개 — DB에 넣으면서 파일로도 받기) ──
+    xf = ttk.LabelFrame(root, text='CSV 내보내기 (선택 · 저장 위치와 별개로 동작)', padding=8)
+    xf.pack(fill='x', padx=10, pady=(0, 4))
+    csv_var = tk.BooleanVar(value=cfg.get('csv_on', False))
+    e_csvdir = ttk.Entry(xf, width=56)
+    e_csvdir.insert(0, cfg.get('csv_dir', ''))
+
+    def browse_csv():
+        d = filedialog.askdirectory(title='CSV를 저장할 폴더 선택')
+        if d:
+            e_csvdir.delete(0, 'end')
+            e_csvdir.insert(0, d)
+
+    ttk.Checkbutton(xf, text='이번 실행분을 CSV로도 저장(엑셀용) →', variable=csv_var,
+                    ).pack(side='left')
+    e_csvdir.pack(side='left', padx=4, fill='x', expand=True)
+    ttk.Button(xf, text='찾아보기', command=browse_csv).pack(side='left')
+
     # ── 탭 ──
     nb = ttk.Notebook(root)
     nb.pack(fill='x', padx=10, pady=4)
@@ -654,8 +713,6 @@ def launch_gui():
                     variable=dongs_var).pack(side='left')
     detail_var = tk.BooleanVar(value=cfg.get('detail', False))
     ttk.Checkbutton(onf, text='상세정보도 수집(느림)', variable=detail_var).pack(side='left', padx=10)
-    ncsv_var = tk.BooleanVar(value=cfg.get('csv', True))
-    ttk.Checkbutton(onf, text='CSV 저장(로컬 모드)', variable=ncsv_var).pack(side='left')
 
     bfn = ttk.Frame(tab_n)
     bfn.pack(fill='x', pady=(6, 0))
@@ -743,6 +800,7 @@ def launch_gui():
             'mode': mode_var.get(),
             'ssh_host': e_host.get(), 'ssh_user': e_user.get(), 'ssh_pw': e_spw.get(),
             'database_url': e_db.get(), 'folder': e_folder.get().strip(),
+            'csv_on': csv_var.get(), 'csv_dir': e_csvdir.get().strip(),
         }
 
     def _validate_common(o):
@@ -759,6 +817,13 @@ def launch_gui():
             if not os.path.isdir(o['folder']):
                 messagebox.showwarning('폴더 없음', f"폴더가 존재하지 않습니다:\n{o['folder']}")
                 return False
+        if o['csv_on']:
+            if not o['csv_dir']:
+                messagebox.showwarning('입력 필요', 'CSV를 저장할 폴더를 선택하세요.')
+                return False
+            if not os.path.isdir(o['csv_dir']):
+                messagebox.showwarning('폴더 없음', f"CSV 폴더가 존재하지 않습니다:\n{o['csv_dir']}")
+                return False
         return True
 
     def _save_cfg(extra):
@@ -768,6 +833,7 @@ def launch_gui():
         data = {**cfg, **{
             'mode': o['mode'], 'ssh_host': o['ssh_host'], 'ssh_user': o['ssh_user'],
             'ssh_pw': o['ssh_pw'], 'database_url': o['database_url'], 'folder': o['folder'],
+            'csv_on': o['csv_on'], 'csv_dir': o['csv_dir'],
         }, **extra}
         cfg.update(data)
         try:
@@ -803,12 +869,10 @@ def launch_gui():
             tcount = 10
         o.update({'sidos': sidos, 'trades': trades, 'types': types,
                   'sample': (limit_mode.get() == 'sample'), 'test_count': tcount,
-                  'target_dongs': dongs_var.get(), 'detail': detail_var.get(),
-                  'csv': ncsv_var.get()})
+                  'target_dongs': dongs_var.get(), 'detail': detail_var.get()})
         _save_cfg({'sidos': sidos, 'trades': trades, 'ntypes': types,
                    'limit_mode': limit_mode.get(), 'test_count': tcount,
-                   'target_dongs': dongs_var.get(), 'detail': detail_var.get(),
-                   'csv': ncsv_var.get()})
+                   'target_dongs': dongs_var.get(), 'detail': detail_var.get()})
         _launch(run_naver, o, '네이버')
 
     def start_samsam():
