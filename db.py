@@ -1,4 +1,12 @@
-"""Postgres (Supabase) schema + helpers shared by crawler and web app."""
+"""크롤러·웹앱이 공유하는 Postgres 스키마 + 헬퍼.
+
+메인 DB는 오라클 서버의 내부 pg 컨테이너. 다만 네이버 로컬 크롤은 장시간 SSH 터널
+쓰기가 유실되는 문제 때문에 지금도 Supabase를 중간 적재소로 경유(적재 후 서버가
+sync_from_supabase.sh 로 가져감)하므로, Supabase 풀러(pgbouncer) 대응 코드는 유지한다.
+
+원래 SQLite로 시작한 프로젝트라, 기존 호출부를 고치지 않도록 sqlite3 호환 인터페이스
+(? 플레이스홀더, INSERT OR REPLACE, row['col'] 접근)를 Postgres 위에 씌워 제공한다.
+"""
 import os
 import re
 
@@ -110,9 +118,10 @@ class _Cursor:
 
 
 def _pg8000_connect(url):
-    """pg8000으로 Postgres 연결. Supabase 풀러는 자체 CA를 써서 공개 CA로는 검증 불가.
-
-    URL 쿼리에 sslmode=disable 이면 SSL 없이 접속(내부 pg·SSH 터널용 — SSL 미지원 서버)."""
+    """pg8000으로 Postgres 연결. SSL은 3가지 경우로 나뉜다:
+    - URL에 sslmode=disable: 평문 접속 (오라클 내부 pg·SSH 터널 — SSL 미지원 서버)
+    - DB_SSL_CA 환경변수: 지정한 CA 파일로 정식 검증
+    - 기본: 암호화하되 CA 검증 생략 (Supabase 풀러가 자체 CA라 공개 CA로는 검증 불가)"""
     u = urllib.parse.urlparse(url)
     qs = urllib.parse.parse_qs(u.query or '')
     if (qs.get('sslmode') or [''])[0] == 'disable':
@@ -141,7 +150,7 @@ class _Conn:
     def __init__(self):
         url = os.environ.get('DATABASE_URL')
         if not url:
-            raise RuntimeError('DATABASE_URL 환경변수를 설정하세요 (.env 또는 Railway 환경변수).')
+            raise RuntimeError('DATABASE_URL 환경변수를 설정하세요 (.env).')
         if _DRIVER == 'psycopg2':
             self._conn = psycopg2.connect(url)
         elif _DRIVER == 'pg8000':
@@ -191,10 +200,8 @@ class _Conn:
         return _Cursor(cur)
 
     def commit(self):
-        # 연결은 autocommit=True 로 열려 모든 execute/executemany 가 이미 커밋된다.
-        # 이 상태의 명시적 commit 은 열린 트랜잭션이 없어 불필요하고, Supabase 트랜잭션
-        # 풀러(pgbouncer)에선 bare 'commit' 이 백엔드 교체와 겹쳐 간헐적으로
-        # 'unnamed prepared statement does not exist'(26000)를 낸다 → autocommit 이면 건너뛴다.
+        # autocommit 연결에선 이미 다 커밋된 상태. 이때 bare 'commit'을 또 보내면
+        # 트랜잭션 풀러(pgbouncer)에서 간헐적으로 26000 에러가 나므로 건너뛴다.
         if getattr(self._conn, 'autocommit', False):
             return
         self._conn.commit()
@@ -214,10 +221,13 @@ def connect():
 
 
 def _seed_admin(conn):
-    """관리자 계정(gunho) 1회 시드. 환경변수 ADMIN_USERNAME/ADMIN_PASSWORD 로 덮어쓸 수 있음."""
+    """새 DB 부트스트랩용 관리자 시드 — 환경변수 ADMIN_USERNAME/ADMIN_PASSWORD 가
+    둘 다 설정된 경우에만 동작(코드에 계정정보 하드코딩 금지). 이미 있으면 무시."""
+    uname = os.environ.get('ADMIN_USERNAME')
+    pw = os.environ.get('ADMIN_PASSWORD')
+    if not uname or not pw:
+        return
     from werkzeug.security import generate_password_hash
-    uname = os.environ.get('ADMIN_USERNAME', 'gunho')
-    pw = os.environ.get('ADMIN_PASSWORD', 'rjsgh1004!')
     row = conn.execute("SELECT id FROM members WHERE username=%s", (uname,)).fetchone()
     if row:
         return
@@ -373,7 +383,7 @@ def init_db(force=False):
         cortarno                      TEXT,
         crawled_at                    TEXT
     )""")
-    # 기존(이미 생성된) Supabase 테이블엔 CREATE TABLE IF NOT EXISTS 가 새 컬럼을 추가해주지 않으므로 별도 ALTER.
+    # CREATE TABLE IF NOT EXISTS 는 기존 테이블에 새 컬럼을 추가하지 않으므로 별도 ALTER 로 보강.
     conn.execute("ALTER TABLE naver_listings ADD COLUMN IF NOT EXISTS building_type_code TEXT")
     conn.execute("ALTER TABLE naver_listings ADD COLUMN IF NOT EXISTS tags TEXT")
     conn.execute("ALTER TABLE naver_listings ADD COLUMN IF NOT EXISTS bldg_dong TEXT")
@@ -418,7 +428,7 @@ def init_db(force=False):
     )""")
     # 달력월별 예약률(JSON: {'YYYY-MM':{bk,bl,days}}) — 롤링(1/2/3달)과 별개로 특정 달 조회용. 앞으로 크롤분부터.
     conn.execute("ALTER TABLE samsam_listings ADD COLUMN IF NOT EXISTS month_occ TEXT")
-    # 주간 예약률 스냅샷(지역×유형 집계). 매주 크롤 후 snapshot.py 가 1행씩 적재 → 인기 트렌드 추적.
+    # 예약률 스냅샷(지역×유형 집계). 크롤 회차마다 snapshot.py 가 적재 → 인기 트렌드 추적.
     conn.execute("""
     CREATE TABLE IF NOT EXISTS samsam_snapshots (
         snapshot_date  TEXT,
@@ -461,7 +471,7 @@ def init_db(force=False):
         updated_at  TEXT
     )""")
     # 회원/로그인. 관리자는 username, 일반회원은 email로 로그인. 비번은 해시 저장.
-    # (이름이 Supabase 예약 auth.users 와 헷갈려 public.members 로 명명)
+    # ('users'는 DB 예약어·내장 테이블과 헷갈리기 쉬워 members 로 명명)
     conn.execute("""
     CREATE TABLE IF NOT EXISTS members (
         id              SERIAL PRIMARY KEY,
@@ -541,8 +551,8 @@ def init_db(force=False):
         title         TEXT,
         UNIQUE (room_id, msg_key)
     )""")
-    # 답장 발송 큐 — 삼삼 쓰기가 REST가 아니라 브라우저 UI 조작(Playwright)으로만 가능해,
-    # 웹(Vercel)에서는 여기 큐잉만 하고 GH Actions가 실제 발송을 처리한다.
+    # 답장 발송 큐 — 삼삼 쓰기는 REST가 아니라 브라우저 UI 조작(Playwright)으로만 가능해,
+    # 웹은 여기 큐잉만 하고 서버의 채팅 폴러(크론 → common/chat_poll.py)가 실제 발송한다.
     conn.execute("""
     CREATE TABLE IF NOT EXISTS samsam_chat_outbox (
         id          SERIAL PRIMARY KEY,
@@ -610,4 +620,4 @@ def init_db(force=False):
 
 if __name__ == "__main__":
     init_db()
-    print("Supabase Postgres DB initialized.")
+    print("Postgres DB initialized.")
