@@ -19,6 +19,7 @@ import socket
 import subprocess
 import sys
 import threading
+import time
 import urllib.parse
 from socketserver import BaseRequestHandler, ThreadingTCPServer
 
@@ -38,6 +39,8 @@ def _ssh():
     c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     c.connect(os.environ["ORACLE_HOST"], username=os.environ["ORACLE_USER"],
               password=os.environ["ORACLE_PASSWORD"], timeout=20)
+    # 수 시간짜리 크롤 동안 유휴 SSH가 끊기지 않게 keepalive (NAT/방화벽 타임아웃 대비).
+    c.get_transport().set_keepalive(15)
     return c
 
 
@@ -49,14 +52,22 @@ def _run(ssh, cmd):
 def _make_handler(transport, remote_host, remote_port):
     class H(BaseRequestHandler):
         def handle(self):
-            try:
-                chan = transport.open_channel(
-                    "direct-tcpip", (remote_host, remote_port),
-                    self.request.getpeername())
-            except Exception as ex:
-                print(f"[tunnel] 채널 열기 실패: {ex}", flush=True)
-                return
+            # 연결 폭주/일시 장애로 채널 열기가 실패할 수 있어 3회 재시도
+            # (여기서 조용히 죽으면 크롤 쪽 DB 쓰기가 유실됨).
+            chan = None
+            for attempt in range(3):
+                try:
+                    chan = transport.open_channel(
+                        "direct-tcpip", (remote_host, remote_port),
+                        self.request.getpeername())
+                    if chan is not None:
+                        break
+                except Exception as ex:
+                    print(f"[tunnel] 채널 열기 실패({attempt + 1}/3): {ex}", flush=True)
+                time.sleep(0.5 * (attempt + 1))
             if chan is None:
+                print("[tunnel] 채널 포기 — DB 연결 1건 실패", flush=True)
+                self.request.close()
                 return
             try:
                 while True:
