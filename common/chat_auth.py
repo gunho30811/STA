@@ -133,15 +133,26 @@ def refresh_id_token(refresh_token):
     }
 
 
-def send_message(email, password, room_name, message):
+def send_message(email, password, room_name, message,
+                 counterpart_nickname=None, samsam_room_key=None):
     """실제 브라우저(Playwright)로 /host/chat UI를 조작해 메시지 전송.
 
     정찰 결과 삼삼의 메시지 쓰기는 Firebase REST/RTDB가 아니라 Next.js 서버 액션(배포마다
     바뀔 수 있는 해시 헤더 필요)이라, 그 내부 API를 직접 흉내내는 대신 로그인처럼 실제 UI를
-    그대로 조작한다. room_name은 samsam_chat_rooms.room_name — 채팅 목록에 보이는 매물명
-    텍스트로 방을 찾는다(동일 계정 내 room_name이 완전히 같은 방이 여러 개면 첫 번째가 선택됨).
+    그대로 조작한다.
 
-    실패 시 SendError.
+    ⚠️ 오발송 방지가 최우선. 같은 매물(room_name)에 여러 사람이 문의하면 채팅 목록에
+    동일한 매물명 방이 여러 개 존재한다(실측: 한 계정에 같은 이름 방 7개). 그래서 방을
+    room_name만으로 찾으면 안 되고, room_name + 상대 닉네임(counterpart_nickname)으로
+    '정확히 한 개'일 때만 클릭한다. 0개거나 2개 이상이면 특정 불가로 보고 발송을 중단한다
+    (엉뚱한 사람에게 보내느니 안 보내는 게 낫다 — fail-closed).
+
+    두 겹의 UI 확인:
+      1) 목록에서 room_name + 닉네임으로 후보를 좁혀 정확히 1개만 클릭.
+      2) 방을 연 뒤, 열린 화면에 그 상대 닉네임이 실제로 보이는지 재확인 후에만 전송.
+
+    samsam_room_key는 로그/디버그용(현재 UI에는 노출되지 않아 클릭 키로는 못 씀).
+    실패·특정불가 시 SendError.
     """
     from playwright.sync_api import sync_playwright
 
@@ -156,11 +167,34 @@ def send_message(email, password, room_name, message):
             pg.goto(f'{BASE}/host/chat', wait_until='networkidle', timeout=20000)
             pg.wait_for_timeout(4000)  # 채팅 목록 클라이언트 렌더링 대기
 
+            # --- 안전장치 ①: 매물명 + 상대 닉네임으로 방을 '정확히 1개' 특정 ---
+            candidates = pg.locator('li', has_text=room_name)
+            if counterpart_nickname:
+                candidates = candidates.filter(has_text=counterpart_nickname)
             try:
-                pg.locator('li', has_text=room_name).first.click(timeout=8000)
+                n = candidates.count()
+            except Exception as e:
+                raise SendError(f'채팅방 목록 조회 실패: {repr(e)[:100]}')
+            who = f'매물={room_name!r}, 상대={counterpart_nickname!r}, key={samsam_room_key!r}'
+            if n == 0:
+                raise SendError(f'채팅방을 찾지 못함({who}) — 발송 중단')
+            if n > 1:
+                raise SendError(
+                    f'채팅방이 {n}개로 특정되지 않음({who}) — 오발송 방지 위해 발송 중단')
+            try:
+                candidates.first.click(timeout=8000)
                 pg.wait_for_timeout(1500)
             except Exception as e:
-                raise SendError(f'채팅방을 찾지 못함({room_name!r}): {repr(e)[:100]}')
+                raise SendError(f'채팅방 열기 실패({who}): {repr(e)[:100]}')
+
+            # --- 안전장치 ②: 열린 방에 그 상대 닉네임이 실제로 보이는지 재확인 ---
+            if counterpart_nickname:
+                try:
+                    pg.get_by_text(counterpart_nickname, exact=False).first.wait_for(
+                        state='visible', timeout=5000)
+                except Exception:
+                    raise SendError(
+                        f'열린 방에서 상대({counterpart_nickname!r}) 확인 실패 — 발송 중단')
 
             try:
                 input_box = pg.get_by_placeholder('메시지를 입력해 주세요')
