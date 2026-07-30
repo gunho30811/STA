@@ -137,8 +137,11 @@ def _load_db():
     try:
         import db
         conn = db.connect()
+        # 수도권만 노출 — 비수도권은 일일 크롤 갱신 대상이 아니라 예약률이 동결(한 달+ 전)돼
+        # 있어 화면에선 제외한다. DB에서는 지우지 않고 보존(향후 분석 리포트용, 2026-07-30 결정).
         rows = [dict(x) for x in conn.execute(
-            f"SELECT {', '.join(SAM_COLS)} FROM samsam_listings"
+            f"SELECT {', '.join(SAM_COLS)} FROM samsam_listings "
+            "WHERE sido IN ('서울특별시','경기도','인천광역시')"
         ).fetchall()]
         conn.close()
         return rows
