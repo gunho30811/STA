@@ -1050,6 +1050,7 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
   <table><thead><tr><th>공실률</th><th>월 예약(환산)</th><th>연 순수익</th><th>월 순수익</th></tr></thead>
   <tbody id=o_vac></tbody></table>
 </div>
+{% if not user %}
 <div class=cta-row>
   <div class=cta-text>
     <p class=cta-h1 id=o_ctahead>이 매물은 한 달 약 -일까지 채우면 흑자예요.</p>
@@ -1057,6 +1058,7 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
   </div>
   <a class=cta-btn href="/auth/signup">★ 공급부족 스팟 보기</a>
 </div>
+{% endif %}
 <script>
 function won(x){return '₩'+Math.round(x).toLocaleString()}
 function man(x){return (Math.round(x*10)/10).toLocaleString()+'만'}
@@ -1096,7 +1098,8 @@ function calc(){
   document.getElementById('o_bepct').textContent=revW>0?bePct:'-'
   var beLabel=revW>0?('월 약 '+beDays+'일 예약(공실 '+bePct+'%)'):'월 순익이 나지 않음'
   document.getElementById('o_vacnotice').textContent='⚠ 손익분기 · '+beLabel+' · 이 아래로 채우면 적자'
-  document.getElementById('o_ctahead').textContent=revW>0?
+  var ctaHead=document.getElementById('o_ctahead')
+  if(ctaHead) ctaHead.textContent=revW>0?
     ('이 매물은 한 달 약 '+beDays+'일까지 채우면 흑자예요.'):'이 매물은 지금 조건으로는 흑자가 나지 않아요.'
   var tb=document.getElementById('o_vac'),h='', beShown=false
   ;[0,10,15,20,30].forEach(function(p){
