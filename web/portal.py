@@ -874,6 +874,13 @@ padding:14px 40px;margin:-20px -14px 20px}
 .hd-cta .login{font-size:14px;font-weight:600;color:var(--text-sub);text-decoration:none}
 .hd-cta .signup{font-size:14px;font-weight:700;color:var(--brand);border:1px solid var(--line);
 padding:8px 15px;border-radius:8px;text-decoration:none}
+/* 로그인 시 auth._inject_nav가 body 시작 직후 삽입하는 공통 네비바(#__nav)도
+   body의 padding에 밀리지 않게 동일하게 상쇄 — 다른 뷰어(body padding:0)와 간격 맞춤.
+   주의: _inject_nav는 여는 태그 문자열을 앞에서부터 찾아 그 바로 뒤에 네비바를 끼워넣는다.
+   그 탐색 문자열을 이 style 블록의 주석 등에 예시로 그대로 적으면, 실제 태그보다 먼저
+   매치돼 네비바가 문서 앞쪽 엉뚱한 자리에 삽입되는 버그가 난다(실제로 겪음) — 그래서
+   이 주석에서도 그 문자열 형태를 그대로 쓰지 않는다. */
+#__nav{margin:-20px -14px 20px}
 .wrap{max-width:900px;margin:0 auto}
 .back{display:inline-block;margin-bottom:14px;color:var(--text-sub);text-decoration:none;font-size:13px;font-weight:700}
 .back:hover{color:var(--brand)}
