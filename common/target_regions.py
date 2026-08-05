@@ -9,7 +9,11 @@
 '서울시/인천시/부산시'. 그래서 시도는 **접두**로, 추가 지역은 '시도 시군구' 문자열의
 **부분일치**로 매칭한다.
 
-EXTRA_REGIONS는 콤마구분 토큰 목록이며 env RENDIT_EXTRA_REGIONS로 덮어쓴다(빈 값 = 수도권만).
+환경변수 두 가지:
+  RENDIT_EXTRA_REGIONS  수도권에 **더할** 지역(콤마구분 토큰). 미설정 시 DEFAULT_EXTRA.
+  RENDIT_TARGET_REGIONS 대상 지역을 **통째로 지정**(수도권도 포함 안 됨). 크롤러 exe처럼
+                        원하는 지역만 골라 돌릴 때 사용. `*`/`ALL`/`전국` = 전 지역(필터 없음).
+토큰은 '시도 시군구' 문자열에 대한 부분일치라 표기차를 흡수한다.
   '부산'   → '부산광역시 …' · '부산시 …' 둘 다
   '천안시' → '충청남도 천안시 서북구' · '…동남구' 둘 다
 """
@@ -17,14 +21,23 @@ import os
 
 METRO_SIDO = {'서울특별시', '경기도', '인천광역시'}   # 삼삼 표기(기존 코드 호환용)
 METRO_PREFIX = ('서울', '경기', '인천')               # 소스별 표기차 흡수
-_DEFAULT_EXTRA = '부산,천안시'                        # 2026-08-05 추가 — 일일 크롤 대상
-EXTRA_REGIONS = [s.strip() for s in
-                 os.environ.get('RENDIT_EXTRA_REGIONS', _DEFAULT_EXTRA).split(',') if s.strip()]
+DEFAULT_EXTRA = '부산,천안시'                         # 2026-08-05 추가 — 일일 크롤 대상
+
+_OVERRIDE = os.environ.get('RENDIT_TARGET_REGIONS', '').strip()
+ALL_REGIONS = _OVERRIDE.upper() in ('*', 'ALL', '전국')
+if _OVERRIDE and not ALL_REGIONS:
+    METRO_PREFIX = ()      # 명시 지정 모드 — 수도권도 토큰에 있어야 포함된다
+    EXTRA_REGIONS = [s.strip() for s in _OVERRIDE.split(',') if s.strip()]
+else:
+    EXTRA_REGIONS = [s.strip() for s in
+                     os.environ.get('RENDIT_EXTRA_REGIONS', DEFAULT_EXTRA).split(',') if s.strip()]
 
 
 def in_target(sido, sigungu=''):
     """(시도, 시군구)가 크롤·노출 대상인가."""
-    if (sido or '').startswith(METRO_PREFIX):
+    if ALL_REGIONS:
+        return True
+    if METRO_PREFIX and (sido or '').startswith(METRO_PREFIX):
         return True
     label = f"{sido or ''} {sigungu or ''}"
     return any(t in label for t in EXTRA_REGIONS)
@@ -32,6 +45,8 @@ def in_target(sido, sigungu=''):
 
 def sql_where(sido_col='sido', sigungu_col='sigungu'):
     """대상 지역 SQL 조건 → (WHERE 조각, 파라미터 리스트). 플레이스홀더는 %s."""
+    if ALL_REGIONS:
+        return "TRUE", []
     parts, params = [], []
     for p in METRO_PREFIX:
         parts.append(f"{sido_col} LIKE %s")
@@ -39,6 +54,8 @@ def sql_where(sido_col='sido', sigungu_col='sigungu'):
     for t in EXTRA_REGIONS:
         parts.append(f"(coalesce({sido_col},'') || ' ' || coalesce({sigungu_col},'')) LIKE %s")
         params.append('%' + t + '%')
+    if not parts:      # 지역을 하나도 안 고른 경우 — 아무것도 대상이 아님(전체 노출 사고 방지)
+        return "FALSE", []
     return "(" + " OR ".join(parts) + ")", params
 
 
@@ -69,4 +86,7 @@ def short(sido):
 
 def label():
     """로그용 요약."""
-    return "수도권(서울/경기/인천)" + (" + " + ", ".join(EXTRA_REGIONS) if EXTRA_REGIONS else "")
+    if ALL_REGIONS:
+        return "전국"
+    parts = (["수도권(서울/경기/인천)"] if METRO_PREFIX else []) + list(EXTRA_REGIONS)
+    return " + ".join(parts) if parts else "(선택 없음)"

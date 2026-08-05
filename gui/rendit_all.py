@@ -83,6 +83,14 @@ NAVER_TYPES = [('아파트', 'APT'), ('오피스텔', 'OPST'), ('빌라', 'VL'),
 TRADE_TYPES = [('월세', 'B2'), ('전세', 'B1'), ('매매', 'A1')]
 SAMSAM_TYPES = [('오피스텔', 'OFFICETEL'), ('아파트', 'APARTMENT'), ('연립빌라', 'VILLA'),
                 ('단독주택', 'DETACHED'), ('원룸건물', 'STUDIO'), ('상가주택', 'MIXED_USE')]
+# 삼삼 지역 선택(전국). 값은 common/target_regions.py 토큰 — '시도 시군구' 부분일치라
+# 표기차(부산광역시/부산시)를 흡수한다. 광주는 '경기도 광주시'와 섞이지 않게 '광주광역'.
+SAMSAM_SIDOS = [('서울', '서울'), ('경기', '경기'), ('인천', '인천'), ('부산', '부산'),
+                ('대구', '대구'), ('광주', '광주광역'), ('대전', '대전'), ('울산', '울산'),
+                ('세종', '세종'), ('강원', '강원'), ('충북', '충청북'), ('충남', '충청남'),
+                ('전북', '전라북'), ('전남', '전라남'), ('경북', '경상북'), ('경남', '경상남'),
+                ('제주', '제주')]
+SAMSAM_CAPITAL = ['서울', '경기', '인천']
 
 
 def _add_paths():
@@ -350,6 +358,15 @@ def run_naver(opts, log_q, stop_flag):
         if opts['mode'] == 'server':
             print("[GUI] ── 사이트 실시간 뷰(nl_live) 갱신 ──")
             try:
+                # 이번에 크롤한 시도를 뷰 노출 범위에 '더한다'. 운영 기본 범위(수도권+부산·천안)를
+                # 유지해야 사이트가 좁아지지 않는다 — 그래서 TARGET(통째 지정)이 아니라 EXTRA.
+                os.environ.pop('RENDIT_TARGET_REGIONS', None)
+                sys.modules.pop('target_regions', None)
+                import target_regions as _tr
+                os.environ['RENDIT_EXTRA_REGIONS'] = ','.join(dict.fromkeys(
+                    [t.strip() for t in _tr.DEFAULT_EXTRA.split(',') if t.strip()]
+                    + list(opts['sidos'])))
+                sys.modules.pop('target_regions', None)   # 새 env로 다시 읽히게
                 clv = _load_from_file('create_live_view',
                                       os.path.join('pipeline', 'naver', 'create_live_view.py'))
                 sys.argv = ['create_live_view']
@@ -378,8 +395,10 @@ def run_naver(opts, log_q, stop_flag):
 # ── 삼삼 파이프라인(워커 스레드) ─────────────────────────────────────────────────
 def run_samsam(opts, log_q, stop_flag):
     _add_paths()
-    for m in ('db', 'crawler', 'snapshot', 'export_jsonl', 'subway'):
-        sys.modules.pop(m, None)
+    for m in ('db', 'crawler', 'snapshot', 'export_jsonl', 'subway', 'target_regions'):
+        sys.modules.pop(m, None)   # target_regions는 import 시점에 env를 읽어 캐시된다
+    # 선택한 지역만 수집·갱신(수도권 자동 포함 아님). '*' = 전국.
+    os.environ['RENDIT_TARGET_REGIONS'] = opts.get('regions') or '*'
     os.environ['SAMSAM_EMAIL'] = opts['email1'].strip()
     os.environ['SAMSAM_PASSWORD'] = opts['password1']
     for k in ('SAMSAM_EMAIL2', 'SAMSAM_PASSWORD2'):
@@ -405,12 +424,16 @@ def run_samsam(opts, log_q, stop_flag):
 
         crawler = _load_from_file('crawler', os.path.join('pipeline', 'samsam', 'crawler.py'))
         sel = list(opts['types'])
-        print(f"[GUI] 삼삼 크롤 시작 — 종류 {len(sel)}개: {', '.join(sel)}"
+        rgn = opts.get('regions') or '*'
+        print(f"[GUI] 삼삼 크롤 시작 — 지역 {'전국' if rgn == '*' else rgn}"
+              + (f" / 시군구 '{opts['sigungu']}'" if opts.get('sigungu') else "")
+              + f" / 종류 {len(sel)}개: {', '.join(sel)}"
               + ("  (테스트: 각 50건)" if opts.get('test') else "")
               + f"  / 계정당 하루 한도 {opts.get('daily_limit', 4000)}건")
         if stop_flag.is_set():
             return
         sys.argv = ['crawler', '--types', ','.join(sel)] + \
+            (['--sigungu', opts['sigungu']] if opts.get('sigungu') else []) + \
             (['--limit', '50'] if opts.get('test') else [])
         crawler.main()
 
@@ -738,6 +761,35 @@ def launch_gui():
     e_em2 = acc_row(af, '이메일 2', 2, default=cfg.get('email2', ''))
     e_pw2 = acc_row(af, '비밀번호 2', 3, show='*', default=cfg.get('password2', ''))
 
+    srf = ttk.LabelFrame(tab_s, text='지역 (복수 선택 · 고른 지역만 수집/갱신)', padding=6)
+    srf.pack(fill='x', pady=(4, 0))
+    saved_sregions = set(cfg.get('sregions', SAMSAM_CAPITAL))
+    sregion_vars = {}
+    S_PER_ROW = 9
+    for i, (label, token) in enumerate(SAMSAM_SIDOS):
+        v = tk.BooleanVar(value=(label in saved_sregions))
+        ttk.Checkbutton(srf, text=label, variable=v).grid(
+            row=i // S_PER_ROW, column=i % S_PER_ROW, sticky='w', padx=4)
+        sregion_vars[label] = (v, token)
+    sbrow = ttk.Frame(srf)
+    sbrow.grid(row=(len(SAMSAM_SIDOS) // S_PER_ROW) + 1, column=0,
+               columnspan=S_PER_ROW, sticky='w', pady=(6, 0))
+
+    def _set_sregions(names):
+        for lb, (v, _) in sregion_vars.items():
+            v.set(lb in names)
+    ttk.Button(sbrow, text='전국 전체', width=9,
+               command=lambda: _set_sregions([lb for lb, _ in SAMSAM_SIDOS])).pack(side='left')
+    ttk.Button(sbrow, text='수도권만', width=9,
+               command=lambda: _set_sregions(SAMSAM_CAPITAL)).pack(side='left', padx=4)
+    ttk.Button(sbrow, text='전체 해제', width=9,
+               command=lambda: _set_sregions([])).pack(side='left')
+    ttk.Label(sbrow, text='   시군구 좁히기(선택)').pack(side='left')
+    e_sgg = ttk.Entry(sbrow, width=14)
+    e_sgg.insert(0, cfg.get('ssigungu', ''))
+    e_sgg.pack(side='left', padx=2)
+    ttk.Label(sbrow, text='예: 천안 · 해운대구').pack(side='left')
+
     stf = ttk.LabelFrame(tab_s, text='매물 종류 (복수 선택)', padding=6)
     stf.pack(fill='x', pady=(4, 0))
     saved_stypes = set(cfg.get('stypes', ['OFFICETEL']))
@@ -886,16 +938,24 @@ def launch_gui():
         if not types:
             messagebox.showwarning('입력 필요', '매물 종류를 하나 이상 선택하세요.')
             return
+        picked = [(lb, tk_) for lb, (v, tk_) in sregion_vars.items() if v.get()]
+        if not picked:
+            messagebox.showwarning('입력 필요', '지역을 하나 이상 선택하세요.')
+            return
+        # 전부 고르면 필터 없이 전국(부분일치 토큰 나열보다 확실하고 빠름)
+        regions = '*' if len(picked) == len(SAMSAM_SIDOS) else ','.join(t for _, t in picked)
         try:
             dlimit = max(100, min(5000, int(limit_spin.get())))
         except (ValueError, tk.TclError):
             dlimit = 4000
         o.update({'email1': e_em1.get(), 'password1': e_pw1.get(),
                   'email2': e_em2.get(), 'password2': e_pw2.get(),
-                  'types': types, 'test': stest_var.get(), 'daily_limit': dlimit})
+                  'types': types, 'test': stest_var.get(), 'daily_limit': dlimit,
+                  'regions': regions, 'sigungu': e_sgg.get().strip()})
         _save_cfg({'email1': e_em1.get(), 'password1': e_pw1.get(),
                    'email2': e_em2.get(), 'password2': e_pw2.get(),
-                   'stypes': types, 'daily_limit': dlimit})
+                   'stypes': types, 'daily_limit': dlimit,
+                   'sregions': [lb for lb, _ in picked], 'ssigungu': e_sgg.get().strip()})
         _launch(run_samsam, o, '삼삼')
 
     def stop():
