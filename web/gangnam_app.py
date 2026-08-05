@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-수도권 네이버부동산 매물 뷰어 (Flask).
+네이버부동산 매물 뷰어 (Flask). 노출 지역은 common/target_regions.py 기준
+(수도권 + 매일 크롤하는 추가 지역 — 2026-08-05 기준 부산·천안).
 
 naver_listings(Supabase) 를 SQL로 조회(필터·페이지네이션)해 카드 그리드 + 상세 모달로 보여준다.
 근처 삼삼(수요)은 samsam_listings(Supabase, 오피스텔) 인메모리 인덱스로 부착.

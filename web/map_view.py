@@ -123,7 +123,7 @@ text-decoration:none;font-size:13px;white-space:nowrap}
 <div id=wrap>
 <div id=map></div>
 <div id=demobar>
-  <span>🔒 지금은 <b>강남권 미리보기</b> — 수도권 전 지역·부동산 매칭·⭐추천 스팟은 회원 전용</span>
+  <span>🔒 지금은 <b>강남권 미리보기</b> — 전 지역·부동산 매칭·⭐추천 스팟은 회원 전용</span>
   <a href="/auth/signup">무료로 가입하고 전체 보기</a>
 </div>
 <div class=bar>
@@ -180,7 +180,7 @@ text-decoration:none;font-size:13px;white-space:nowrap}
     <div class=mhead><div class=mtitle>⭐ 추천 스팟 설정</div><button class=mx onclick="closeRModal()">✕</button></div>
     <div class=mbody style="padding:2px 18px 18px">
       <label class=rl>지역 (추천 스팟이 있는 시군구만 표시)</label>
-      <select id=r_area class=ri><option value="">전체 (수도권)</option></select>
+      <select id=r_area class=ri><option value="">전체 지역</option></select>
       <label class=rl>건물 유형</label>
       <select id=r_btype class=ri>
         <option value="">전체</option><option>오피스텔</option><option>원룸건물</option>
@@ -215,7 +215,7 @@ function signupNudge(what){
   t.textContent='🔒 '+(what||'이 기능')+'은 회원 전용'
   b.innerHTML='<div style="padding:18px 10px;text-align:center">'+
     '<div style="font-size:14px;color:#334155;line-height:1.6;margin-bottom:16px">'+
-    '지금 보시는 건 <b>강남권 미리보기</b>예요.<br>무료 가입하면 <b>수도권 전 지역</b> + '+
+    '지금 보시는 건 <b>강남권 미리보기</b>예요.<br>무료 가입하면 <b>전 지역</b> + '+
     '부동산 매물 매칭 + ⭐추천 스팟까지 전부 열립니다.</div>'+
     '<a href="/auth/signup" style="display:inline-block;background:#4321F3;color:#fff;font-weight:800;'+
     'font-size:14px;padding:12px 28px;border-radius:10px;text-decoration:none">무료로 가입하고 전체 보기</a>'+

@@ -14,7 +14,9 @@ import re
 import secrets
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _ROOT)
+sys.path.insert(0, os.path.join(_ROOT, "common"))   # target_regions(대상 지역) 등 공용
 
 import requests as _requests
 
@@ -23,6 +25,7 @@ from flask import (Blueprint, jsonify, redirect, render_template_string, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import db
+import target_regions
 
 ONLINE_WINDOW_MIN = 5   # 이 시간 안에 핑이 온 세션만 "현재 접속중"으로 집계
 
@@ -83,7 +86,8 @@ def online_count():
 
 def latest_listing_churn():
     """가장 최근 크롤일의 크롤 대상 지역 시도별 매물 추가/삭제/총계.
-    반환: {'date': 'YYYY-MM-DD', 'rows': {sido: {'added':a,'removed':r,'total':t}}} 또는 None."""
+    반환: {'date','rows':{sido:{added,removed,total}}, 'cells':[{region,added,removed,total}]}
+    cells는 화면용 — 대상 지역이 늘어도(부산·천안 등) 그대로 나오게 매물 수 순으로 정렬해 둔다."""
     try:
         conn = db.connect()
         d = conn.execute("SELECT MAX(crawl_date) FROM samsam_churn").fetchone()[0]
@@ -94,9 +98,11 @@ def latest_listing_churn():
             "SELECT sido, added, removed, total FROM samsam_churn WHERE crawl_date=%s",
             (d,)).fetchall()
         conn.close()
-        return {"date": d,
-                "rows": {r[0]: {"added": r[1] or 0, "removed": r[2] or 0, "total": r[3] or 0}
-                         for r in rows}}
+        table = {r[0]: {"added": r[1] or 0, "removed": r[2] or 0, "total": r[3] or 0}
+                 for r in rows}
+        cells = [{"region": target_regions.short(sido), **v}
+                 for sido, v in sorted(table.items(), key=lambda kv: -kv[1]["total"])]
+        return {"date": d, "rows": table, "cells": cells}
     except Exception:
         return None
 
@@ -599,11 +605,8 @@ def crawl_status():
                     '아직 없습니다 (다음 렌트 크롤 후 표시).</div>')
         tr = ""
         # 크롤 대상 지역이 늘 수 있어(부산·천안 등) 고정 3개 대신 집계에 있는 지역을 매물 수 순으로.
-        _SHORT = {"서울특별시": "서울", "경기도": "경기", "인천광역시": "인천",
-                  "부산광역시": "부산", "충청남도": "충남"}
-        order = sorted(ch["rows"].items(), key=lambda kv: -(kv[1].get("total") or 0))
-        for full, c in order:
-            tr += (f"<tr><td>{_SHORT.get(full, full)}</td>"
+        for c in ch.get("cells", []):
+            tr += (f"<tr><td>{c['region']}</td>"
                    f"<td style='text-align:right;color:#059669;font-weight:700'>+{c['added']:,}</td>"
                    f"<td style='text-align:right;color:#dc2626;font-weight:700'>-{c['removed']:,}</td>"
                    f"<td style='text-align:right'>{c['total']:,}</td></tr>")
