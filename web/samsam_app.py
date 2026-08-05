@@ -67,6 +67,7 @@ import chat_poll  # noqa: E402
 import crypto_util  # noqa: E402
 import db  # noqa: E402
 import search  # noqa: E402  (건물명·역명 텍스트 검색 색인 — 외부 엔진 없이 순수 파이썬 n-gram)
+import target_regions  # noqa: E402  (크롤·노출 대상 지역)
 
 SAM_COLS = ("room_id", "url", "name", "building_type", "building_name",
             "sido", "sigungu", "dong", "area_pyeong", "rent_total_weekly",
@@ -137,11 +138,12 @@ def _load_db():
     try:
         import db
         conn = db.connect()
-        # 수도권만 노출 — 비수도권은 일일 크롤 갱신 대상이 아니라 예약률이 동결(한 달+ 전)돼
-        # 있어 화면에선 제외한다. DB에서는 지우지 않고 보존(향후 분석 리포트용, 2026-07-30 결정).
+        # 매일 크롤로 갱신되는 지역만 노출(수도권 + 부산·천안). 그 밖의 지역은 예약률이
+        # 몇 주씩 동결돼 있어 화면에선 제외 — DB에서는 지우지 않고 보존(분석 리포트용,
+        # 2026-07-30 결정). 대상 지역 정의는 common/target_regions.py 한 곳.
+        where, params = target_regions.sql_where()
         rows = [dict(x) for x in conn.execute(
-            f"SELECT {', '.join(SAM_COLS)} FROM samsam_listings "
-            "WHERE sido IN ('서울특별시','경기도','인천광역시')"
+            f"SELECT {', '.join(SAM_COLS)} FROM samsam_listings WHERE {where}", params
         ).fetchall()]
         conn.close()
         return rows
@@ -796,7 +798,9 @@ def _reco_candidates(conn):
 
     # ① 동별 네이버 집계: 대표좌표(중앙값)·월세회전율(최근7일 신규/활성)
     #    시도 포함(서울 '중구'·인천 '중구' 같은 동명이인 구분 + 표기용 축약).
-    _SIDO_SHORT = {"서울특별시": "서울", "경기도": "경기", "인천광역시": "인천"}
+    #    주의: listings(네이버)의 시도 표기는 '서울시/인천시'라 삼삼 표기('서울특별시')로
+    #    필터하면 경기도만 걸린다 — 그래서 target_regions의 접두 매칭을 쓴다.
+    nv_where, nv_params = target_regions.sql_where()
     dong = {}
     rows = conn.execute(
         "SELECT sido, sigungu, dong,"
@@ -804,18 +808,20 @@ def _reco_candidates(conn):
         " COUNT(*) FILTER (WHERE confirmymd::text >= to_char(now()-interval '7 days','YYYYMMDD')) AS new7,"
         " percentile_cont(0.5) WITHIN GROUP (ORDER BY lat) AS clat,"
         " percentile_cont(0.5) WITHIN GROUP (ORDER BY lon) AS clon"
-        " FROM listings WHERE sido IN ('서울특별시','경기도','인천광역시')"
+        f" FROM listings WHERE {nv_where}"
         "   AND dong IS NOT NULL AND lat BETWEEN 33 AND 39.5 AND lon BETWEEN 124 AND 132"
-        " GROUP BY sido, sigungu, dong HAVING COUNT(*) FILTER (WHERE confirmymd IS NOT NULL) >= 20"
+        " GROUP BY sido, sigungu, dong HAVING COUNT(*) FILTER (WHERE confirmymd IS NOT NULL) >= 20",
+        nv_params
     ).fetchall()
     for r in rows:
-        dong[(r[1], r[2])] = {"sido": _SIDO_SHORT.get(r[0], r[0]), "sigungu": r[1], "dong": r[2],
+        dong[(r[1], r[2])] = {"sido": target_regions.short(r[0]), "sigungu": r[1], "dong": r[2],
                               "active": r[3], "new7": r[4], "lat": float(r[5]), "lon": float(r[6])}
 
     # ② 삼삼 공급(동별 매물 수) — 공급이 많으면 이미 경쟁 시장이라 제외 대상
+    sam_where, sam_params = target_regions.sql_where()
     sam = dict(conn.execute(
-        "SELECT dong, COUNT(*) FROM samsam_listings"
-        " WHERE sido IN ('서울특별시','경기도','인천광역시') GROUP BY dong").fetchall())
+        f"SELECT dong, COUNT(*) FROM samsam_listings WHERE {sam_where} GROUP BY dong",
+        sam_params).fetchall())
 
     # ②-b 소비력 프록시 — 동별 아파트 보증금 중앙값(만원). 부촌일수록↑ = 단기임대 요금 방어력.
     #     소득/소비 공식통계가 없어 우리 DB의 아파트 시세로 근사(대치10억·반포9억 vs 가산5.5천).
@@ -823,9 +829,9 @@ def _reco_candidates(conn):
     try:
         for sg, d, med in conn.execute(
                 "SELECT sigungu, dong, percentile_cont(0.5) WITHIN GROUP (ORDER BY deposit)"
-                " FROM listings WHERE sido IN ('서울특별시','경기도','인천광역시')"
+                f" FROM listings WHERE {nv_where}"
                 "   AND realestatetype = '아파트' AND deposit > 0"
-                " GROUP BY sigungu, dong HAVING COUNT(*) >= 10").fetchall():
+                " GROUP BY sigungu, dong HAVING COUNT(*) >= 10", nv_params).fetchall():
             if med:
                 wealth[(sg, d)] = int(med)
     except Exception:

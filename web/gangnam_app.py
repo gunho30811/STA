@@ -19,6 +19,7 @@ sys.path.insert(0, ROOT)   # db 모듈 import용(상세 모달이 DB에서 전�
 sys.path.insert(0, os.path.join(ROOT, "common"))   # 공용 유틸(subway 등, sta-common 예정)
 import subway  # noqa: E402  # 역 반경 검색: 매물 lat/lng ↔ 역 좌표 거리 계산
 import db  # noqa: E402  # naver_listings 를 DB에서 직접 쿼리(70MB 파일 통짜 로드 대신)
+import target_regions  # noqa: E402  # 크롤·노출 대상 지역(수도권 + 부산·천안)
 # 역명(N역) → (lat, lng). data/subway_stations.csv(수도권 589역). '역 반경 검색' 자동완성·거리계산에 씀.
 STATION_COORDS = {f"{n}역": (y, x) for n, y, x in subway._load()}
 M2_PER_PYEONG = 3.305785
@@ -194,14 +195,15 @@ def assets(filename):
 def api_facets():
     # 첫 화면을 막지 않게 '가벼운 것만' 준다. 지역 트리는 /api/regions 로 lazy,
     # 업무용 매물수(느린 ILIKE 스캔)는 /api/office_count 로 async 로 뺐다.
-    # sido는 작은 regions 테이블(수도권)에서 — nl_live(29만) DISTINCT 전체 스캔 회피.
-    # types는 고정 7종(수도권 월세는 전부 존재) — building_type_code DISTINCT 스캔 회피.
+    # sido는 작은 regions 테이블에서 — nl_live(29만) DISTINCT 전체 스캔 회피.
+    # 대상 지역(수도권 + 부산·천안)만 노출. types는 고정 7종 — DISTINCT 스캔 회피.
     def _load():
+        where, params = target_regions.sql_where()
         conn = db.connect()
         try:
             return [r[0] for r in conn.execute(
-                "SELECT DISTINCT sido FROM regions "
-                "WHERE sido IN ('서울시','경기도','인천시') ORDER BY sido").fetchall()]
+                f"SELECT DISTINCT sido FROM regions WHERE {where} ORDER BY sido",
+                params).fetchall()]
         finally:
             conn.close()
     sidos = _cached("facets_sido", 600, _load)
@@ -255,12 +257,13 @@ def api_stats():
                 f"SELECT COUNT(DISTINCT dong) FROM {BASE} "
                 "WHERE dong IS NOT NULL AND dong <> ''").fetchone()[0]
             # 정확한 중앙값은 40만행 정렬이라 수십 초 → listings 10% 표본으로 근사(뷰는 TABLESAMPLE 불가).
+            med_where, med_params = target_regions.sql_where()
             med = conn.execute(
                 "SELECT percentile_disc(0.5) WITHIN GROUP (ORDER BY rent) "
                 "FROM listings TABLESAMPLE SYSTEM(10) "
-                "WHERE sido IN ('서울시','경기도','인천시') "
+                f"WHERE {med_where} "
                 "AND crawled_at >= to_char(now() - interval '7 days','YYYY-MM-DD') "
-                "AND rent > 0").fetchone()[0]
+                "AND rent > 0", med_params).fetchone()[0]
             by_type = [(r[0], r[1]) for r in conn.execute(
                 f"SELECT building_type_code, COUNT(*) c FROM {BASE} "
                 "GROUP BY building_type_code ORDER BY c DESC").fetchall()]

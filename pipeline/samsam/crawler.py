@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-삼삼엠투 수도권(서울·경기·인천) 매물 크롤러 → Supabase samsam_listings 적재.
+삼삼엠투 매물 크롤러 → samsam_listings 적재.
+
+대상 지역은 common/target_regions.py(수도권 + 매일 도는 추가 지역: 부산·천안).
 
 신규 매물은 상세+예약스케줄을 모두 수집하고, 이미 적재된 기존 매물은 예약
 스케줄(booked_days_*/blocked_days_1m)만 매일 전부 다시 확인해 예약률을 최신화한다.
@@ -33,6 +35,7 @@ sys.path.insert(0, os.path.join(BASE_DIR, 'pipeline', 'samsam'))   # deploy_lab�
 sys.path.insert(0, os.path.join(BASE_DIR, 'common'))   # subway 등 공용 유틸(sta-common 예정)
 
 import db
+import target_regions
 from subway import stations_within
 
 load_dotenv(os.path.join(BASE_DIR, '.env'))
@@ -56,7 +59,9 @@ BTYPE_KO = {
 BATCH = 50
 REQ_SLEEP = 0.5
 BLOCK_WAIT = 120
-METRO_SIDO = {'서울특별시', '경기도', '인천광역시'}  # 수도권만 수집·갱신 (그 외 지역은 DB에 남아있어도 갱신 안 함)
+# 수집·갱신 대상 지역은 common/target_regions.py 한 곳에서 관리(수도권 + 매일 도는 추가 지역).
+# 대상 밖 지역은 DB에 남아 있어도 갱신하지 않는다.
+METRO_SIDO = target_regions.METRO_SIDO
 # 기존 매물 예약률 갱신 동시 요청 수. 서버 차단이 의심되면 env(SAMSAM_REFRESH_WORKERS)로 낮춰 재실험.
 REFRESH_WORKERS = int(os.environ.get('SAMSAM_REFRESH_WORKERS', '2'))
 REFRESH_CHUNK = 2000      # 이 건수마다 세션(로그인)을 새로 고침
@@ -694,10 +699,10 @@ def _room_dong(room):
 
 
 def prune_and_track(conn, rids, done):
-    """① 삼삼에서 내려간 매물을 samsam_listings에서 삭제(현재 목록에 없는 수도권 매물).
+    """① 삼삼에서 내려간 매물을 samsam_listings에서 삭제(현재 목록에 없는 대상 지역 매물).
     ② 신규 매물(이번에 처음 보인 room)을 동별로 집계 → kv_cache 'samsam_new_by_dong'.
     ③ 시도별 추가/삭제/총계를 samsam_churn에 적재.
-    rids: 수도권 전유형 현재 목록 {room_id: room}. done: DB에 이미 있던 room_id 집합."""
+    rids: 대상 지역 전유형 현재 목록 {room_id: room}. done: DB에 이미 있던 room_id 집합."""
     cur_ids = set()
     cur_meta = {}   # rid → (sido, sigungu, dong)
     for rid, room in rids.items():
@@ -708,11 +713,12 @@ def prune_and_track(conn, rids, done):
         cur_ids.add(r)
         cur_meta[r] = _room_dong(room)
 
-    # ① 삭제: 현재 목록에 없는 수도권 매물 제거(달력·라이브도 함께)
-    metro_sql = "('서울특별시','경기도','인천광역시')"
-    db_metro = [r[0] for r in conn.execute(
-        f"SELECT room_id FROM samsam_listings WHERE sido IN {metro_sql}").fetchall()]
-    gone = [r for r in db_metro if r not in cur_ids]
+    # ① 삭제: 현재 목록에 없는 매물 제거(달력·라이브도 함께).
+    #    삭제 범위 = rids와 같은 대상 지역. 대상 밖 지역은 목록을 안 받으므로 건드리지 않는다.
+    where, params = target_regions.sql_where()
+    db_target = [r[0] for r in conn.execute(
+        f"SELECT room_id FROM samsam_listings WHERE {where}", params).fetchall()]
+    gone = [r for r in db_target if r not in cur_ids]
     if gone:
         for i in range(0, len(gone), 500):
             part = gone[i:i + 500]
@@ -747,7 +753,11 @@ def prune_and_track(conn, rids, done):
             + f" (신규 총 {payload['total_new']}건)")
 
     # ③ 시도별 변동 → samsam_churn (직전 라이브셋 대비)
-    prev = {r[0]: r[1] for r in conn.execute("SELECT room_id, sido FROM samsam_live").fetchall()}
+    # 지역별로 나눠 실행하므로(수도권 / 부산 / 천안) **이번 실행이 목록을 받은 시도만** 비교·교체한다.
+    # 안 그러면 뒤 스텝이 앞 스텝 지역을 "전부 삭제됨"으로 집계하고 라이브셋에서도 지운다.
+    scope_sidos = {m[0] for m in cur_meta.values() if m[0]}
+    prev = {r[0]: r[1] for r in conn.execute("SELECT room_id, sido FROM samsam_live").fetchall()
+            if r[1] in scope_sidos}
     today = date.today().isoformat()
     added, removed, total = defaultdict(int), defaultdict(int), defaultdict(int)
     for rid in cur_ids:
@@ -765,7 +775,11 @@ def prune_and_track(conn, rids, done):
                 "ON CONFLICT (crawl_date,sido) DO UPDATE SET added=EXCLUDED.added,"
                 "removed=EXCLUDED.removed,total=EXCLUDED.total",
                 (today, sido, added[sido], removed[sido], total[sido]))
-    conn.execute("DELETE FROM samsam_live")
+    if scope_sidos:
+        ph = ",".join(["%s"] * len(scope_sidos))
+        conn.execute(f"DELETE FROM samsam_live WHERE sido IN ({ph})", list(scope_sidos))
+    else:
+        conn.execute("DELETE FROM samsam_live")
     if cur_ids:
         conn.executemany("INSERT INTO samsam_live(room_id,sido) VALUES(%s,%s)",
                          [[rid, cur_meta[rid][0]] for rid in cur_ids])
@@ -814,8 +828,10 @@ def main():
     log("매물 목록 수집 중...")
     rids = collect_rids(session)
     before_metro = len(rids)
-    rids = {rid: room for rid, room in rids.items() if _room_sido(room) in METRO_SIDO}
-    log(f"수도권(서울/경기/인천) 필터: {before_metro} → {len(rids)}건 (그 외 지역은 갱신 대상에서 제외)")
+    rids = {rid: room for rid, room in rids.items()
+            if target_regions.in_target(_room_sido(room), (room.get('province') or '').strip())}
+    log(f"대상 지역 필터 [{target_regions.label()}]: {before_metro} → {len(rids)}건 "
+        f"(그 외 지역은 갱신 대상에서 제외)")
 
     # ── 삭제 매물 정리 + 신규 매물 지역 집계 ──────────────────────────────────
     # 목록 API는 전 유형을 한 번에 주므로(유형 필터 전) 여기서 처리 → --types OFFICETEL 일일 크롤에서도

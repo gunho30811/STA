@@ -31,6 +31,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import db
 import poi as poi_mod
 import subway
+import target_regions   # 크롤·노출 대상 지역(수도권 + 부산·천안)
 from auth import current_user, init_auth, latest_listing_churn, online_count
 
 portal = Flask(__name__)
@@ -76,12 +77,14 @@ SPOT_TOP = 8
 def _supply_shortage_spots(conn):
     """동 단위 공급부족 스팟 TOP N — 예약률·렌트/네이버 매물수·평균 월순수익·영업이익률."""
     # ① 동별 렌트 수요/공급
+    where, params = target_regions.sql_where()
     dongs = conn.execute(
         "SELECT sigungu, dong, COUNT(*) n,"
         " AVG(LEAST(1.0, COALESCE(booked_days_1m,0)::float"
         "     / GREATEST(31-COALESCE(blocked_days_1m,0),1)))*100 occ"
-        " FROM samsam_listings WHERE sido IN ('서울특별시','경기도','인천광역시')"
-        " GROUP BY sigungu, dong HAVING COUNT(*) >= %s", (SPOT_MIN_RENT,)).fetchall()
+        f" FROM samsam_listings WHERE {where}"
+        " GROUP BY sigungu, dong HAVING COUNT(*) >= %s",
+        params + [SPOT_MIN_RENT]).fetchall()
     cands = [{"sigungu": r[0] or "", "dong": r[1] or "", "n_rent": r[2], "occ": round(r[3], 1)}
              for r in dongs if r[3] >= SPOT_MIN_OCC and r[2] <= SPOT_MAX_RENT]
     cands.sort(key=lambda x: -x["occ"])
@@ -173,18 +176,21 @@ def _unclaimed_spots(conn):
     회전율 = 최근 7일 신규 등록(confirmYmd) / 활성 매물 수. 등록이 빨리 채워질수록
     월세 수요가 활발하다는 신호(매물이 안 나가면 신규 등록만 계속 쌓여 오히려 활성 재고가
     불어나므로, 회전율은 '재고 대비 신규 유입 속도'로 시장 활력의 근사치)."""
+    # listings(네이버)는 시도 표기가 '서울시/인천시'라 삼삼 표기로 필터하면 경기도만 걸린다
+    # → target_regions의 접두 매칭 사용.
+    where, params = target_regions.sql_where()
     rows = conn.execute(
         "SELECT sigungu, dong,"
         " COUNT(*) FILTER (WHERE confirmymd IS NOT NULL) AS active,"
         " COUNT(*) FILTER (WHERE confirmymd::text >= to_char(now()-interval '7 days','YYYYMMDD')) AS new7"
-        " FROM listings WHERE sido IN ('서울특별시','경기도','인천광역시') AND dong IS NOT NULL"
-        " GROUP BY sigungu, dong HAVING COUNT(*) FILTER (WHERE confirmymd IS NOT NULL) >= 30"
-    ).fetchall()
+        f" FROM listings WHERE {where} AND dong IS NOT NULL"
+        " GROUP BY sigungu, dong HAVING COUNT(*) FILTER (WHERE confirmymd IS NOT NULL) >= 30",
+        params).fetchall()
     dong_names = list({r[1] for r in rows})
     sam = dict(conn.execute(
-        "SELECT dong, COUNT(*) FROM samsam_listings"
-        " WHERE sido IN ('서울특별시','경기도','인천광역시') AND dong = ANY(%s) GROUP BY dong",
-        (dong_names,)).fetchall()) if dong_names else {}
+        f"SELECT dong, COUNT(*) FROM samsam_listings WHERE {where}"
+        " AND dong = ANY(%s) GROUP BY dong",
+        params + [dong_names]).fetchall()) if dong_names else {}
     cands = []
     for sg, d, active, new7 in rows:
         turnover = new7 / active if active else 0
