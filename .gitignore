@@ -25,3 +25,7 @@ selftest_result.txt
 # 개인용 분석 리포트·스크린샷(로컬 전용, 저장소 미포함)
 rendit_*.pdf
 image.png
+# 크롤러 exe/스크립트로 뽑은 개인 작업용 내보내기(침구제공 리스트 등) — 레포에 안 올림
+samsam_침구제공*
+samsam_매물_*.csv
+naver_매물_*.csv
