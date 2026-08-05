@@ -82,7 +82,7 @@ def online_count():
 
 
 def latest_listing_churn():
-    """가장 최근 크롤일의 수도권 시도별 매물 추가/삭제/총계.
+    """가장 최근 크롤일의 크롤 대상 지역 시도별 매물 추가/삭제/총계.
     반환: {'date': 'YYYY-MM-DD', 'rows': {sido: {'added':a,'removed':r,'total':t}}} 또는 None."""
     try:
         conn = db.connect()
@@ -598,9 +598,12 @@ def crawl_status():
             return ('<div class="msg info" style="margin-top:20px">렌트 매물 추가/삭제 집계가 '
                     '아직 없습니다 (다음 렌트 크롤 후 표시).</div>')
         tr = ""
-        for full, short in (("서울특별시", "서울"), ("경기도", "경기"), ("인천광역시", "인천")):
-            c = ch["rows"].get(full, {"added": 0, "removed": 0, "total": 0})
-            tr += (f"<tr><td>{short}</td>"
+        # 크롤 대상 지역이 늘 수 있어(부산·천안 등) 고정 3개 대신 집계에 있는 지역을 매물 수 순으로.
+        _SHORT = {"서울특별시": "서울", "경기도": "경기", "인천광역시": "인천",
+                  "부산광역시": "부산", "충청남도": "충남"}
+        order = sorted(ch["rows"].items(), key=lambda kv: -(kv[1].get("total") or 0))
+        for full, c in order:
+            tr += (f"<tr><td>{_SHORT.get(full, full)}</td>"
                    f"<td style='text-align:right;color:#059669;font-weight:700'>+{c['added']:,}</td>"
                    f"<td style='text-align:right;color:#dc2626;font-weight:700'>-{c['removed']:,}</td>"
                    f"<td style='text-align:right'>{c['total']:,}</td></tr>")
