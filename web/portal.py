@@ -349,16 +349,15 @@ padding:14px;text-align:center}
   <a class=card href="/samsam/"><div class=ic>{ICON_RENT}</div><h2>렌트 분석</h2>
     <p>옵션별 예약률 영향, 건물 인기(월순수익), 지역 예약률 트렌드</p></a>
   <a class=card href="/gangnam/"><div class=ic>{ICON_ESTATE}</div><h2>부동산 매물</h2>
-    <p>수도권(서울·경기·인천) 부동산 매물 카드/상세 탐색</p></a>
+    <p>{REGION_TEXT} 부동산 매물 카드/상세 탐색</p></a>
 </div>
 {% if churn %}
 <div class=churn>
   <div class=churn-h>🔄 렌트 매물 변동 <span class=churn-d>최근 크롤 {{churn.date}}</span></div>
   <div class=churn-grid>
-    {% for full, short in [('서울특별시','서울'),('경기도','경기'),('인천광역시','인천')] %}
-    {% set c = churn.rows.get(full, {'added':0,'removed':0,'total':0}) %}
+    {% for c in churn.cells %}
     <div class=churn-cell>
-      <div class=cc-region>{{short}}</div>
+      <div class=cc-region>{{c.region}}</div>
       <div class=cc-nums><span class=up>+{{'{:,}'.format(c.added)}}</span><span class=dn>-{{'{:,}'.format(c.removed)}}</span></div>
       <div class=cc-total>현재 {{'{:,}'.format(c.total)}}</div>
     </div>
@@ -726,7 +725,7 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
   <div class=sec-h>
     <span class=tag2>⭐ 공급부족 스팟 파인더</span>
     <h2>단기임대 수요는 높은데 공급이 없는 동네,<br>지도에서 바로 찾으세요</h2>
-    <p>계산기·지도는 강남권까지 무료. 수도권 전 지역과 공급부족 스팟 + 근처 매물 매칭은 가입하면 열려요.</p>
+    <p>계산기·지도는 강남권까지 무료. {REGION_TEXT} 전 지역과 공급부족 스팟 + 근처 매물 매칭은 가입하면 열려요.</p>
   </div>
   <div class=wall-panel>
     <div class=wall-grid>
@@ -736,8 +735,8 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
         <div class=n>평균 순수익 +164만원 · 매물 12개</div>
       </div>
       <div class="wcell locked">
-        <div class=k>수도권 전체</div>
-        <div class=name>마포·성동·송파…</div>
+        <div class=k>전 지역</div>
+        <div class=name>마포·성동·해운대…</div>
         <div class=n>평균 순수익 +███만원 · 매물 ███개</div>
       </div>
       <div class="wcell locked">
@@ -749,7 +748,7 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
     <div class=wall-overlay>
       <div class=wall-card>
         <div class=t>🔓 전체 지도·추천 스팟 잠금 해제</div>
-        <div class=d>수도권 전체 순위와 공급부족 추천 스팟을 지도에서 한눈에.</div>
+        <div class=d>{REGION_TEXT} 전 지역 순위와 공급부족 추천 스팟을 지도에서 한눈에.</div>
         <a href="/auth/signup">가입하고 전체 열기 →</a>
       </div>
     </div>
@@ -778,7 +777,7 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
 <section class=signup-sec id=signup>
   <div class=signup-card>
     <h2>계산해 봤다면, 이제 전체를 열어보세요</h2>
-    <p>수도권 전 지역 순위, 공급부족 추천 스팟 지도, 상세 수익 리포트까지 회원에게 열립니다.</p>
+    <p>{REGION_TEXT} 전 지역 순위, 공급부족 추천 스팟 지도, 상세 수익 리포트까지 회원에게 열립니다.</p>
     <a class=btn href="/auth/signup">가입하고 전체 열기</a>
   </div>
 </section>
@@ -854,7 +853,9 @@ ICON_WARN = _tile('<path d="M23 13l11 19H12z"/><path d="M23 20v6"/>'
 
 _ICONS = {"ICON_PROFIT": ICON_PROFIT, "ICON_RENT": ICON_RENT, "ICON_ESTATE": ICON_ESTATE,
           "ICON_CALC": ICON_CALC, "ICON_MAP": ICON_MAP, "ICON_SPOT": ICON_SPOT,
-          "ICON_LOST": ICON_LOST, "ICON_SCATTER": ICON_SCATTER, "ICON_WARN": ICON_WARN}
+          "ICON_LOST": ICON_LOST, "ICON_SCATTER": ICON_SCATTER, "ICON_WARN": ICON_WARN,
+          # 서비스 커버리지 문구 — 지역이 늘면(부산·천안 등) 문구도 같이 바뀐다
+          "REGION_TEXT": target_regions.display()}
 for _k, _v in _ICONS.items():
     LANDING = LANDING.replace("{" + _k + "}", _v)
     PUBLIC_LANDING = PUBLIC_LANDING.replace("{" + _k + "}", _v)

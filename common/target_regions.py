@@ -84,6 +84,19 @@ def short(sido):
     return s
 
 
+def display(sep='·'):
+    """화면 문구용 지역 목록 — '서울·경기·인천·부산·천안'."""
+    if ALL_REGIONS:
+        return '전국'
+    names = ['서울', '경기', '인천'] if METRO_PREFIX else []
+    for t in EXTRA_REGIONS:
+        n = t.replace('광역', '').replace('특별자치', '')
+        if len(n) > 2 and n[-1] in '시도':
+            n = n[:-1]
+        names.append(n)
+    return sep.join(dict.fromkeys(names))
+
+
 def label():
     """로그용 요약."""
     if ALL_REGIONS:
