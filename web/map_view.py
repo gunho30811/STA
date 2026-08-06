@@ -123,7 +123,7 @@ text-decoration:none;font-size:13px;white-space:nowrap}
 <div id=wrap>
 <div id=map></div>
 <div id=demobar>
-  <span>🔒 지금은 <b>강남권 미리보기</b> — 수도권 전 지역·부동산 매칭·⭐추천 스팟은 회원 전용</span>
+  <span>🔒 지금은 <b>강남권 미리보기</b> — 전 지역·부동산 매칭·⭐추천 스팟은 회원 전용</span>
   <a href="/auth/signup">무료로 가입하고 전체 보기</a>
 </div>
 <div class=bar>
@@ -180,7 +180,7 @@ text-decoration:none;font-size:13px;white-space:nowrap}
     <div class=mhead><div class=mtitle>⭐ 추천 스팟 설정</div><button class=mx onclick="closeRModal()">✕</button></div>
     <div class=mbody style="padding:2px 18px 18px">
       <label class=rl>지역 (추천 스팟이 있는 시군구만 표시)</label>
-      <select id=r_area class=ri><option value="">전체 (수도권)</option></select>
+      <select id=r_area class=ri><option value="">전체 지역</option></select>
       <label class=rl>건물 유형</label>
       <select id=r_btype class=ri>
         <option value="">전체</option><option>오피스텔</option><option>원룸건물</option>
@@ -215,7 +215,7 @@ function signupNudge(what){
   t.textContent='🔒 '+(what||'이 기능')+'은 회원 전용'
   b.innerHTML='<div style="padding:18px 10px;text-align:center">'+
     '<div style="font-size:14px;color:#334155;line-height:1.6;margin-bottom:16px">'+
-    '지금 보시는 건 <b>강남권 미리보기</b>예요.<br>무료 가입하면 <b>수도권 전 지역</b> + '+
+    '지금 보시는 건 <b>강남권 미리보기</b>예요.<br>무료 가입하면 <b>전 지역</b> + '+
     '부동산 매물 매칭 + ⭐추천 스팟까지 전부 열립니다.</div>'+
     '<a href="/auth/signup" style="display:inline-block;background:#4321F3;color:#fff;font-weight:800;'+
     'font-size:14px;padding:12px 28px;border-radius:10px;text-decoration:none">무료로 가입하고 전체 보기</a>'+
@@ -344,7 +344,7 @@ function openList(items,cls){
       h+='<a class=item href="'+n.url+'" target=_blank rel=noreferrer>'+
         '<div><div class=it-name>'+(n.name||'(이름없음)')+'</div>'+
         '<div class=it-sub>보증금 '+(n.dep!=null?n.dep.toLocaleString():'-')+' / 월세 '+(n.rent!=null?n.rent:'-')+'만'+
-        (n.m2?' · '+n.m2+'㎡':'')+(n.floor!=null?' · '+n.floor+'층':'')+'</div></div>'+
+        (n.m2?' · '+(Math.round(n.m2/3.30578*10)/10)+'평('+n.m2+'㎡)':'')+(n.floor!=null?' · '+n.floor+'층':'')+'</div></div>'+
         '<div class=it-go>매물 보기 →</div></a>'
     })
   }
@@ -685,7 +685,7 @@ function openReco(s){
     h+='<a class=item href="'+m.url+'" target=_blank rel=noreferrer>'+
       '<div><div class=it-name>'+(m.name||'(이름없음)')+(m.btype?' <span style="font-weight:600;color:#94a3b8;font-size:11px">'+m.btype+'</span>':'')+'</div>'+
       '<div class=it-sub>월세 '+(m.rent!=null?m.rent:'-')+'만'+(m.mfee?'+관리 '+m.mfee+'만':'')+' / 보증금 '+(m.dep!=null?m.dep.toLocaleString():'-')+'만'+
-      (m.m2?' · '+m.m2+'㎡':'')+(m.floor!=null?' · '+m.floor+'층':'')+'</div></div>'+
+      (m.m2?' · '+(Math.round(m.m2/3.30578*10)/10)+'평('+m.m2+'㎡)':'')+(m.floor!=null?' · '+m.floor+'층':'')+'</div></div>'+
       '<div style="text-align:right">'+(m.enet!=null?'<div class="it-occ '+(m.enet>=0?'good':'bad')+'">+'+m.enet+'만</div><div style="font-size:9.5px;color:#94a3b8">예상 월순익</div>':'')+
       '<div class=it-go>매물 보기 →</div></div></a>'
   })

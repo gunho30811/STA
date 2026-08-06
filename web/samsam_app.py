@@ -67,6 +67,7 @@ import chat_poll  # noqa: E402
 import crypto_util  # noqa: E402
 import db  # noqa: E402
 import search  # noqa: E402  (건물명·역명 텍스트 검색 색인 — 외부 엔진 없이 순수 파이썬 n-gram)
+import target_regions  # noqa: E402  (크롤·노출 대상 지역)
 
 SAM_COLS = ("room_id", "url", "name", "building_type", "building_name",
             "sido", "sigungu", "dong", "area_pyeong", "rent_total_weekly",
@@ -137,8 +138,12 @@ def _load_db():
     try:
         import db
         conn = db.connect()
+        # 매일 크롤로 갱신되는 지역만 노출(수도권 + 부산·천안). 그 밖의 지역은 예약률이
+        # 몇 주씩 동결돼 있어 화면에선 제외 — DB에서는 지우지 않고 보존(분석 리포트용,
+        # 2026-07-30 결정). 대상 지역 정의는 common/target_regions.py 한 곳.
+        where, params = target_regions.sql_where()
         rows = [dict(x) for x in conn.execute(
-            f"SELECT {', '.join(SAM_COLS)} FROM samsam_listings"
+            f"SELECT {', '.join(SAM_COLS)} FROM samsam_listings WHERE {where}", params
         ).fetchall()]
         conn.close()
         return rows
@@ -793,7 +798,9 @@ def _reco_candidates(conn):
 
     # ① 동별 네이버 집계: 대표좌표(중앙값)·월세회전율(최근7일 신규/활성)
     #    시도 포함(서울 '중구'·인천 '중구' 같은 동명이인 구분 + 표기용 축약).
-    _SIDO_SHORT = {"서울특별시": "서울", "경기도": "경기", "인천광역시": "인천"}
+    #    주의: listings(네이버)의 시도 표기는 '서울시/인천시'라 삼삼 표기('서울특별시')로
+    #    필터하면 경기도만 걸린다 — 그래서 target_regions의 접두 매칭을 쓴다.
+    nv_where, nv_params = target_regions.sql_where()
     dong = {}
     rows = conn.execute(
         "SELECT sido, sigungu, dong,"
@@ -801,18 +808,20 @@ def _reco_candidates(conn):
         " COUNT(*) FILTER (WHERE confirmymd::text >= to_char(now()-interval '7 days','YYYYMMDD')) AS new7,"
         " percentile_cont(0.5) WITHIN GROUP (ORDER BY lat) AS clat,"
         " percentile_cont(0.5) WITHIN GROUP (ORDER BY lon) AS clon"
-        " FROM listings WHERE sido IN ('서울특별시','경기도','인천광역시')"
+        f" FROM listings WHERE {nv_where}"
         "   AND dong IS NOT NULL AND lat BETWEEN 33 AND 39.5 AND lon BETWEEN 124 AND 132"
-        " GROUP BY sido, sigungu, dong HAVING COUNT(*) FILTER (WHERE confirmymd IS NOT NULL) >= 20"
+        " GROUP BY sido, sigungu, dong HAVING COUNT(*) FILTER (WHERE confirmymd IS NOT NULL) >= 20",
+        nv_params
     ).fetchall()
     for r in rows:
-        dong[(r[1], r[2])] = {"sido": _SIDO_SHORT.get(r[0], r[0]), "sigungu": r[1], "dong": r[2],
+        dong[(r[1], r[2])] = {"sido": target_regions.short(r[0]), "sigungu": r[1], "dong": r[2],
                               "active": r[3], "new7": r[4], "lat": float(r[5]), "lon": float(r[6])}
 
     # ② 삼삼 공급(동별 매물 수) — 공급이 많으면 이미 경쟁 시장이라 제외 대상
+    sam_where, sam_params = target_regions.sql_where()
     sam = dict(conn.execute(
-        "SELECT dong, COUNT(*) FROM samsam_listings"
-        " WHERE sido IN ('서울특별시','경기도','인천광역시') GROUP BY dong").fetchall())
+        f"SELECT dong, COUNT(*) FROM samsam_listings WHERE {sam_where} GROUP BY dong",
+        sam_params).fetchall())
 
     # ②-b 소비력 프록시 — 동별 아파트 보증금 중앙값(만원). 부촌일수록↑ = 단기임대 요금 방어력.
     #     소득/소비 공식통계가 없어 우리 DB의 아파트 시세로 근사(대치10억·반포9억 vs 가산5.5천).
@@ -820,9 +829,9 @@ def _reco_candidates(conn):
     try:
         for sg, d, med in conn.execute(
                 "SELECT sigungu, dong, percentile_cont(0.5) WITHIN GROUP (ORDER BY deposit)"
-                " FROM listings WHERE sido IN ('서울특별시','경기도','인천광역시')"
+                f" FROM listings WHERE {nv_where}"
                 "   AND realestatetype = '아파트' AND deposit > 0"
-                " GROUP BY sigungu, dong HAVING COUNT(*) >= 10").fetchall():
+                " GROUP BY sigungu, dong HAVING COUNT(*) >= 10", nv_params).fetchall():
             if med:
                 wealth[(sg, d)] = int(med)
     except Exception:
@@ -1230,14 +1239,11 @@ def chat_api_add_account():
     label = (data.get("label") or "").strip()
     if not email or not password:
         return jsonify({"error": "이메일/비밀번호를 입력해주세요."}), 400
-    try:
-        res = chat_auth.login_and_get_refresh_token(email, password)
-    except chat_auth.LoginError as e:
-        return jsonify({"error": str(e)}), 400
-    except ModuleNotFoundError:
-        # Vercel 등 서버리스 배포엔 Playwright(브라우저 자동화)가 없어 이 요청 안에서
-        # 로그인을 못 끝낸다. 비번만 암호화해 큐잉해두면 GH Actions 폴링 workflow가
-        # (Playwright 설치된 환경) 다음 주기에 로그인을 대신 완료한다.
+
+    def _queue_pending():
+        # 이 프로세스에서 Playwright 로그인을 못 끝내는 경우(모듈/브라우저 없음 등):
+        # 비번만 암호화해 큐잉해두면 Playwright 있는 환경(서버 크론/GH Actions)이
+        # 다음 폴링 주기에 로그인을 대신 완료한다.
         conn = db.connect()
         conn.execute(
             "INSERT INTO samsam_accounts (member_id, samsam_email, label, password_enc, "
@@ -1249,8 +1255,18 @@ def chat_api_add_account():
         _trigger_chat_poll_workflow()
         return jsonify({"ok": True, "pending": True,
                          "message": "로그인 처리 중입니다. 잠시 후(보통 1분 이내) 새로고침해주세요."})
+
+    if not chat_auth.playwright_available():
+        return _queue_pending()
+    try:
+        res = chat_auth.login_and_get_refresh_token(email, password)
+    except chat_auth.LoginError as e:
+        return jsonify({"error": str(e)}), 400
     except Exception as e:
-        return jsonify({"error": f"로그인 중 오류: {repr(e)[:120]}"}), 500
+        # 브라우저 미설치·실행 실패 등 환경 문제 — 500 대신 큐잉으로 폴백(잘못된 비번은
+        # 위 LoginError로 이미 걸러짐). 예전엔 여기서 500이 떠 계정 연결이 아예 막혔다.
+        print(f"[chat] 로그인 환경 오류 — 큐잉 폴백: {repr(e)[:120]}", flush=True)
+        return _queue_pending()
 
     conn = db.connect()
     conn.execute(
@@ -1302,10 +1318,38 @@ def chat_api_cron_poll():
     key = request.args.get("key", "")
     if not secret or not hmac.compare_digest(key, secret):
         return jsonify({"error": "unauthorized"}), 403
-    conn = db.connect()
-    n = chat_poll.poll_all(conn)
-    conn.close()
-    return jsonify({"ok": True, "polled": n})
+
+    # 폴링은 계정 수·재로그인(Playwright)에 따라 1분을 넘길 수 있어 동기로 돌리면
+    # 크론 curl이 타임아웃(그리고 워커 점유)된다 → 백그라운드 스레드로 돌리고 즉시 응답.
+    # 중복 방지: 워커 프로세스가 여러 개라 pg advisory lock(DB 전역)으로 1회 실행 보장.
+    def _run():
+        conn = db.connect()
+        locked = False
+        try:
+            try:
+                locked = bool(conn.execute(
+                    "SELECT pg_try_advisory_lock(823401)").fetchone()[0])
+            except Exception:
+                locked = True    # SQLite 등 락 미지원 — 그냥 진행
+            if not locked:
+                print("[chat] cron-poll 스킵: 이미 실행 중", flush=True)
+                return
+            n = chat_poll.poll_all(conn)
+            s = chat_poll.process_outbox(conn)
+            print(f"[chat] cron-poll 완료: {n}계정 폴링, 답장 {s}건", flush=True)
+        except Exception as e:
+            print(f"[chat] cron-poll 오류: {repr(e)[:150]}", flush=True)
+        finally:
+            if locked:
+                try:
+                    conn.execute("SELECT pg_advisory_unlock(823401)")
+                except Exception:
+                    pass
+            conn.close()
+
+    import threading
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"ok": True, "started": True})
 
 
 @app.route("/chat/api/rooms")

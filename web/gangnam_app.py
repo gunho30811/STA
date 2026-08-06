@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-수도권 네이버부동산 매물 뷰어 (Flask).
+네이버부동산 매물 뷰어 (Flask). 노출 지역은 common/target_regions.py 기준
+(수도권 + 매일 크롤하는 추가 지역 — 2026-08-05 기준 부산·천안).
 
 naver_listings(Supabase) 를 SQL로 조회(필터·페이지네이션)해 카드 그리드 + 상세 모달로 보여준다.
 근처 삼삼(수요)은 samsam_listings(Supabase, 오피스텔) 인메모리 인덱스로 부착.
@@ -19,6 +20,7 @@ sys.path.insert(0, ROOT)   # db 모듈 import용(상세 모달이 DB에서 전�
 sys.path.insert(0, os.path.join(ROOT, "common"))   # 공용 유틸(subway 등, sta-common 예정)
 import subway  # noqa: E402  # 역 반경 검색: 매물 lat/lng ↔ 역 좌표 거리 계산
 import db  # noqa: E402  # naver_listings 를 DB에서 직접 쿼리(70MB 파일 통짜 로드 대신)
+import target_regions  # noqa: E402  # 크롤·노출 대상 지역(수도권 + 부산·천안)
 # 역명(N역) → (lat, lng). data/subway_stations.csv(수도권 589역). '역 반경 검색' 자동완성·거리계산에 씀.
 STATION_COORDS = {f"{n}역": (y, x) for n, y, x in subway._load()}
 M2_PER_PYEONG = 3.305785
@@ -58,14 +60,16 @@ def _cached(key, ttl, fn):
 OFFICE_KW = ("업무용", "전입불가", "전입 불가", "전입신고 불가", "전입신고불가")
 
 
-PYEONG_TOL = 3   # '평수도 같은' 허용 오차(평)
+# 네이버 building_type_code → 삼삼 building_type. 같은 유형끼리만 비교(오피스텔↔오피스텔).
+_NAVCODE2SAM = {"OPST": "오피스텔", "APT": "아파트", "VL": "연립빌라",
+                "OR": "원룸건물", "DDDGG": "단독주택", "SG": "상가주택"}
 
 _SAMOFF = None
-def _sam_offices():
-    """동 → [삼삼 오피스텔 {occ%, pyeong, week(주당 만원), name, url}]. (시군구,동)+동 키 둘 다.
+def _sam_idx():
+    """동 → [삼삼 매물 {btype, occ%, pyeong, week(주당 만원), name, url}]. (시군구,동)+동 키 둘 다.
 
-    네이버 매물에 '근처(같은 동)·같은 평수 삼삼 오피스텔'의 주당 평균·잘나가는/안나가는 걸
-    붙여, 삼삼엔 없어도 근처라 괜찮을지 가늠하게 한다. 계약=DB: samsam_listings(오피스텔)로 색인."""
+    네이버 매물에 '근처(같은 동)·같은 유형·같은 평수' 삼삼 시세를 붙여 비교하게 한다.
+    예전엔 삼삼 오피스텔만 색인해 네이버 원룸·빌라에도 오피스텔이 붙었음 → 전 유형 색인으로 교체."""
     global _SAMOFF
     if _SAMOFF is not None:
         return _SAMOFF
@@ -73,16 +77,17 @@ def _sam_offices():
     try:
         conn = db.connect()
         rows = conn.execute(
-            "SELECT name, building_name, url, sigungu, dong, area_pyeong, "
+            "SELECT name, building_name, url, sigungu, dong, building_type, area_pyeong, "
             "rent_total_weekly, booked_days_1m, blocked_days_1m "
-            "FROM samsam_listings WHERE building_type = '오피스텔'").fetchall()
+            "FROM samsam_listings").fetchall()
         conn.close()
     except Exception as e:
         print(f"[gangnam_app] 근처삼삼 DB 조회 실패({type(e).__name__}) → 빈 색인", flush=True)
         rows = []
     for r in rows:
         bk, bl = r["booked_days_1m"] or 0, r["blocked_days_1m"] or 0
-        o = {"occ": round(min(1.0, bk / max(31 - bl, 1)) * 100, 1),
+        o = {"btype": r["building_type"] or "",
+             "occ": round(min(1.0, bk / max(31 - bl, 1)) * 100, 1),
              "pyeong": r["area_pyeong"],
              "week": round((r["rent_total_weekly"] or 0) / 10000, 1),
              "name": r["name"] or r["building_name"] or "",
@@ -95,23 +100,30 @@ def _sam_offices():
 
 
 def _area_of(x):
-    """이 네이버 매물 근처(같은 동)·같은 평수 삼삼 오피스텔: 주당 평균 + 잘나가는/안나가는 것."""
-    idx = _sam_offices()
-    lst = idx.get((x.get("sigungu") or "", x.get("dong") or "")) or idx.get(("", x.get("dong") or "")) or []
-    if not lst:
-        return None
+    """이 네이버 매물 근처(같은 동)의 '같은 유형 + 같은 평수(정수 평 동일)' 삼삼 매물 비교.
+
+    유형이 다르거나(오피스텔↔원룸 등) 평수가 다르면 비교군에서 제외 — 완전 동일 조건만.
+    비교군이 없으면 None(비교 박스 미표시). 느슨한 '동 전체 폴백'은 오해를 낳아 제거."""
+    sam_bt = _NAVCODE2SAM.get(x.get("building_type_code") or "")
     py = x.get("pyeong")
-    same = [o for o in lst if py and o["pyeong"] and abs(o["pyeong"] - py) <= PYEONG_TOL]
-    comp = same or lst                      # 같은 평수 없으면 동 전체로 폴백
+    if not sam_bt or not py:
+        return None
+    idx = _sam_idx()
+    lst = idx.get((x.get("sigungu") or "", x.get("dong") or "")) or idx.get(("", x.get("dong") or "")) or []
+    py_i = round(py)
+    comp = [o for o in lst
+            if o["btype"] == sam_bt and o["pyeong"] and round(o["pyeong"]) == py_i]
+    if not comp:
+        return None
     weeks = [o["week"] for o in comp if o["week"]]
     avg_week = round(sum(weeks) / len(weeks), 1) if weeks else None
     best = max(comp, key=lambda o: o["occ"])
     worst = min(comp, key=lambda o: o["occ"])
     pick = lambda o: {"name": o["name"], "occ": o["occ"], "week": o["week"], "url": o["url"]}
-    res = {"n": len(comp), "same_pyeong": bool(same), "avg_week": avg_week,
-           "best": pick(best), "worst": pick(worst),
+    res = {"n": len(comp), "same_pyeong": True, "pyeong": py_i, "btype": sam_bt,
+           "avg_week": avg_week, "best": pick(best), "worst": pick(worst),
            "net": None, "sam_rev": None, "mgmt": None}
-    # 순수익(월): 예약률 높은(잘나감) 삼삼 오피스텔 매출 − 네이버 월세 − 관리비(없으면 기본 20).
+    # 순수익(월): 예약률 높은(잘나감) 동일조건 삼삼 매출 − 네이버 월세 − 관리비(없으면 기본 20).
     #   삼삼 월매출 = 주당 × 예약률 × 30/7 (build_integrated 관례).
     rent = x.get("rent_monthly")
     if best["week"] and isinstance(rent, (int, float)) and rent > 0:
@@ -184,14 +196,15 @@ def assets(filename):
 def api_facets():
     # 첫 화면을 막지 않게 '가벼운 것만' 준다. 지역 트리는 /api/regions 로 lazy,
     # 업무용 매물수(느린 ILIKE 스캔)는 /api/office_count 로 async 로 뺐다.
-    # sido는 작은 regions 테이블(수도권)에서 — nl_live(29만) DISTINCT 전체 스캔 회피.
-    # types는 고정 7종(수도권 월세는 전부 존재) — building_type_code DISTINCT 스캔 회피.
+    # sido는 작은 regions 테이블에서 — nl_live(29만) DISTINCT 전체 스캔 회피.
+    # 대상 지역(수도권 + 부산·천안)만 노출. types는 고정 7종 — DISTINCT 스캔 회피.
     def _load():
+        where, params = target_regions.sql_where()
         conn = db.connect()
         try:
             return [r[0] for r in conn.execute(
-                "SELECT DISTINCT sido FROM regions "
-                "WHERE sido IN ('서울시','경기도','인천시') ORDER BY sido").fetchall()]
+                f"SELECT DISTINCT sido FROM regions WHERE {where} ORDER BY sido",
+                params).fetchall()]
         finally:
             conn.close()
     sidos = _cached("facets_sido", 600, _load)
@@ -245,12 +258,13 @@ def api_stats():
                 f"SELECT COUNT(DISTINCT dong) FROM {BASE} "
                 "WHERE dong IS NOT NULL AND dong <> ''").fetchone()[0]
             # 정확한 중앙값은 40만행 정렬이라 수십 초 → listings 10% 표본으로 근사(뷰는 TABLESAMPLE 불가).
+            med_where, med_params = target_regions.sql_where()
             med = conn.execute(
                 "SELECT percentile_disc(0.5) WITHIN GROUP (ORDER BY rent) "
                 "FROM listings TABLESAMPLE SYSTEM(10) "
-                "WHERE sido IN ('서울시','경기도','인천시') "
+                f"WHERE {med_where} "
                 "AND crawled_at >= to_char(now() - interval '7 days','YYYY-MM-DD') "
-                "AND rent > 0").fetchone()[0]
+                "AND rent > 0", med_params).fetchone()[0]
             by_type = [(r[0], r[1]) for r in conn.execute(
                 f"SELECT building_type_code, COUNT(*) c FROM {BASE} "
                 "GROUP BY building_type_code ORDER BY c DESC").fetchall()]

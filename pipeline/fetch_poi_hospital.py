@@ -27,7 +27,9 @@ load_dotenv(os.path.join(BASE, ".env"))
 
 OUT = os.path.join(BASE, "data", "poi.csv")
 API = "https://apis.data.go.kr/B551182/hospInfoServicev2/getHospBasisList"
-SIDO = {"110000": "서울", "310000": "경기", "230000": "인천"}
+# 크롤 대상 지역과 맞춘다(2026-08-05 부산·충남 추가 — 충남은 천안 수요 근거용).
+SIDO = {"110000": "서울", "310000": "경기", "230000": "인천",
+        "210000": "부산", "340000": "충남"}
 CLCD = {"01": "상급종합", "11": "종합병원"}
 
 

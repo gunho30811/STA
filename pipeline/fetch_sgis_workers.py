@@ -26,7 +26,10 @@ load_dotenv(os.path.join(BASE, ".env"))
 
 OUT = os.path.join(BASE, "data", "dong_workers.csv")
 SGIS = "https://sgisapi.kostat.go.kr/OpenAPI3"
-METRO = {"11": "서울특별시", "31": "경기도", "23": "인천광역시"}   # SGIS 시도코드
+# SGIS 시도코드(MOIS 법정동 코드와 다름 — SGIS 21=부산, 34=충남).
+# 크롤 대상 지역과 맞춘다(2026-08-05 부산·충남 추가 — 충남은 천안 수요 근거용).
+METRO = {"11": "서울특별시", "31": "경기도", "23": "인천광역시",
+         "21": "부산광역시", "34": "충청남도"}
 YEAR = "2022"   # 전국사업체조사 최신 제공연도
 
 

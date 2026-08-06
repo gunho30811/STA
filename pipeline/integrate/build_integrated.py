@@ -24,7 +24,9 @@ sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, BASE)
+sys.path.insert(0, os.path.join(BASE, 'common'))
 import db
+import target_regions
 
 OUT = os.path.join(BASE, 'data', 'net_profit_integrated.csv')
 
@@ -43,8 +45,8 @@ SAM_TO_NAV = {
     '원룸건물': {'OR'},             # 원룸
     '상가주택': {'SG', 'DDDGG'},    # 상가 + 단독/다가구(상가주택 성격 혼재)로 완화
 }
-# 네이버 매칭이 없어도 노출할 지역 — 네이버 커버리지가 있는 수도권만(비수도권 미매칭은 제외).
-METRO_SIDO = {'서울특별시', '경기도', '인천광역시'}
+# 네이버 매칭이 없어도 노출할 지역 = 매일 크롤하는 대상 지역(common/target_regions.py).
+# 그 밖의 지역은 네이버 시세가 낡아 미매칭이면 판단 근거가 없으므로 제외한다.
 
 
 # ── 공통 유틸 ──────────────────────────────────────────────────────────────────
@@ -197,8 +199,8 @@ def build_rows(sam, nav, max_deposit=None):
     for s in sam:
         hits, bldg_all = strict_match(s, nidx, fine)
         matched = bool(hits)
-        # 네이버 매칭이 없어도 수도권 매물은 삼삼 데이터만이라도 노출(요청). 비수도권 미매칭은 제외.
-        if not matched and s['sido'] not in METRO_SIDO:
+        # 네이버 매칭이 없어도 대상 지역 매물은 삼삼 데이터만이라도 노출(요청).
+        if not matched and not target_regions.in_target(s['sido'], s['sigungu']):
             continue
 
         # ── 삼삼 공통(매칭 여부 무관) ──

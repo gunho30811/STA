@@ -5,19 +5,26 @@
 부동산 매물 뷰어(web/gangnam_app.py)가 상세 테이블(naver_listings) 대신 이 뷰를 읽어,
 목록 크롤(crawler.py)이 listings에 넣는 즉시 사이트에 반영되게 한다(진짜 실시간).
 
-  nl_live = listings(실시간·수도권·최근7일) LEFT JOIN naver_listings(상세 보강)
+  nl_live = listings(실시간·크롤 대상 지역·최근7일) LEFT JOIN naver_listings(상세 보강)
     - 필터/정렬/집계 컬럼(building_type_code, sido, dong, rent, deposit, area, crawled_at,
       confirmymd)은 listings에서 '직접' 노출 → 인덱스로 빠르게. 타입은 한글명→코드 CASE.
     - 상세 전용 컬럼(rooms, floor_current, subway_*, *_address)만 naver_listings에서 조인.
-    - WHERE: 수도권(서울/경기/인천) + 최근 7일(crawled_at) = 내려간 매물 자동 숨김(DB엔 유지).
+    - WHERE: 크롤 대상 지역(common/target_regions.py) + 월세. 대상 밖 지역은 시세가 낡아 숨김
+      (DB엔 유지). 삭제된 매물은 별도 정리.
 
   python pipeline/naver/create_live_view.py
 """
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+_BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, _BASE)
+sys.path.insert(0, os.path.join(_BASE, "common"))
 import db
+import target_regions
+
+# 뷰 노출 지역 = 크롤 대상 지역(수도권 + 부산·천안). 뷰 정의엔 파라미터를 못 쓰므로 리터럴로.
+_REGION = target_regions.sql_literal('l.sido', 'l.sigungu')
 
 # 한글 매물명 → 네이버 코드 (listings.realestatetype 은 realEstateTypeName(한글)을 저장함)
 _BTYPE = (
@@ -58,7 +65,7 @@ SELECT
   NULLIF(l.confirmymd,'') AS confirmed_sort
 FROM listings l
 LEFT JOIN naver_listings n ON n.article_no = l.articleno::bigint
-WHERE l.sido IN ('서울시','경기도','인천시')
+WHERE {_REGION}
   AND l.tradetype = '월세'
   -- (최신일 필터 제거: 부분 크롤에도 뷰 공백 방지. 삭제매물은 별도 정리)
 """
@@ -83,7 +90,7 @@ SELECT
   l.crawled_at,
   NULLIF(l.confirmymd,'') AS confirmed_sort
 FROM listings l
-WHERE l.sido IN ('서울시','경기도','인천시')
+WHERE {_REGION}
   AND l.tradetype = '월세'
   -- (최신일 필터 제거: 부분 크롤에도 뷰 공백 방지. 삭제매물은 별도 정리)
 """

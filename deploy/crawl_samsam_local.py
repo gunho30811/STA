@@ -9,7 +9,8 @@
   3) DATABASE_URL을 그 터널로 지정하고 크롤·후처리 파이프라인을 순서대로 실행한다.
      - 스케줄(예약) 조회는 이 PC(가정용 IP)라 삼삼 소프트차단을 피한다.
      - DB 쓰기는 전부 오라클 pg로 간다.
-기본은 수도권 오피스텔 전량 매일 갱신(쿨다운 해제). --types 로 대상 조정.
+기본은 수도권 오피스텔 전량 매일 갱신(쿨다운 해제) + 추가 지역(부산·천안) 전 유형 갱신.
+--types / SAMSAM_LOCAL_TYPES 로 수도권 대상 유형을, SAMSAM_EXTRA_REGIONS로 추가 지역을 조정한다.
 
 윈도우 작업 스케줄러(rendit-samsam-daily)가 매일 05:00 실행. PC가 켜져 있어야 함.
 """
@@ -19,6 +20,7 @@ import socket
 import subprocess
 import sys
 import threading
+import time
 import urllib.parse
 from socketserver import BaseRequestHandler, ThreadingTCPServer
 
@@ -30,7 +32,15 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(os.path.join(ROOT, ".env"))
 
 LOCAL_PORT = 15432
-TYPES = os.environ.get("SAMSAM_LOCAL_TYPES", "OFFICETEL")   # 기본 오피스텔
+TYPES = os.environ.get("SAMSAM_LOCAL_TYPES", "OFFICETEL")   # 기본 오피스텔(수도권 물량이 커서)
+
+# 수도권 외 추가 지역은 매물이 적어(부산 1.3k·천안 0.15k) 전 유형을 매일 돌린다.
+# 토큰은 common/target_regions.py의 EXTRA_REGIONS와 같은 표기(시군구 필터로도 그대로 씀).
+EXTRA_REGIONS = [s.strip() for s in
+                 os.environ.get("SAMSAM_EXTRA_REGIONS", "부산,천안시").split(",") if s.strip()]
+# 계정당 하루 예약조회 한도(~5,000 실측) 안에서 수도권 오피스텔(계정당 ~3.4k)과 나눠 쓴다.
+EXTRA_LIMIT = os.environ.get("SAMSAM_EXTRA_DAILY_LIMIT", "800")
+ONLY_EXTRA = os.environ.get("SAMSAM_ONLY_EXTRA") == "1"   # 추가 지역만(지역 편입 1회성 실행용)
 
 
 def _ssh():
@@ -38,6 +48,8 @@ def _ssh():
     c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     c.connect(os.environ["ORACLE_HOST"], username=os.environ["ORACLE_USER"],
               password=os.environ["ORACLE_PASSWORD"], timeout=20)
+    # 수 시간짜리 크롤 동안 유휴 SSH가 끊기지 않게 keepalive (NAT/방화벽 타임아웃 대비).
+    c.get_transport().set_keepalive(15)
     return c
 
 
@@ -49,14 +61,22 @@ def _run(ssh, cmd):
 def _make_handler(transport, remote_host, remote_port):
     class H(BaseRequestHandler):
         def handle(self):
-            try:
-                chan = transport.open_channel(
-                    "direct-tcpip", (remote_host, remote_port),
-                    self.request.getpeername())
-            except Exception as ex:
-                print(f"[tunnel] 채널 열기 실패: {ex}", flush=True)
-                return
+            # 연결 폭주/일시 장애로 채널 열기가 실패할 수 있어 3회 재시도
+            # (여기서 조용히 죽으면 크롤 쪽 DB 쓰기가 유실됨).
+            chan = None
+            for attempt in range(3):
+                try:
+                    chan = transport.open_channel(
+                        "direct-tcpip", (remote_host, remote_port),
+                        self.request.getpeername())
+                    if chan is not None:
+                        break
+                except Exception as ex:
+                    print(f"[tunnel] 채널 열기 실패({attempt + 1}/3): {ex}", flush=True)
+                time.sleep(0.5 * (attempt + 1))
             if chan is None:
+                print("[tunnel] 채널 포기 — DB 연결 1건 실패", flush=True)
+                self.request.close()
                 return
             try:
                 while True:
@@ -106,24 +126,35 @@ def main():
     env["PYTHONPATH"] = ROOT + os.pathsep + os.path.join(ROOT, "pipeline", "samsam")
 
     py = sys.executable
-    steps = [
-        [py, "pipeline/samsam/crawler.py", "--types", TYPES],
-        [py, "pipeline/samsam/snapshot.py"],
-        # 최신 예약률로 네이버 크롤 대상 동(예약률 30%+ 수도권) 재생성 → 다음 네이버 02:00 실행이 사용
-        [py, "pipeline/samsam/gen_naver_dongs.py"],
-        [py, "pipeline/integrate/build_integrated.py"],
-        [py, "pipeline/refresh_insights.py"],
+    # (명령, env 덮어쓰기, 실패 시 중단)
+    steps = []
+    if not ONLY_EXTRA:
+        # 수도권 오피스텔 — 추가 지역은 아래 전용 스텝이 맡으므로 여기선 제외(중복 조회 방지)
+        steps.append(([py, "pipeline/samsam/crawler.py", "--types", TYPES],
+                      {"RENDIT_EXTRA_REGIONS": ""}, True))
+    for token in EXTRA_REGIONS:
+        steps.append(([py, "pipeline/samsam/crawler.py", "--sigungu", token],
+                      {"RENDIT_EXTRA_REGIONS": token,
+                       "SAMSAM_REFRESH_DAILY_LIMIT": EXTRA_LIMIT}, False))
+    steps += [
+        ([py, "pipeline/samsam/snapshot.py"], {}, False),
+        # 최신 예약률로 네이버 크롤 대상 동(예약률 30%+) 재생성 → 다음 네이버 02:00 실행이 사용
+        ([py, "pipeline/samsam/gen_naver_dongs.py"], {}, False),
+        ([py, "pipeline/integrate/build_integrated.py"], {}, False),
+        ([py, "pipeline/refresh_insights.py"], {}, False),
     ]
     rc = 0
     try:
-        for step in steps:
-            print(f"\n[run] {' '.join(step)}", flush=True)
-            p = subprocess.run(step, cwd=ROOT, env=env)
+        for step, over, critical in steps:
+            print(f"\n[run] {' '.join(step)}"
+                  + (f"  [{' '.join(f'{k}={v}' for k, v in over.items())}]" if over else ""),
+                  flush=True)
+            p = subprocess.run(step, cwd=ROOT, env={**env, **over})
             if p.returncode != 0:
                 print(f"[warn] 종료코드 {p.returncode}: {step[1]}", flush=True)
                 rc = p.returncode
-                if step[1].endswith("crawler.py"):
-                    break   # 크롤 실패면 후처리 무의미
+                if critical:
+                    break   # 수도권 크롤이 실패하면 후처리 무의미
     finally:
         server.shutdown()
         ssh.close()

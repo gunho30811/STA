@@ -26,8 +26,10 @@ sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 import chat_auth
 import crypto_util
 import db
+import kakao_notify
 
 MSG_LIMIT = 50  # 폴링마다 방당 최근 메시지 N개만 조회 — 신규분만 있으면 충분, 전체 이력 아님
+CHAT_URL = f"https://{os.environ.get('RENDIT_DOMAIN', 'rendits.duckdns.org')}/samsam/chat/"
 
 
 def log(m):
@@ -110,8 +112,44 @@ def _poll_messages(conn, room_id, room_key, id_token):
     conn.commit()
 
 
+def _notify_new_chat(conn, acct, room_id, room, nickname, st, prev_in, new_in, first_poll):
+    """방별 첫 신규 수신 메시지에만 카톡 알림. '읽음→안읽음' 전환 순간 1회.
+
+    st: {last_read_at, last_notified_time}(적재 전 상태), prev_in/new_in: 적재 전/후 상대방 최신 시각.
+    first_poll(계정 첫 연결)엔 기준선만 잡고 알림 안 함(기존 대화 무더기 알림 방지)."""
+    if new_in is None:
+        return
+    has_new = prev_in is None or new_in > prev_in
+    if not has_new:
+        return
+    last_read = (st['last_read_at'] if st else None) or 0
+    last_notif = (st['last_notified_time'] if st else None) or 0
+    unread_before = prev_in is not None and prev_in > last_read
+    should = (not first_poll) and (not unread_before) and (new_in > last_notif)
+    if should:
+        label = acct.get('label') or acct.get('samsam_email') or '삼삼 계정'
+        preview = (room.get('last_message') or '').strip().replace('\n', ' ')[:60]
+        text = (f"[rendit] 새 채팅 문의\n계정: {label}\n"
+                f"{nickname or '게스트'}: {preview or '(내용 없음)'}")
+        try:
+            if kakao_notify.send_to_member(conn, acct['member_id'], text, CHAT_URL, "채팅 열기"):
+                log(f"    카톡 알림 발송(room {room_id}, member#{acct['member_id']})")
+        except Exception as e:
+            log(f"    카톡 알림 오류: {repr(e)[:100]}")
+    if new_in > last_notif:
+        conn.execute("UPDATE samsam_chat_rooms SET last_notified_time=%s WHERE id=%s",
+                     (new_in, room_id))
+        conn.commit()
+
+
 def poll_account(conn, acct):
     acct_id = acct['id']
+    # 재연결 필요(비번 오류 등)로 표시된 계정은 자동 폴링에서 제외 — 1분 크론이 실패하는
+    # 브라우저 로그인을 무한 반복하지 않게. 사용자가 웹에서 수동 폴링/재연결하면 다시 시도.
+    if (acct.get('status') or '') == 'reauth_needed':
+        log(f"  계정#{acct_id} 재연결 필요 상태 — 자동 재시도 생략")
+        return
+    first_poll = not acct['refresh_token_enc']  # 계정 첫 연결(아직 refreshToken 없음)
     tok = None
 
     # refresh_token_enc가 아직 없으면(웹에서 Playwright 없이 큐잉만 된 pending_login 계정)
@@ -155,13 +193,25 @@ def poll_account(conn, acct):
     # 임대인(host) 모드 채팅만 저장 — 이 계정이 게스트로 예약한 방(임차인 채팅)은 제외.
     host_rooms = {k: r for k, r in chatlist.items() if r.get('host_or_guest') == 'host'}
     nickname_cache = {}
+    me = str(member_id)
     for room_key, room in host_rooms.items():
         nickname = None
         counterpart = room.get('member')
         if counterpart:
             nickname = _get_nickname(id_token, counterpart, nickname_cache)
         room_id = _upsert_room(conn, acct_id, room_key, room, nickname)
+        # 신규 수신 메시지 감지용 상태(적재 전) — 상대방(sender != 내 member_id) 최신 메시지 시각.
+        st = conn.execute(
+            "SELECT last_read_at, last_notified_time FROM samsam_chat_rooms WHERE id=%s",
+            (room_id,)).fetchone()
+        prev_in = conn.execute(
+            "SELECT MAX(message_time) FROM samsam_chat_messages WHERE room_id=%s AND sender<>%s",
+            (room_id, me)).fetchone()[0]
         _poll_messages(conn, room_id, room_key, id_token)
+        new_in = conn.execute(
+            "SELECT MAX(message_time) FROM samsam_chat_messages WHERE room_id=%s AND sender<>%s",
+            (room_id, me)).fetchone()[0]
+        _notify_new_chat(conn, acct, room_id, room, nickname, st, prev_in, new_in, first_poll)
 
     conn.execute(
         "UPDATE samsam_accounts SET refresh_token_enc=%s, samsam_member_id=%s, "
@@ -179,17 +229,59 @@ def _mark_outbox(conn, outbox_id, status, error=None):
     conn.commit()
 
 
+def _verify_room_live(item):
+    """발송 직전, 삼삼 실서버(RTDB)로 방이 살아있고 지정한 상대의 방이 맞는지 교차확인.
+
+    UI 조작(send_message)만으로는 같은 매물명 방이 여러 개일 때 오발송 위험이 있어, 그 전에
+    기계적으로 확실한 신원(room_key·상대 회원ID)으로 한 겹 더 막는다.
+
+    반환: (ok: bool, reason: str)
+      - 방이 채팅목록에서 사라졌으면(삭제) → 발송 보류. 사용자가 원한 정책:
+        "삭제된 방엔 상대가 다시 연락할 때까지 발송하지 않는다".
+      - 방의 상대 회원ID가 DB와 다르면(신원 불일치) → 오발송 방지 위해 중단.
+    """
+    enc = item.get('refresh_token_enc')
+    if not enc:
+        return False, '계정 토큰 없음 — 재연결 필요'
+    try:
+        tok = chat_auth.refresh_id_token(crypto_util.decrypt(enc))
+        id_token, me = tok['id_token'], tok['samsam_member_id']
+    except Exception as e:
+        return False, f'토큰 갱신 실패: {repr(e)[:80]}'
+    try:
+        chatlist = chat_auth.rtdb_get(f'live/chatlist/{me}', id_token) or {}
+    except Exception as e:
+        return False, f'chatlist 조회 실패: {repr(e)[:80]}'
+    room = chatlist.get(str(item['samsam_room_key']))
+    if not room:
+        return False, '방이 삭제됨(채팅목록에 없음) — 상대가 다시 연락할 때까지 발송 보류'
+    if str(room.get('member') or '') != str(item['counterpart_member'] or ''):
+        return False, ('방-상대 불일치(목록 상대 '
+                       f"{room.get('member')} != DB {item['counterpart_member']}) — 발송 중단")
+    if room.get('host_or_guest') != 'host':
+        return False, '임대인(host) 방이 아님 — 발송 중단'
+    return True, 'ok'
+
+
 def process_outbox(conn):
     """대기 중인 답장(samsam_chat_outbox status='pending')을 실제 발송.
 
     로그인과 마찬가지로 브라우저 자동화(Playwright)가 필요해 GH Actions에서만 처리한다
     (Vercel 1분 cron은 poll_all만 돌리고 여긴 안 건드림 — chat_api_cron_poll이 이 함수를
     호출하지 않는 이유).
+
+    오발송 방지가 최우선이라 여러 겹으로 확인한다:
+      1) RTDB 교차확인(_verify_room_live): room_key 생존 + 상대 회원ID 일치.
+      2) send_message: 매물명 + 상대 닉네임으로 방을 '정확히 1개' 특정 + 열린 방 재확인.
+    어느 겹이라도 어긋나면 발송하지 않는다. 삭제된 방은 'blocked'로 남겨(=재시도 안 함)
+    상대가 다시 연락해 방이 되살아나기 전까지 보내지 않는다.
     """
     if not chat_auth.playwright_available():
         return 0
     items = conn.execute(
-        """SELECT o.id, o.room_id, o.message, r.room_name, a.samsam_email, a.password_enc
+        """SELECT o.id, o.room_id, o.message,
+                  r.room_name, r.samsam_room_key, r.counterpart_member, r.counterpart_nickname,
+                  a.samsam_email, a.password_enc, a.refresh_token_enc
            FROM samsam_chat_outbox o
            JOIN samsam_chat_rooms r ON r.id = o.room_id
            JOIN samsam_accounts a ON a.id = r.account_id
@@ -200,11 +292,22 @@ def process_outbox(conn):
         if not item['password_enc']:
             _mark_outbox(conn, item['id'], 'failed', '연결 계정 비밀번호 없음')
             continue
+        # 안전장치 ①: 발송 전 방 생존·상대 신원 교차확인(삭제된 방은 보류).
+        ok, reason = _verify_room_live(item)
+        if not ok:
+            _mark_outbox(conn, item['id'], 'blocked', reason)
+            log(f"  outbox#{item['id']} 발송 보류: {reason}")
+            continue
+        # 안전장치 ②: UI에서 매물명+닉네임으로 방을 정확히 특정해 발송(내부에서 재확인).
         try:
             password = crypto_util.decrypt(item['password_enc'])
-            chat_auth.send_message(item['samsam_email'], password, item['room_name'], item['message'])
+            chat_auth.send_message(
+                item['samsam_email'], password,
+                room_name=item['room_name'], message=item['message'],
+                counterpart_nickname=item['counterpart_nickname'],
+                samsam_room_key=item['samsam_room_key'])
             _mark_outbox(conn, item['id'], 'sent')
-            log(f"  outbox#{item['id']} 방({item['room_name']}) 발송 완료")
+            log(f"  outbox#{item['id']} 방({item['room_name']}/{item['counterpart_nickname']}) 발송 완료")
         except Exception as e:
             log(f"  outbox#{item['id']} 발송 실패: {repr(e)[:120]}")
             _mark_outbox(conn, item['id'], 'failed', repr(e)[:200])
@@ -215,7 +318,7 @@ def poll_all(conn):
     """연결된(비활성 아닌) 전체 계정을 폴링. GH Actions(main)와 Vercel cron 엔드포인트가 공용으로 씀."""
     accounts = conn.execute(
         "SELECT id, member_id, samsam_email, label, password_enc, refresh_token_enc, "
-        "samsam_member_id FROM samsam_accounts WHERE status != 'disabled'").fetchall()
+        "samsam_member_id, status FROM samsam_accounts WHERE status != 'disabled'").fetchall()
     for acct in accounts:
         poll_account(conn, dict(acct))
     return len(accounts)

@@ -31,6 +31,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import db
 import poi as poi_mod
 import subway
+import target_regions   # 크롤·노출 대상 지역(수도권 + 부산·천안)
 from auth import current_user, init_auth, latest_listing_churn, online_count
 
 portal = Flask(__name__)
@@ -76,12 +77,14 @@ SPOT_TOP = 8
 def _supply_shortage_spots(conn):
     """동 단위 공급부족 스팟 TOP N — 예약률·렌트/네이버 매물수·평균 월순수익·영업이익률."""
     # ① 동별 렌트 수요/공급
+    where, params = target_regions.sql_where()
     dongs = conn.execute(
         "SELECT sigungu, dong, COUNT(*) n,"
         " AVG(LEAST(1.0, COALESCE(booked_days_1m,0)::float"
         "     / GREATEST(31-COALESCE(blocked_days_1m,0),1)))*100 occ"
-        " FROM samsam_listings WHERE sido IN ('서울특별시','경기도','인천광역시')"
-        " GROUP BY sigungu, dong HAVING COUNT(*) >= %s", (SPOT_MIN_RENT,)).fetchall()
+        f" FROM samsam_listings WHERE {where}"
+        " GROUP BY sigungu, dong HAVING COUNT(*) >= %s",
+        params + [SPOT_MIN_RENT]).fetchall()
     cands = [{"sigungu": r[0] or "", "dong": r[1] or "", "n_rent": r[2], "occ": round(r[3], 1)}
              for r in dongs if r[3] >= SPOT_MIN_OCC and r[2] <= SPOT_MAX_RENT]
     cands.sort(key=lambda x: -x["occ"])
@@ -173,18 +176,21 @@ def _unclaimed_spots(conn):
     회전율 = 최근 7일 신규 등록(confirmYmd) / 활성 매물 수. 등록이 빨리 채워질수록
     월세 수요가 활발하다는 신호(매물이 안 나가면 신규 등록만 계속 쌓여 오히려 활성 재고가
     불어나므로, 회전율은 '재고 대비 신규 유입 속도'로 시장 활력의 근사치)."""
+    # listings(네이버)는 시도 표기가 '서울시/인천시'라 삼삼 표기로 필터하면 경기도만 걸린다
+    # → target_regions의 접두 매칭 사용.
+    where, params = target_regions.sql_where()
     rows = conn.execute(
         "SELECT sigungu, dong,"
         " COUNT(*) FILTER (WHERE confirmymd IS NOT NULL) AS active,"
         " COUNT(*) FILTER (WHERE confirmymd::text >= to_char(now()-interval '7 days','YYYYMMDD')) AS new7"
-        " FROM listings WHERE sido IN ('서울특별시','경기도','인천광역시') AND dong IS NOT NULL"
-        " GROUP BY sigungu, dong HAVING COUNT(*) FILTER (WHERE confirmymd IS NOT NULL) >= 30"
-    ).fetchall()
+        f" FROM listings WHERE {where} AND dong IS NOT NULL"
+        " GROUP BY sigungu, dong HAVING COUNT(*) FILTER (WHERE confirmymd IS NOT NULL) >= 30",
+        params).fetchall()
     dong_names = list({r[1] for r in rows})
     sam = dict(conn.execute(
-        "SELECT dong, COUNT(*) FROM samsam_listings"
-        " WHERE sido IN ('서울특별시','경기도','인천광역시') AND dong = ANY(%s) GROUP BY dong",
-        (dong_names,)).fetchall()) if dong_names else {}
+        f"SELECT dong, COUNT(*) FROM samsam_listings WHERE {where}"
+        " AND dong = ANY(%s) GROUP BY dong",
+        params + [dong_names]).fetchall()) if dong_names else {}
     cands = []
     for sg, d, active, new7 in rows:
         turnover = new7 / active if active else 0
@@ -343,16 +349,15 @@ padding:14px;text-align:center}
   <a class=card href="/samsam/"><div class=ic>{ICON_RENT}</div><h2>렌트 분석</h2>
     <p>옵션별 예약률 영향, 건물 인기(월순수익), 지역 예약률 트렌드</p></a>
   <a class=card href="/gangnam/"><div class=ic>{ICON_ESTATE}</div><h2>부동산 매물</h2>
-    <p>수도권(서울·경기·인천) 부동산 매물 카드/상세 탐색</p></a>
+    <p>{REGION_TEXT} 부동산 매물 카드/상세 탐색</p></a>
 </div>
 {% if churn %}
 <div class=churn>
   <div class=churn-h>🔄 렌트 매물 변동 <span class=churn-d>최근 크롤 {{churn.date}}</span></div>
   <div class=churn-grid>
-    {% for full, short in [('서울특별시','서울'),('경기도','경기'),('인천광역시','인천')] %}
-    {% set c = churn.rows.get(full, {'added':0,'removed':0,'total':0}) %}
+    {% for c in churn.cells %}
     <div class=churn-cell>
-      <div class=cc-region>{{short}}</div>
+      <div class=cc-region>{{c.region}}</div>
       <div class=cc-nums><span class=up>+{{'{:,}'.format(c.added)}}</span><span class=dn>-{{'{:,}'.format(c.removed)}}</span></div>
       <div class=cc-total>현재 {{'{:,}'.format(c.total)}}</div>
     </div>
@@ -720,7 +725,7 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
   <div class=sec-h>
     <span class=tag2>⭐ 공급부족 스팟 파인더</span>
     <h2>단기임대 수요는 높은데 공급이 없는 동네,<br>지도에서 바로 찾으세요</h2>
-    <p>계산기·지도는 강남권까지 무료. 수도권 전 지역과 공급부족 스팟 + 근처 매물 매칭은 가입하면 열려요.</p>
+    <p>계산기·지도는 강남권까지 무료. {REGION_TEXT} 전 지역과 공급부족 스팟 + 근처 매물 매칭은 가입하면 열려요.</p>
   </div>
   <div class=wall-panel>
     <div class=wall-grid>
@@ -730,8 +735,8 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
         <div class=n>평균 순수익 +164만원 · 매물 12개</div>
       </div>
       <div class="wcell locked">
-        <div class=k>수도권 전체</div>
-        <div class=name>마포·성동·송파…</div>
+        <div class=k>전 지역</div>
+        <div class=name>마포·성동·해운대…</div>
         <div class=n>평균 순수익 +███만원 · 매물 ███개</div>
       </div>
       <div class="wcell locked">
@@ -743,7 +748,7 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
     <div class=wall-overlay>
       <div class=wall-card>
         <div class=t>🔓 전체 지도·추천 스팟 잠금 해제</div>
-        <div class=d>수도권 전체 순위와 공급부족 추천 스팟을 지도에서 한눈에.</div>
+        <div class=d>{REGION_TEXT} 전 지역 순위와 공급부족 추천 스팟을 지도에서 한눈에.</div>
         <a href="/auth/signup">가입하고 전체 열기 →</a>
       </div>
     </div>
@@ -772,7 +777,7 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
 <section class=signup-sec id=signup>
   <div class=signup-card>
     <h2>계산해 봤다면, 이제 전체를 열어보세요</h2>
-    <p>수도권 전 지역 순위, 공급부족 추천 스팟 지도, 상세 수익 리포트까지 회원에게 열립니다.</p>
+    <p>{REGION_TEXT} 전 지역 순위, 공급부족 추천 스팟 지도, 상세 수익 리포트까지 회원에게 열립니다.</p>
     <a class=btn href="/auth/signup">가입하고 전체 열기</a>
   </div>
 </section>
@@ -848,7 +853,9 @@ ICON_WARN = _tile('<path d="M23 13l11 19H12z"/><path d="M23 20v6"/>'
 
 _ICONS = {"ICON_PROFIT": ICON_PROFIT, "ICON_RENT": ICON_RENT, "ICON_ESTATE": ICON_ESTATE,
           "ICON_CALC": ICON_CALC, "ICON_MAP": ICON_MAP, "ICON_SPOT": ICON_SPOT,
-          "ICON_LOST": ICON_LOST, "ICON_SCATTER": ICON_SCATTER, "ICON_WARN": ICON_WARN}
+          "ICON_LOST": ICON_LOST, "ICON_SCATTER": ICON_SCATTER, "ICON_WARN": ICON_WARN,
+          # 서비스 커버리지 문구 — 지역이 늘면(부산·천안 등) 문구도 같이 바뀐다
+          "REGION_TEXT": target_regions.display()}
 for _k, _v in _ICONS.items():
     LANDING = LANDING.replace("{" + _k + "}", _v)
     PUBLIC_LANDING = PUBLIC_LANDING.replace("{" + _k + "}", _v)
@@ -1103,7 +1110,7 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
 <div class=cta-row>
   <div class=cta-text>
     <p class=cta-h1 id=o_ctahead>이 매물은 한 달 약 -일까지 채우면 흑자예요.</p>
-    <p class=cta-h2>그럼 애초에 공실 걱정 적은 — 수요 높고 공급 부족한 자리는 어디일까요?</p>
+    <p class=cta-h2>그럼 애초에 공실 걱정 적은, 수요 높고 공급 부족한 자리는 어디일까요?</p>
   </div>
   <a class=cta-btn href="/auth/signup">★ 공급부족 스팟 보기</a>
 </div>
@@ -1146,8 +1153,8 @@ function calc(){
   document.getElementById('o_bedays').textContent=revW>0?beDays:'-'
   document.getElementById('o_bepct').textContent=revW>0?bePct:'-'
   var ctaHead=document.getElementById('o_ctahead')
-  if(ctaHead) ctaHead.textContent=revW>0?
-    ('이 매물은 한 달 약 '+beDays+'일까지 채우면 흑자예요.'):'이 매물은 지금 조건으로는 흑자가 나지 않아요.'
+  if(ctaHead) ctaHead.innerHTML=revW>0?
+    ('이 매물은 한 달 <span class=pos>약 '+beDays+'일</span>까지 채우면 흑자예요.'):'이 매물은 지금 조건으로는 흑자가 나지 않아요.'
   var tb=document.getElementById('o_vac'),h='', beShown=false
   ;[0,10,15,20,30].forEach(function(p){
     if(!beShown && revW>0 && p>bePct){
