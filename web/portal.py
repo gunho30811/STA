@@ -912,14 +912,9 @@ border-radius:10px;padding:12px 14px;background:#fff}
 .field-box input{border:none;outline:none;background:transparent;font-size:22px;font-weight:800;
 color:var(--text);text-align:right;width:100%;font-family:inherit}
 .field-box .unit{font-size:13px;color:var(--text-sub);font-weight:600;white-space:nowrap}
-details.more{margin-top:16px;border-top:1px solid var(--line);}
-details.more:not(.calc-detail){padding-top:14px}
-details.more summary{cursor:pointer;font-size:14px;font-weight:800;color:var(--text);list-style:none;
-display:flex;align-items:center;gap:6px;line-height:1}
-details.more summary::-webkit-details-marker{display:none}
-details.more summary .chev{display:inline-flex;transition:transform .15s}
-details.more summary .chev svg{width:1em;height:1em;display:block}
-details.more[open] summary .chev{transform:rotate(180deg)}
+/* 접기(details) 없이 항상 펼친 상태 — 클릭해야 보이는 게 불친절하다는 피드백(장효령, 08-06) */
+.more{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
+.more-title{font-size:14px;font-weight:800;color:var(--text);line-height:1;margin:0 0 2px}
 .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
 @media(max-width:480px){.field-grid{grid-template-columns:1fr}}
 .field-sm label{display:block;font-size:12px;color:var(--text-sub);margin-bottom:5px}
@@ -940,21 +935,24 @@ details.more[open] summary .chev{transform:rotate(180deg)}
 .hero-card{padding:24px 22px;border:none;box-shadow:0 2px 10px rgba(28,24,48,.06)}
 .hero-sub{font-size:14px;color:var(--text-sub);margin:0 0 10px}
 .hero-sub b{color:var(--text);font-weight:800}
-.hero-row{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
-.hero-num{font-size:34px;font-weight:700;letter-spacing:-.02em}
-.hero-annual{font-size:14px;color:var(--text-sub);font-weight:600}
+/* 큰 숫자 아래에 '연 환산'을 배지로 — 한 줄에 붙여 두면 어디까지가 월/연인지 안 읽힌다 */
+.hero-row{display:flex;flex-direction:column;align-items:flex-start;gap:12px}
+.hero-num{font-size:34px;font-weight:700;letter-spacing:-.02em;white-space:nowrap}
+.hero-annual{display:inline-block;background:#fff;border-radius:999px;padding:7px 16px;
+font-size:14px;font-weight:800;color:var(--brand);white-space:nowrap;
+box-shadow:0 1px 3px rgba(28,24,48,.08)}
+@media(max-width:480px){.hero-num{font-size:27px}}
 .kpi3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}
 @media(max-width:700px){.kpi3{grid-template-columns:1fr}}
 .kpi3-cell{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px}
 .kpi3-cell.warn{border-color:#F0DCA0;background:#FDF8ED}
 .kpi3-cell .l{font-size:12.5px;color:var(--text-sub);margin-bottom:6px}
 .kpi3-cell.warn .l{color:var(--gold);font-weight:700}
-.kpi3-cell .v{font-size:20px;font-weight:800}
+.kpi3-cell .v{font-size:20px;font-weight:800;white-space:nowrap}   /* '+145,385 / 원' 줄바꿈 방지 */
 .kpi3-paren{font-size:13px;font-weight:600;color:var(--text-sub)}
 .kpi3-sub{font-size:11.5px;color:var(--text-sub);margin-top:4px}
 .calc-detail{margin-top:20px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px}
-.calc-detail summary{margin:0}
-.calc-detail[open] summary{margin-bottom:4px}
+.calc-detail .more-title{margin:0}
 .calc-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;margin-top:14px}
 @media(max-width:480px){.calc-detail-grid{grid-template-columns:1fr}}
 .calc-detail-grid>div{display:flex;justify-content:space-between;font-size:13px}
@@ -1019,10 +1017,8 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
       <div class=field-box><input id=i_dep type=number value={{dep or 1000}}><span class=unit>만원</span></div></div>
     <div class=field-primary><label>월 관리비</label>
       <div class=field-box><input id=i_mgmt type=number value=30><span class=unit>만원</span></div></div>
-    <details class=more>
-      <summary><span class=chev><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-</svg></span>세부 비용 · 기본값 (바로 수정 가능)</summary>
+    <div class=more>
+      <p class=more-title>세부 비용 · 기본값 (바로 수정 가능)</p>
       <div class=field-grid>
         <div class=field-sm><label>보증금 이자율(연)</label>
           <div class=field-box><input id=i_deprate type=number value=5 step=0.5><span class=unit>%</span></div></div>
@@ -1033,7 +1029,7 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
         <div class=field-sm><label>주당 임대 소모품</label>
           <div class=field-box><input id=i_supply type=number value=1000 step=100><span class=unit>원</span></div></div>
       </div>
-    </details>
+    </div>
   </div>
   <div class=box>
     <div class=card-head><h2><span class="ic ic-brand"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1059,7 +1055,7 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
   <p class=hero-sub>이 매물, 단기임대로 돌리면 <b id=o_herobadge>공실 10% 기준</b></p>
   <div class=hero-row>
     <span class=hero-num id=o_heromonth>월 순수익 -</span>
-    <span class=hero-annual id=o_heroyear>연 -</span>
+    <span class=hero-annual id=o_heroyear>연 환산 -</span>
   </div>
 </div>
 <div class=kpi3>
@@ -1079,17 +1075,15 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
     <div class=v id=o_wnet>-</div>
   </div>
 </div>
-<details class="more calc-detail">
-  <summary><span class=chev><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-</svg></span>계산 내역</summary>
+<div class=calc-detail>
+  <p class=more-title>계산 내역</p>
   <div class=calc-detail-grid>
     <div><span class=cd-l>주 매출</span><span class=cd-v id=o_wrev>-</span></div>
     <div><span class=cd-l>주 임대원가</span><span class=cd-v id=o_wcost>-</span></div>
     <div><span class=cd-l>연 임차원가</span><span class=cd-v id=o_ycost>-</span></div>
     <div><span class=cd-l>손익분기 예약 주수</span><span class=cd-v id=o_be>-</span></div>
   </div>
-</details>
+</div>
 
 <div class="box vac"><h2><span class="ic ic-brand"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 <g clip-path="url(#clip0_5_43)">
@@ -1145,7 +1139,7 @@ function calc(){
   var heroEl=document.getElementById('o_heromonth')
   heroEl.textContent='월 순수익 '+signed(heroMonth)+'원'
   heroEl.className='hero-num '+(heroMonth>=0?'pos-brand':'neg')
-  document.getElementById('o_heroyear').textContent='연 '+signed(heroYear)+'원'
+  document.getElementById('o_heroyear').textContent='연 환산 '+signed(heroYear)+'원'
   // 손익분기를 일 단위로 환산(1주=7일) — 30일 기준 월 예약일수·공실률로도 같이 표시(표시 전환일 뿐, be 값 자체는 그대로).
   var beDaysRaw=be*7
   var beDays=Math.max(0,Math.min(30,Math.round(beDaysRaw)))
