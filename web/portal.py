@@ -884,6 +884,9 @@ padding:8px 15px;border-radius:8px;text-decoration:none}
 .wrap{max-width:900px;margin:0 auto}
 .back{display:inline-block;margin-bottom:14px;color:var(--text-sub);text-decoration:none;font-size:13px;font-weight:700}
 .back:hover{color:var(--brand)}
+.ic{display:inline-flex;vertical-align:-0.15em;margin-right:6px}
+.ic svg{width:1em;height:1em;display:block}
+.ic-brand{color:var(--brand)}
 h1{font-size:22px;font-weight:900;margin:4px 0 2px;letter-spacing:-.01em}
 .sub{color:var(--text-sub);font-size:13px;margin:0 0 28px;line-height:1.6}
 .sec-label{font-size:13px;font-weight:800;color:var(--text-sub);margin:0 0 12px}
@@ -906,8 +909,9 @@ details.more{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
 details.more summary{cursor:pointer;font-size:13px;font-weight:800;color:var(--text);list-style:none;
 display:flex;align-items:center;gap:6px}
 details.more summary::-webkit-details-marker{display:none}
-details.more summary::before{content:'⌃';display:inline-block;transition:transform .15s}
-details.more:not([open]) summary::before{transform:rotate(180deg)}
+details.more summary .chev{display:inline-flex;transition:transform .15s}
+details.more summary .chev svg{width:1em;height:1em;display:block}
+details.more[open] summary .chev{transform:rotate(180deg)}
 .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
 @media(max-width:480px){.field-grid{grid-template-columns:1fr}}
 .field-sm label{display:block;font-size:12px;color:var(--text-sub);margin-bottom:5px}
@@ -920,15 +924,16 @@ details.more:not([open]) summary::before{transform:rotate(180deg)}
 .slider-row .scale{display:flex;justify-content:space-between;font-size:11px;color:var(--text-sub);margin-top:2px}
 .pos{color:var(--profit)}.pos-brand{color:var(--brand)}.neg{color:var(--loss)}
 .vac{margin-top:28px}
-.vac h2{margin-top:0}
+.vac h2{margin-top:0;display:flex;align-items:center;font-size:20px}
+.vac h2 .ic{margin-right:7px}
 .vac table{width:100%;border-collapse:collapse;font-size:12.5px}
 .vac th,.vac td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--line)}
-.vac th{color:var(--text-sub);font-weight:700}.vac td:first-child,.vac th:first-child{text-align:left}
+.vac th{color:var(--text-sub);font-weight:800}.vac td:first-child,.vac th:first-child{text-align:left}
 .hero-card{padding:24px 22px;border:none;box-shadow:0 2px 10px rgba(28,24,48,.06)}
 .hero-sub{font-size:14px;color:var(--text-sub);margin:0 0 10px}
 .hero-sub b{color:var(--text);font-weight:800}
 .hero-row{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
-.hero-num{font-size:34px;font-weight:900;letter-spacing:-.02em}
+.hero-num{font-size:34px;font-weight:700;letter-spacing:-.02em}
 .hero-annual{font-size:14px;color:var(--text-sub);font-weight:600}
 .kpi3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}
 @media(max-width:700px){.kpi3{grid-template-columns:1fr}}
@@ -947,8 +952,15 @@ details.more:not([open]) summary::before{transform:rotate(180deg)}
 .calc-detail-grid>div{display:flex;justify-content:space-between;font-size:13px}
 .cd-l{color:var(--text-sub)}
 .cd-v{font-weight:700;color:var(--text)}
-.vac-notice{background:#FDF8ED;border:1px solid #F0DCA0;color:var(--gold);font-size:12.5px;font-weight:700;
-padding:9px 12px;border-radius:9px;margin-bottom:12px}
+.info-wrap{position:relative;display:inline-flex;align-items:center;margin-left:7px}
+.info-ic{width:16px;height:16px;display:flex;align-items:center;justify-content:center;cursor:help}
+.info-ic svg{width:16px;height:16px;display:block}
+.info-tip{display:none;position:absolute;top:26px;left:-12px;background:#E4E4E7;color:var(--text);
+font-size:13px;font-weight:600;padding:10px 14px;border-radius:12px;white-space:nowrap;z-index:5;
+box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.info-tip::before{content:'';position:absolute;top:-5px;left:14px;width:11px;height:11px;background:#E4E4E7;
+transform:rotate(45deg);border-radius:2px}
+.info-wrap:hover .info-tip,.info-wrap.show .info-tip{display:block}
 .be-row td{border-top:1px dashed var(--gold);border-bottom:none;color:var(--gold);font-size:11px;
 font-weight:700;text-align:center;padding:6px 4px}
 .cta-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
@@ -970,12 +982,28 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
 {% endif %}
 <div class=wrap>
 <a class=back href="/">← 대시보드</a>
-<h1>🧮 단기임대 수익 계산기{% if dong %} — {{dong}}{% endif %}</h1>
+<h1><span class="ic ic-brand"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M19 2H5C4.44772 2 4 2.44772 4 3V21C4 21.5523 4.44772 22 5 22H19C19.5523 22 20 21.5523 20 21V3C20 2.44772 19.5523 2 19 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M7 5.5H17V10H7V5.5Z" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M8.5 14C9.05228 14 9.5 13.5523 9.5 13C9.5 12.4477 9.05228 12 8.5 12C7.94772 12 7.5 12.4477 7.5 13C7.5 13.5523 7.94772 14 8.5 14Z" fill="currentColor"/>
+<path d="M8.5 17C9.05228 17 9.5 16.5523 9.5 16C9.5 15.4477 9.05228 15 8.5 15C7.94772 15 7.5 15.4477 7.5 16C7.5 16.5523 7.94772 17 8.5 17Z" fill="currentColor"/>
+<path d="M8.5 20C9.05228 20 9.5 19.5523 9.5 19C9.5 18.4477 9.05228 18 8.5 18C7.94772 18 7.5 18.4477 7.5 19C7.5 19.5523 7.94772 20 8.5 20Z" fill="currentColor"/>
+<path d="M12 14C12.5523 14 13 13.5523 13 13C13 12.4477 12.5523 12 12 12C11.4477 12 11 12.4477 11 13C11 13.5523 11.4477 14 12 14Z" fill="currentColor"/>
+<path d="M12 17C12.5523 17 13 16.5523 13 16C13 15.4477 12.5523 15 12 15C11.4477 15 11 15.4477 11 16C11 16.5523 11.4477 17 12 17Z" fill="currentColor"/>
+<path d="M12 20C12.5523 20 13 19.5523 13 19C13 18.4477 12.5523 18 12 18C11.4477 18 11 18.4477 11 19C11 19.5523 11.4477 20 12 20Z" fill="currentColor"/>
+<path d="M15.5 14C16.0523 14 16.5 13.5523 16.5 13C16.5 12.4477 16.0523 12 15.5 12C14.9477 12 14.5 12.4477 14.5 13C14.5 13.5523 14.9477 14 15.5 14Z" fill="currentColor"/>
+<path d="M15.5 17C16.0523 17 16.5 16.5523 16.5 16C16.5 15.4477 16.0523 15 15.5 15C14.9477 15 14.5 15.4477 14.5 16C14.5 16.5523 14.9477 17 15.5 17Z" fill="currentColor"/>
+<path d="M15.5 20C16.0523 20 16.5 19.5523 16.5 19C16.5 18.4477 16.0523 18 15.5 18C14.9477 18 14.5 18.4477 14.5 19C14.5 19.5523 14.9477 20 15.5 20Z" fill="currentColor"/>
+</svg></span>단기임대 수익 계산기{% if dong %} — {{dong}}{% endif %}</h1>
 <p class=sub>임차(내가 내는 비용)와 임대(투숙객에게 받는 돈)를 넣으면 월 순수익·손익분기·공실률별 시나리오를 계산합니다. 연↔주 환산은 ÷52.{% if rent %} <b style="color:var(--brand)">{{dong}} 시세(월세 {{rent}}만·보증금 {{dep}}만)를 자동 입력했어요.</b>{% endif %}</p>
-<div class=sec-label>① 입력 — 내가 넣는 값</div>
+<div class=sec-label>① 입력</div>
 <div class=cols>
   <div class=box>
-    <div class=card-head><h2>↗ 내가 내는 돈</h2><span class=unit-badge>월 단위</span></div>
+    <div class=card-head><h2><span class="ic ic-brand"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M2 15L4.5 3H19.5L22 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M2 15H7.455L8.3635 18H15.6365L16.5455 15H22V21.5H2V15Z" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+<path d="M15 10L12 7L9 10M12 7V13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg></span>내가 내는 돈</h2><span class=unit-badge>월 단위</span></div>
     <p class=hint>핵심 3가지만 넣으면 바로 계산돼요</p>
     <div class=field-primary><label>월 임차료</label>
       <div class=field-box><input id=i_rent type=number value={{rent or 85}}><span class=unit>만원</span></div></div>
@@ -984,7 +1012,9 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
     <div class=field-primary><label>월 관리비</label>
       <div class=field-box><input id=i_mgmt type=number value=30><span class=unit>만원</span></div></div>
     <details class=more>
-      <summary>세부 비용 · 기본값 (바로 수정 가능)</summary>
+      <summary><span class=chev><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg></span>세부 비용 · 기본값 (바로 수정 가능)</summary>
       <div class=field-grid>
         <div class=field-sm><label>보증금 이자율(연)</label>
           <div class=field-box><input id=i_deprate type=number value=5 step=0.5><span class=unit>%</span></div></div>
@@ -998,14 +1028,18 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
     </details>
   </div>
   <div class=box>
-    <div class=card-head><h2>🗋 받는 돈</h2><span class=unit-badge>주 단위</span></div>
-    <p class=hint>단기임대는 주 단위로 받아요 · 연 환산 ÷52 자동</p>
+    <div class=card-head><h2><span class="ic ic-brand"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M2.5 15L5 3H19L21.5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M2.5 15H7.455L8.3635 18H15.6365L16.5455 15H21.5V21.5H2.5V15Z" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+<path d="M15 10L12 13L9 10M12 13V7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg></span>받는 돈</h2><span class=unit-badge>주 단위</span></div>
+    <p class=hint>단기임대는 주 단위로 받아요</p>
     <div class=field-primary><label>주 임대료</label>
       <div class=field-box><input id=i_wrent type=number value=31><span class=unit>만원</span></div></div>
     <div class=field-primary><label>주 관리비(청소비 등)</label>
       <div class=field-box><input id=i_wmgmt type=number value=12><span class=unit>만원</span></div></div>
     <div class=slider-row>
-      <div class=lbl><span>기대 공실률 · 월 순수익 계산 기준</span><b id=o_vacpct>10%</b></div>
+      <div class=lbl><span>기대 공실률</span><b id=o_vacpct>10%</b></div>
       <input type=range id=i_vacancy min=0 max=30 step=5 value=10>
       <div class=scale><span>0%</span><span>30%</span></div>
     </div>
@@ -1021,14 +1055,16 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
   </div>
 </div>
 <div class=kpi3>
+  <div class="kpi3-cell warn">
+    <div class=l><span class=ic><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path fill-rule="evenodd" clip-rule="evenodd" d="M1.25001 12C1.25001 6.063 6.06301 1.25 12 1.25C17.937 1.25 22.75 6.063 22.75 12C22.75 17.937 17.937 22.75 12 22.75C10.144 22.75 8.39501 22.279 6.87001 21.45L2.63701 22.237C2.51739 22.2591 2.39418 22.2519 2.278 22.2158C2.16183 22.1797 2.05617 22.1159 1.97015 22.0299C1.88413 21.9438 1.82032 21.8382 1.78424 21.722C1.74815 21.6058 1.74087 21.4826 1.76301 21.363L2.55101 17.13C1.69462 15.5559 1.24727 13.792 1.25001 12ZM12 7.25C12.1989 7.25 12.3897 7.32902 12.5303 7.46967C12.671 7.61032 12.75 7.80109 12.75 8V12C12.75 12.1989 12.671 12.3897 12.5303 12.5303C12.3897 12.671 12.1989 12.75 12 12.75C11.8011 12.75 11.6103 12.671 11.4697 12.5303C11.329 12.3897 11.25 12.1989 11.25 12V8C11.25 7.80109 11.329 7.61032 11.4697 7.46967C11.6103 7.32902 11.8011 7.25 12 7.25ZM12.567 16.501C12.6354 16.4283 12.6885 16.3426 12.7234 16.2491C12.7582 16.1556 12.774 16.056 12.7699 15.9563C12.7658 15.8565 12.7418 15.7586 12.6993 15.6683C12.6568 15.578 12.5968 15.497 12.5226 15.4302C12.4485 15.3634 12.3618 15.312 12.2675 15.2792C12.1733 15.2463 12.0734 15.2326 11.9738 15.2388C11.8742 15.245 11.7768 15.271 11.6874 15.3154C11.5979 15.3597 11.5183 15.4215 11.453 15.497L11.443 15.508C11.3746 15.5807 11.3215 15.6664 11.2867 15.7599C11.2518 15.8534 11.236 15.953 11.2401 16.0527C11.2443 16.1525 11.2683 16.2504 11.3107 16.3407C11.3532 16.431 11.4132 16.512 11.4874 16.5788C11.5615 16.6456 11.6483 16.697 11.7425 16.7298C11.8368 16.7627 11.9366 16.7764 12.0362 16.7702C12.1359 16.764 12.2332 16.738 12.3227 16.6936C12.4121 16.6493 12.4918 16.5875 12.557 16.512L12.567 16.501Z" fill="currentColor"/>
+</svg></span>손익분기</div>
+    <div class=v>월 약 <b id=o_bedays>-</b>일 <span class=kpi3-paren>(공실 <span id=o_bepct>-</span>%)</span></div>
+    <div class=kpi3-sub>이 아래로 채우면 적자</div>
+  </div>
   <div class=kpi3-cell>
     <div class=l>영업이익률</div>
     <div class=v id=o_margin>-</div>
-  </div>
-  <div class="kpi3-cell warn">
-    <div class=l>⚠ 손익분기</div>
-    <div class=v>월 약 <b id=o_bedays>-</b>일 <span class=kpi3-paren>(공실 <span id=o_bepct>-</span>%)</span></div>
-    <div class=kpi3-sub>이 아래로 채우면 적자</div>
   </div>
   <div class=kpi3-cell>
     <div class=l>주 순익</div>
@@ -1036,7 +1072,9 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
   </div>
 </div>
 <details class="more calc-detail">
-  <summary>계산 내역 · 검증용</summary>
+  <summary><span class=chev><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg></span>계산 내역 · 검증용</summary>
   <div class=calc-detail-grid>
     <div><span class=cd-l>주 매출</span><span class=cd-v id=o_wrev>-</span></div>
     <div><span class=cd-l>주 임대원가</span><span class=cd-v id=o_wcost>-</span></div>
@@ -1045,8 +1083,18 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
   </div>
 </details>
 
-<div class="box vac"><h2>📉 공실률 시나리오 (연 매출 × (1−공실률) − 연 임차원가)</h2>
-  <div class=vac-notice id=o_vacnotice>⚠ 손익분기 · 월 약 -일 예약(공실 -%) · 이 아래로 채우면 적자</div>
+<div class="box vac"><h2><span class="ic ic-brand"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_5_43)">
+<path fill-rule="evenodd" clip-rule="evenodd" d="M17.188 1.07759C18.4702 0.819408 19.7785 0.713675 21.0855 0.762588C21.3874 0.77432 21.6738 0.89951 21.8874 1.11316C22.1011 1.3268 22.2263 1.61318 22.238 1.91509C22.268 2.62309 22.2715 4.11459 21.923 5.81259C21.718 6.81409 20.5135 7.08559 19.8495 6.42109L18.891 5.46309C18.5177 5.80077 18.1489 6.1433 17.7845 6.49059C16.839 7.39109 15.653 8.58159 14.6525 9.77009C13.8015 10.7811 12.169 10.7741 11.37 9.65509C10.8648 8.94564 10.3399 8.25037 9.796 7.57009C8.679 8.33459 6.36 10.0941 3.753 13.0751C3.591 13.2601 3.42833 13.4498 3.265 13.6441C3.09413 13.847 2.84967 13.9737 2.58538 13.9963C2.3211 14.019 2.05864 13.9357 1.85575 13.7648C1.65286 13.594 1.52615 13.3495 1.50351 13.0852C1.48086 12.8209 1.56413 12.5585 1.735 12.3556C1.907 12.1523 2.07767 11.9534 2.247 11.7591C5.042 8.56309 7.5405 6.68309 8.7435 5.86709C9.585 5.29659 10.689 5.49309 11.3065 6.25709C11.8914 6.98581 12.4552 7.73129 12.997 8.49259C13.0006 8.49715 13.005 8.50104 13.01 8.50409C13.0216 8.50902 13.0339 8.51174 13.0465 8.51209C13.0606 8.51306 13.0747 8.51087 13.0879 8.50568C13.101 8.50049 13.1129 8.49243 13.1225 8.48209C14.1905 7.21359 15.4355 5.96609 16.4045 5.04259C16.821 4.64609 17.1895 4.30609 17.475 4.04759L16.58 3.15059C15.9155 2.48659 16.187 1.28259 17.1885 1.07709M16.8825 21.3621C16.8165 20.4571 16.7505 18.8426 16.7505 15.9996C16.7505 13.1566 16.8165 11.5426 16.8825 10.6366C16.9555 9.63159 17.6895 8.84759 18.7335 8.78359C19.0655 8.76359 19.482 8.74959 20.0005 8.74959C20.519 8.74959 20.9355 8.76359 21.2675 8.78359C22.3115 8.84759 23.0455 9.63159 23.1185 10.6366C23.1845 11.5426 23.2505 13.1566 23.2505 15.9996C23.2505 18.8426 23.1845 20.4566 23.1185 21.3626C23.0455 22.3676 22.3115 23.1516 21.2675 23.2156C20.9355 23.2356 20.519 23.2496 20.0005 23.2496C19.482 23.2496 19.0655 23.2356 18.7335 23.2156C17.6895 23.1516 16.9555 22.3671 16.8825 21.3621ZM0.835 21.6351C0.7865 21.1631 0.75 20.4831 0.75 19.5001C0.75 18.5171 0.7865 17.8371 0.8345 17.3651C0.935 16.3701 1.7335 15.7996 2.608 15.7701C3.07186 15.7557 3.53592 15.7491 4 15.7501C4.5935 15.7501 5.0485 15.7586 5.392 15.7701C6.2665 15.7996 7.065 16.3701 7.1655 17.3651C7.2135 17.8371 7.25 18.5171 7.25 19.5001C7.25 20.4831 7.2135 21.1631 7.166 21.6351C7.065 22.6301 6.266 23.2006 5.392 23.2301C5.0485 23.2416 4.5935 23.2501 4 23.2501C3.4065 23.2501 2.9515 23.2416 2.608 23.2301C1.7335 23.2006 0.9355 22.6301 0.835 21.6351ZM8.75 18.0001C8.75 19.7056 8.7995 20.7821 8.8565 21.4586C8.9425 22.4826 9.7265 23.1821 10.7165 23.2256C11.0485 23.2401 11.4695 23.2501 12 23.2501C12.5305 23.2501 12.9515 23.2401 13.2835 23.2251C14.2735 23.1821 15.0575 22.4826 15.1435 21.4586C15.2005 20.7821 15.25 19.7056 15.25 18.0001C15.25 16.2946 15.2005 15.2181 15.144 14.5416C15.0575 13.5176 14.274 12.8181 13.2835 12.7746C12.9515 12.7601 12.5305 12.7501 12 12.7501C11.4695 12.7501 11.0485 12.7601 10.717 12.7751C9.7265 12.8181 8.942 13.5176 8.856 14.5416C8.8 15.2181 8.75 16.2946 8.75 18.0001Z" fill="currentColor"/>
+</g>
+<defs>
+<clipPath id="clip0_5_43">
+<rect width="24" height="24" fill="white"/>
+</clipPath>
+</defs>
+</svg></span>공실률 시나리오<span class=info-wrap><span class=info-ic tabindex=0><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M11 9H13V7H11M12 20C7.59 20 4 16.41 4 12C4 7.59 7.59 4 12 4C16.41 4 20 7.59 20 12C20 16.41 16.41 20 12 20ZM12 2C10.6868 2 9.38642 2.25866 8.17317 2.7612C6.95991 3.26375 5.85752 4.00035 4.92893 4.92893C3.05357 6.8043 2 9.34784 2 12C2 14.6522 3.05357 17.1957 4.92893 19.0711C5.85752 19.9997 6.95991 20.7363 8.17317 21.2388C9.38642 21.7413 10.6868 22 12 22C14.6522 22 17.1957 20.9464 19.0711 19.0711C20.9464 17.1957 22 14.6522 22 12C22 10.6868 21.7413 9.38642 21.2388 8.17317C20.7363 6.95991 19.9997 5.85752 19.0711 4.92893C18.1425 4.00035 17.0401 3.26375 15.8268 2.7612C14.6136 2.25866 13.3132 2 12 2ZM11 17H13V11H11V17Z" fill="#4D2EE9"/>
+</svg></span><span class=info-tip>연 매출 x (1-공실률) - 연 임차원가</span></span></h2>
   <table><thead><tr><th>공실률</th><th>월 예약(환산)</th><th>연 순수익</th><th>월 순수익</th></tr></thead>
   <tbody id=o_vac></tbody></table>
 </div>
@@ -1096,8 +1144,6 @@ function calc(){
   var bePct=Math.max(0,Math.min(100,Math.round(100*(1-beDaysRaw/30))))
   document.getElementById('o_bedays').textContent=revW>0?beDays:'-'
   document.getElementById('o_bepct').textContent=revW>0?bePct:'-'
-  var beLabel=revW>0?('월 약 '+beDays+'일 예약(공실 '+bePct+'%)'):'월 순익이 나지 않음'
-  document.getElementById('o_vacnotice').textContent='⚠ 손익분기 · '+beLabel+' · 이 아래로 채우면 적자'
   var ctaHead=document.getElementById('o_ctahead')
   if(ctaHead) ctaHead.textContent=revW>0?
     ('이 매물은 한 달 약 '+beDays+'일까지 채우면 흑자예요.'):'이 매물은 지금 조건으로는 흑자가 나지 않아요.'
@@ -1115,6 +1161,9 @@ function calc(){
   tb.innerHTML=h
 }
 document.querySelectorAll('input').forEach(function(e){e.addEventListener('input',calc)})
+document.querySelectorAll('.info-ic').forEach(function(el){el.addEventListener('click',function(e){
+  e.stopPropagation();el.parentElement.classList.toggle('show')})})
+document.addEventListener('click',function(){document.querySelectorAll('.info-wrap.show').forEach(function(w){w.classList.remove('show')})})
 calc()
 </script>
 </div></body></html>"""
