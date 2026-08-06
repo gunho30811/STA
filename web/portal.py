@@ -918,7 +918,7 @@ details.more[open] summary .chev{transform:rotate(180deg)}
 .field-sm label{display:block;font-size:12px;color:var(--text-sub);margin-bottom:5px}
 .field-sm .field-box{padding:8px 10px}
 .field-sm .field-box input{font-size:14px;font-weight:700}
-.slider-row{margin-top:18px}
+.slider-row{margin-top:28px}
 .slider-row .lbl{display:flex;justify-content:space-between;font-size:13px;color:var(--text-sub);margin-bottom:8px}
 .slider-row .lbl b{color:var(--brand);font-size:14px}
 .slider-row input[type=range]{width:100%;accent-color:var(--brand)}
