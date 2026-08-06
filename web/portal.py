@@ -897,7 +897,8 @@ padding:8px 15px;border-radius:8px;text-decoration:none}
 h1{font-size:22px;font-weight:900;margin:4px 0 2px;letter-spacing:-.01em}
 .sub{color:var(--text-sub);font-size:13px;margin:0 0 28px;line-height:1.6}
 .sec-label{font-size:17px;font-weight:700;color:var(--text-sub);margin:0 0 9px}
-.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px}
+/* align-items:start — 카드가 서로 키를 맞추느라 오른쪽에 빈 공간이 생기던 문제 */
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px;align-items:start}
 @media(max-width:700px){.cols{grid-template-columns:1fr}}
 .box{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px}
 .card-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px}
@@ -942,6 +943,25 @@ color:var(--text);text-align:right;width:100%;font-family:inherit}
 font-size:14px;font-weight:800;color:var(--brand);white-space:nowrap;
 box-shadow:0 1px 3px rgba(28,24,48,.08)}
 @media(max-width:480px){.hero-num{font-size:27px}}
+/* '받는 돈' 카드 안 주 단위 요약 — 입력하는 자리에서 바로 결과가 보이게(카드 여백도 채움) */
+.week-mini{margin-top:20px;border-top:1px solid var(--line);padding-top:14px;display:grid;gap:9px}
+.week-mini>div{display:flex;justify-content:space-between;align-items:baseline;font-size:13px}
+.week-mini span{color:var(--text-sub)}
+.week-mini b{font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
+.week-mini .hl{margin-top:3px;padding-top:11px;border-top:1px dashed var(--line)}
+.week-mini .hl span{color:var(--text);font-weight:700}
+.week-mini .hl b{font-size:17px}
+/* 손익분기 게이지 — 한 달 30일 중 예약일(막대)과 손익분기일(눈금)을 겹쳐 여유를 한눈에 */
+.gauge{margin-top:20px}
+.gauge-track{position:relative;height:10px;border-radius:999px;background:#E9E6FB}
+.gauge-fill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:var(--brand);
+transition:width .18s}
+.gauge-mark{position:absolute;top:-5px;width:2.5px;height:20px;border-radius:2px;background:var(--gold);
+transition:left .18s}
+.gauge-cap{display:flex;justify-content:space-between;gap:10px;margin-top:9px;font-size:12.5px;
+color:var(--text-sub);flex-wrap:wrap}
+.gauge-cap b{color:var(--text);font-weight:800}
+.gauge-cap .be b{color:var(--gold)}
 .kpi3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}
 @media(max-width:700px){.kpi3{grid-template-columns:1fr}}
 .kpi3-cell{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px}
@@ -953,6 +973,7 @@ box-shadow:0 1px 3px rgba(28,24,48,.08)}
 .kpi3-sub{font-size:11.5px;color:var(--text-sub);margin-top:4px}
 .calc-detail{margin-top:20px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px}
 .calc-detail .more-title{margin:0}
+.more-hint{font-size:12px;color:var(--text-sub);margin:6px 0 0}
 .calc-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;margin-top:14px}
 @media(max-width:480px){.calc-detail-grid{grid-template-columns:1fr}}
 .calc-detail-grid>div{display:flex;justify-content:space-between;font-size:13px}
@@ -1047,6 +1068,11 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
       <input type=range id=i_vacancy min=0 max=30 step=5 value=10>
       <div class=scale><span>0%</span><span>30%</span></div>
     </div>
+    <div class=week-mini>
+      <div><span>주 매출</span><b id=o_wrev_m>-</b></div>
+      <div><span>주 임대원가</span><b id=o_wcost_m>-</b></div>
+      <div class=hl><span>주 순익</span><b id=o_wnet_m>-</b></div>
+    </div>
   </div>
 </div>
 
@@ -1056,6 +1082,16 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
   <div class=hero-row>
     <span class=hero-num id=o_heromonth>월 순수익 -</span>
     <span class=hero-annual id=o_heroyear>연 환산 -</span>
+  </div>
+  <div class=gauge>
+    <div class=gauge-track>
+      <div class=gauge-fill id=o_gfill style="width:0%"></div>
+      <i class=gauge-mark id=o_gmark style="left:0%"></i>
+    </div>
+    <div class=gauge-cap>
+      <span>공실 <b id=o_gvac>-</b>% 기준 월 <b id=o_gdays>-</b>일 예약</span>
+      <span class=be>손익분기 <b id=o_gbe>-</b>일 · 여유 <b id=o_gslack>-</b>일</span>
+    </div>
   </div>
 </div>
 <div class=kpi3>
@@ -1077,10 +1113,11 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
 </div>
 <div class=calc-detail>
   <p class=more-title>계산 내역</p>
+  <p class=more-hint>주 단위 값은 '받는 돈' 카드에 있어요 · 여기는 연 단위 기준</p>
   <div class=calc-detail-grid>
-    <div><span class=cd-l>주 매출</span><span class=cd-v id=o_wrev>-</span></div>
-    <div><span class=cd-l>주 임대원가</span><span class=cd-v id=o_wcost>-</span></div>
+    <div><span class=cd-l>연 매출</span><span class=cd-v id=o_yrev>-</span></div>
     <div><span class=cd-l>연 임차원가</span><span class=cd-v id=o_ycost>-</span></div>
+    <div><span class=cd-l>연 순수익 (공실 반영)</span><span class=cd-v id=o_ynet>-</span></div>
     <div><span class=cd-l>손익분기 예약 주수</span><span class=cd-v id=o_be>-</span></div>
   </div>
 </div>
@@ -1126,12 +1163,16 @@ function calc(){
   var netW=revW-costW
   var be=revW>0?(costY/12)/revW:0                // 손익주=월원가/주매출
   var margin=revW>0?(revW-leaseW)/revW*100:0     // 영업이익률(소모품 제외 원가 기준)
-  var set=function(id,txt,cls){var e=document.getElementById(id);e.textContent=txt;
-    e.className='v'+(cls?' '+cls:'')}
-  set('o_wrev',won(revW)); set('o_wcost',won(costW))
+  // 원래 클래스(.cd-v/.v 등)를 유지한 채 색상 클래스만 덧붙인다.
+  // (예전엔 className을 'v'로 통째 덮어써서 계산 내역 값의 굵기가 사라졌다)
+  var set=function(id,txt,cls){var e=document.getElementById(id);if(!e)return
+    if(e.dataset.base===undefined) e.dataset.base=e.className
+    e.textContent=txt; e.className=(e.dataset.base+' '+(cls||'')).trim()}
+  set('o_wrev_m',won(revW)); set('o_wcost_m',won(costW))
+  set('o_wnet_m',signed(netW)+'원',netW>=0?'pos':'neg')
   set('o_wnet',signed(netW)+'원',netW>=0?'pos':'neg')
   set('o_be',be?be.toFixed(2)+'주':'-'); set('o_margin',margin.toFixed(1)+'%')
-  set('o_ycost',won(costY))
+  set('o_yrev',won(revY)); set('o_ycost',won(costY))
   var p=v('i_vacancy')
   document.getElementById('o_vacpct').textContent=p+'%'
   document.getElementById('o_herobadge').textContent='공실 '+p+'% 기준'
@@ -1140,12 +1181,22 @@ function calc(){
   heroEl.textContent='월 순수익 '+signed(heroMonth)+'원'
   heroEl.className='hero-num '+(heroMonth>=0?'pos-brand':'neg')
   document.getElementById('o_heroyear').textContent='연 환산 '+signed(heroYear)+'원'
+  set('o_ynet',signed(heroYear)+'원',heroYear>=0?'pos':'neg')
   // 손익분기를 일 단위로 환산(1주=7일) — 30일 기준 월 예약일수·공실률로도 같이 표시(표시 전환일 뿐, be 값 자체는 그대로).
   var beDaysRaw=be*7
   var beDays=Math.max(0,Math.min(30,Math.round(beDaysRaw)))
   var bePct=Math.max(0,Math.min(100,Math.round(100*(1-beDaysRaw/30))))
   document.getElementById('o_bedays').textContent=revW>0?beDays:'-'
   document.getElementById('o_bepct').textContent=revW>0?bePct:'-'
+  // 손익분기 게이지: 막대=이 공실률에서 채워지는 월 예약일, 눈금=흑자 전환에 필요한 일수
+  var bookDays=Math.max(0,Math.min(30,Math.round(30*(1-p/100))))
+  var bePos=Math.max(0,Math.min(30,beDaysRaw))
+  document.getElementById('o_gfill').style.width=(bookDays/30*100)+'%'
+  document.getElementById('o_gmark').style.left=(revW>0?bePos/30*100:0)+'%'
+  document.getElementById('o_gvac').textContent=p
+  document.getElementById('o_gdays').textContent=bookDays
+  document.getElementById('o_gbe').textContent=revW>0?beDays:'-'
+  document.getElementById('o_gslack').textContent=revW>0?Math.max(0,bookDays-beDays):'-'
   var ctaHead=document.getElementById('o_ctahead')
   if(ctaHead) ctaHead.innerHTML=revW>0?
     ('이 매물은 한 달 <span class=pos>약 '+beDays+'일</span>까지 채우면 흑자예요.'):'이 매물은 지금 조건으로는 흑자가 나지 않아요.'
