@@ -889,7 +889,7 @@ padding:8px 15px;border-radius:8px;text-decoration:none}
 .ic-brand{color:var(--brand)}
 h1{font-size:22px;font-weight:900;margin:4px 0 2px;letter-spacing:-.01em}
 .sub{color:var(--text-sub);font-size:13px;margin:0 0 28px;line-height:1.6}
-.sec-label{font-size:13px;font-weight:800;color:var(--text-sub);margin:0 0 12px}
+.sec-label{font-size:17px;font-weight:700;color:var(--text-sub);margin:0 0 9px}
 .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px}
 @media(max-width:700px){.cols{grid-template-columns:1fr}}
 .box{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px}
@@ -905,9 +905,10 @@ border-radius:10px;padding:12px 14px;background:#fff}
 .field-box input{border:none;outline:none;background:transparent;font-size:22px;font-weight:800;
 color:var(--text);text-align:right;width:100%;font-family:inherit}
 .field-box .unit{font-size:13px;color:var(--text-sub);font-weight:600;white-space:nowrap}
-details.more{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
-details.more summary{cursor:pointer;font-size:13px;font-weight:800;color:var(--text);list-style:none;
-display:flex;align-items:center;gap:6px}
+details.more{margin-top:16px;border-top:1px solid var(--line);}
+details.more:not(.calc-detail){padding-top:14px}
+details.more summary{cursor:pointer;font-size:14px;font-weight:800;color:var(--text);list-style:none;
+display:flex;align-items:center;gap:6px;line-height:1}
 details.more summary::-webkit-details-marker{display:none}
 details.more summary .chev{display:inline-flex;transition:transform .15s}
 details.more summary .chev svg{width:1em;height:1em;display:block}
@@ -995,8 +996,8 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
 <path d="M15.5 17C16.0523 17 16.5 16.5523 16.5 16C16.5 15.4477 16.0523 15 15.5 15C14.9477 15 14.5 15.4477 14.5 16C14.5 16.5523 14.9477 17 15.5 17Z" fill="currentColor"/>
 <path d="M15.5 20C16.0523 20 16.5 19.5523 16.5 19C16.5 18.4477 16.0523 18 15.5 18C14.9477 18 14.5 18.4477 14.5 19C14.5 19.5523 14.9477 20 15.5 20Z" fill="currentColor"/>
 </svg></span>단기임대 수익 계산기{% if dong %} — {{dong}}{% endif %}</h1>
-<p class=sub>임차(내가 내는 비용)와 임대(투숙객에게 받는 돈)를 넣으면 월 순수익·손익분기·공실률별 시나리오를 계산합니다. 연↔주 환산은 ÷52.{% if rent %} <b style="color:var(--brand)">{{dong}} 시세(월세 {{rent}}만·보증금 {{dep}}만)를 자동 입력했어요.</b>{% endif %}</p>
-<div class=sec-label>① 입력</div>
+<p class=sub>임차(내가 내는 비용)와 임대(투숙객에게 받는 돈)를 넣으면 월 순수익·손익분기·공실률별 시나리오를 계산합니다. (연↔주 환산은 ÷52로 계산합니다.){% if rent %} <b style="color:var(--brand)">{{dong}} 시세(월세 {{rent}}만·보증금 {{dep}}만)를 자동 입력했어요.</b>{% endif %}</p>
+<div class=sec-label>입력</div>
 <div class=cols>
   <div class=box>
     <div class=card-head><h2><span class="ic ic-brand"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1046,7 +1047,7 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
   </div>
 </div>
 
-<div class=sec-label>② 결과</div>
+<div class=sec-label>결과</div>
 <div class="box hero-card">
   <p class=hero-sub>이 매물, 단기임대로 돌리면 <b id=o_herobadge>공실 10% 기준</b></p>
   <div class=hero-row>
@@ -1074,7 +1075,7 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
 <details class="more calc-detail">
   <summary><span class=chev><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-</svg></span>계산 내역 · 검증용</summary>
+</svg></span>계산 내역</summary>
   <div class=calc-detail-grid>
     <div><span class=cd-l>주 매출</span><span class=cd-v id=o_wrev>-</span></div>
     <div><span class=cd-l>주 임대원가</span><span class=cd-v id=o_wcost>-</span></div>
