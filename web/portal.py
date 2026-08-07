@@ -943,6 +943,21 @@ color:var(--text);text-align:right;width:100%;font-family:inherit}
 font-size:14px;font-weight:800;color:var(--brand);white-space:nowrap;
 box-shadow:0 1px 3px rgba(28,24,48,.08)}
 @media(max-width:480px){.hero-num{font-size:27px}}
+/* 매출에서 빠지는 선택 항목(플랫폼 수수료·부가세) — 체크 꺼짐이면 % 입력도 잠근다 */
+.opts{margin-top:20px;border-top:1px solid var(--line);padding-top:14px}
+.opts-title{font-size:13px;font-weight:800;color:var(--text);margin:0 0 10px}
+.opts-sub{font-weight:600;color:var(--text-sub)}
+.opt-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.opt{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer}
+.opt input[type=checkbox]{width:16px;height:16px;accent-color:var(--brand);cursor:pointer}
+.opt-val{display:flex;align-items:center;gap:5px;border:1.5px solid var(--line);border-radius:9px;
+padding:6px 10px;background:#fff}
+.opt-val input{border:none;outline:none;background:transparent;width:52px;text-align:right;
+font-size:14px;font-weight:800;color:var(--text);font-family:inherit}
+.opt-val:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-tint)}
+.opt-val.off{opacity:.45}
+.opt-val .unit{font-size:12px;color:var(--text-sub);font-weight:600}
+.opts-hint{font-size:11.5px;color:var(--text-sub);margin:8px 0 0;line-height:1.5}
 /* '받는 돈' 카드 안 주 단위 요약 — 입력하는 자리에서 바로 결과가 보이게(카드 여백도 채움) */
 .week-mini{margin-top:20px;border-top:1px solid var(--line);padding-top:14px;display:grid;gap:9px}
 .week-mini>div{display:flex;justify-content:space-between;align-items:baseline;font-size:13px}
@@ -1063,13 +1078,26 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
       <div class=field-box><input id=i_wrent type=number value=31><span class=unit>만원</span></div></div>
     <div class=field-primary><label>주 관리비(청소비 등)</label>
       <div class=field-box><input id=i_wmgmt type=number value=12><span class=unit>만원</span></div></div>
+    <div class=opts>
+      <p class=opts-title>매출에서 빠지는 것 <span class=opts-sub>(선택)</span></p>
+      <div class=opt-row>
+        <label class=opt><input type=checkbox id=i_fee_on checked><span>플랫폼 수수료</span></label>
+        <div class=opt-val><input id=i_fee type=number value=3.3 step=0.1 min=0><span class=unit>%</span></div>
+      </div>
+      <div class=opt-row>
+        <label class=opt><input type=checkbox id=i_vat_on><span>부가세</span></label>
+        <div class=opt-val><input id=i_vat type=number value=10 step=1 min=0 disabled><span class=unit>%</span></div>
+      </div>
+      <p class=opts-hint>둘 다 매출(임대료+관리비) 기준으로 뺍니다 · 부가세는 매입세액 공제 미반영</p>
+    </div>
     <div class=slider-row>
       <div class=lbl><span>기대 공실률</span><b id=o_vacpct>10%</b></div>
-      <input type=range id=i_vacancy min=0 max=30 step=5 value=10>
-      <div class=scale><span>0%</span><span>30%</span></div>
+      <input type=range id=i_vacancy min=0 max=100 step=5 value=10>
+      <div class=scale><span>0%</span><span>100%</span></div>
     </div>
     <div class=week-mini>
       <div><span>주 매출</span><b id=o_wrev_m>-</b></div>
+      <div id=o_dedrow style="display:none"><span id=o_dedlabel>수수료</span><b id=o_ded_m>-</b></div>
       <div><span>주 임대원가</span><b id=o_wcost_m>-</b></div>
       <div class=hl><span>주 순익</span><b id=o_wnet_m>-</b></div>
     </div>
@@ -1117,6 +1145,7 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
   <div class=calc-detail-grid>
     <div><span class=cd-l>연 매출</span><span class=cd-v id=o_yrev>-</span></div>
     <div><span class=cd-l>연 임차원가</span><span class=cd-v id=o_ycost>-</span></div>
+    <div id=o_ydedrow style="display:none"><span class=cd-l id=o_ydedlabel>연 수수료·부가세</span><span class=cd-v id=o_yded>-</span></div>
     <div><span class=cd-l>연 순수익 (공실 반영)</span><span class=cd-v id=o_ynet>-</span></div>
     <div><span class=cd-l>손익분기 예약 주수</span><span class=cd-v id=o_be>-</span></div>
   </div>
@@ -1133,7 +1162,7 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
 </defs>
 </svg></span>공실률 시나리오<span class=info-wrap><span class=info-ic tabindex=0><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M11 9H13V7H11M12 20C7.59 20 4 16.41 4 12C4 7.59 7.59 4 12 4C16.41 4 20 7.59 20 12C20 16.41 16.41 20 12 20ZM12 2C10.6868 2 9.38642 2.25866 8.17317 2.7612C6.95991 3.26375 5.85752 4.00035 4.92893 4.92893C3.05357 6.8043 2 9.34784 2 12C2 14.6522 3.05357 17.1957 4.92893 19.0711C5.85752 19.9997 6.95991 20.7363 8.17317 21.2388C9.38642 21.7413 10.6868 22 12 22C14.6522 22 17.1957 20.9464 19.0711 19.0711C20.9464 17.1957 22 14.6522 22 12C22 10.6868 21.7413 9.38642 21.2388 8.17317C20.7363 6.95991 19.9997 5.85752 19.0711 4.92893C18.1425 4.00035 17.0401 3.26375 15.8268 2.7612C14.6136 2.25866 13.3132 2 12 2ZM11 17H13V11H11V17Z" fill="#4D2EE9"/>
-</svg></span><span class=info-tip>연 매출 x (1-공실률) - 연 임차원가</span></span></h2>
+</svg></span><span class=info-tip>연 매출 x (1-공실률) x (1-수수료·부가세) - 연 임차원가</span></span></h2>
   <table><thead><tr><th>공실률</th><th>월 예약(환산)</th><th>연 순수익</th><th>월 순수익</th></tr></thead>
   <tbody id=o_vac></tbody></table>
 </div>
@@ -1157,18 +1186,36 @@ function calc(){
   var leaseY=rentY+depFee+mgmtY+netY            // 연 임차원가(소모품 제외)
   var leaseW=leaseY/52
   var supplyW=v('i_clean')+v('i_supply')
-  var costW=leaseW+supplyW                       // 주 임대원가
-  var costY=leaseY+supplyW*52
   var revW=(v('i_wrent')+v('i_wmgmt'))*10000, revY=revW*52
+  // 매출 연동 공제(선택): 플랫폼 수수료·부가세. 매출이 줄면 함께 줄어드는 변동비다.
+  var feeOn=document.getElementById('i_fee_on').checked
+  var vatOn=document.getElementById('i_vat_on').checked
+  var feeR=feeOn?v('i_fee')/100:0, vatR=vatOn?v('i_vat')/100:0
+  var dedR=feeR+vatR                             // 매출 대비 공제율
+  var dedW=revW*dedR                             // 주 공제액
+  document.getElementById('i_fee').disabled=!feeOn
+  document.getElementById('i_vat').disabled=!vatOn
+  document.getElementById('i_fee').parentElement.className='opt-val'+(feeOn?'':' off')
+  document.getElementById('i_vat').parentElement.className='opt-val'+(vatOn?'':' off')
+  var costW=leaseW+supplyW+dedW                  // 주 임대원가(공제 포함)
+  var costY=leaseY+supplyW*52                    // 연 고정원가(임차+소모품) — 공제는 매출 연동이라 별도
   var netW=revW-costW
-  var be=revW>0?(costY/12)/revW:0                // 손익주=월원가/주매출
-  var margin=revW>0?(revW-leaseW)/revW*100:0     // 영업이익률(소모품 제외 원가 기준)
+  // 손익주 = 월 고정원가 / 주당 실입금(매출에서 수수료·부가세 뺀 값)
+  var be=revW*(1-dedR)>0?(costY/12)/(revW*(1-dedR)):0
+  var margin=revW>0?(revW-leaseW-dedW)/revW*100:0  // 영업이익률(소모품 제외 원가 기준)
   // 원래 클래스(.cd-v/.v 등)를 유지한 채 색상 클래스만 덧붙인다.
   // (예전엔 className을 'v'로 통째 덮어써서 계산 내역 값의 굵기가 사라졌다)
   var set=function(id,txt,cls){var e=document.getElementById(id);if(!e)return
     if(e.dataset.base===undefined) e.dataset.base=e.className
     e.textContent=txt; e.className=(e.dataset.base+' '+(cls||'')).trim()}
   set('o_wrev_m',won(revW)); set('o_wcost_m',won(costW))
+  var dedRow=document.getElementById('o_dedrow')
+  dedRow.style.display=dedR>0?'flex':'none'
+  if(dedR>0){
+    document.getElementById('o_dedlabel').textContent=
+      (feeOn?'플랫폼 수수료':'')+(feeOn&&vatOn?' · ':'')+(vatOn?'부가세':'')
+    set('o_ded_m','-'+Math.round(dedW).toLocaleString()+'원')
+  }
   set('o_wnet_m',signed(netW)+'원',netW>=0?'pos':'neg')
   set('o_wnet',signed(netW)+'원',netW>=0?'pos':'neg')
   set('o_be',be?be.toFixed(2)+'주':'-'); set('o_margin',margin.toFixed(1)+'%')
@@ -1176,12 +1223,19 @@ function calc(){
   var p=v('i_vacancy')
   document.getElementById('o_vacpct').textContent=p+'%'
   document.getElementById('o_herobadge').textContent='공실 '+p+'% 기준'
-  var heroYear=revY*(1-p/100)-leaseY, heroMonth=heroYear/12
+  var heroYear=revY*(1-p/100)*(1-dedR)-leaseY, heroMonth=heroYear/12
   var heroEl=document.getElementById('o_heromonth')
   heroEl.textContent='월 순수익 '+signed(heroMonth)+'원'
   heroEl.className='hero-num '+(heroMonth>=0?'pos-brand':'neg')
   document.getElementById('o_heroyear').textContent='연 환산 '+signed(heroYear)+'원'
   set('o_ynet',signed(heroYear)+'원',heroYear>=0?'pos':'neg')
+  var yDedRow=document.getElementById('o_ydedrow')
+  yDedRow.style.display=dedR>0?'flex':'none'
+  if(dedR>0){
+    document.getElementById('o_ydedlabel').textContent=
+      '연 '+(feeOn?'수수료':'')+(feeOn&&vatOn?'·':'')+(vatOn?'부가세':'')+' (공실 반영)'
+    set('o_yded','-'+Math.round(revY*(1-p/100)*dedR).toLocaleString()+'원')
+  }
   // 손익분기를 일 단위로 환산(1주=7일) — 30일 기준 월 예약일수·공실률로도 같이 표시(표시 전환일 뿐, be 값 자체는 그대로).
   var beDaysRaw=be*7
   var beDays=Math.max(0,Math.min(30,Math.round(beDaysRaw)))
@@ -1201,13 +1255,13 @@ function calc(){
   if(ctaHead) ctaHead.innerHTML=revW>0?
     ('이 매물은 한 달 <span class=pos>약 '+beDays+'일</span>까지 채우면 흑자예요.'):'이 매물은 지금 조건으로는 흑자가 나지 않아요.'
   var tb=document.getElementById('o_vac'),h='', beShown=false
-  ;[0,10,15,20,30].forEach(function(p){
+  ;[0,10,15,20,30,50,70,100].forEach(function(p){
     if(!beShown && revW>0 && p>bePct){
       h+='<tr class=be-row><td colspan=4>손익분기 (공실 '+bePct+'% · '+beDays+'일)</td></tr>'
       beShown=true
     }
     var days=Math.round(30*(1-p/100)), daysTxt=(p===0?'':'약 ')+days+'일'
-    var ry=revY*(1-p/100), ny=ry-leaseY, cls=ny>=0?'pos-brand':'neg'
+    var ry=revY*(1-p/100), ny=ry*(1-dedR)-leaseY, cls=ny>=0?'pos-brand':'neg'
     h+='<tr><td>'+p+'%</td><td>'+daysTxt+'</td><td class='+cls+'><b>'+signed(ny)+'</b></td>'+
        '<td class='+cls+'>'+signed(ny/12)+'</td></tr>'
   })
