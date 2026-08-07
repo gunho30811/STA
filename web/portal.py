@@ -968,11 +968,18 @@ font-size:14px;font-weight:800;color:var(--text);font-family:inherit}
 .week-mini .hl b{font-size:17px}
 /* 손익분기 게이지 — 한 달 30일 중 예약일(막대)과 손익분기일(눈금)을 겹쳐 여유를 한눈에 */
 .gauge{margin-top:20px}
-.gauge-track{position:relative;height:10px;border-radius:999px;background:#E9E6FB}
+/* 손익분기 눈금은 라벨을 달아 위에 띄운다(얇은 선만으론 안 보인다는 피드백, 08-07) */
+.gauge-wrap{position:relative;padding-top:30px}
+.gauge-track{position:relative;height:12px;border-radius:999px;background:#E9E6FB}
 .gauge-fill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:var(--brand);
 transition:width .18s}
-.gauge-mark{position:absolute;top:-5px;width:2.5px;height:20px;border-radius:2px;background:var(--gold);
-transition:left .18s}
+.gauge-mark{position:absolute;top:-6px;bottom:-6px;width:3px;border-radius:2px;background:var(--gold);
+box-shadow:0 0 0 2px #fff;transition:left .18s}
+.gauge-flag{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap;
+background:var(--gold);color:#fff;font-size:11.5px;font-weight:800;padding:4px 9px;border-radius:7px;
+transition:left .18s;box-shadow:0 1px 4px rgba(28,24,48,.18)}
+.gauge-flag::after{content:'';position:absolute;left:50%;top:100%;transform:translateX(-50%);
+border:5px solid transparent;border-top-color:var(--gold)}
 .gauge-cap{display:flex;justify-content:space-between;gap:10px;margin-top:9px;font-size:12.5px;
 color:var(--text-sub);flex-wrap:wrap}
 .gauge-cap b{color:var(--text);font-weight:800}
@@ -1112,13 +1119,16 @@ padding:12px 20px;border-radius:10px;text-decoration:none}
     <span class=hero-annual id=o_heroyear>연 환산 -</span>
   </div>
   <div class=gauge>
-    <div class=gauge-track>
-      <div class=gauge-fill id=o_gfill style="width:0%"></div>
-      <i class=gauge-mark id=o_gmark style="left:0%"></i>
+    <div class=gauge-wrap>
+      <div class=gauge-flag id=o_gflag style="left:0%">손익분기 <b id=o_gbeflag>-</b>일</div>
+      <div class=gauge-track>
+        <div class=gauge-fill id=o_gfill style="width:0%"></div>
+        <i class=gauge-mark id=o_gmark style="left:0%"></i>
+      </div>
     </div>
     <div class=gauge-cap>
       <span>공실 <b id=o_gvac>-</b>% 기준 월 <b id=o_gdays>-</b>일 예약</span>
-      <span class=be>손익분기 <b id=o_gbe>-</b>일 · 여유 <b id=o_gslack>-</b>일</span>
+      <span class=be>여유 <b id=o_gslack>-</b>일</span>
     </div>
   </div>
 </div>
@@ -1245,11 +1255,17 @@ function calc(){
   // 손익분기 게이지: 막대=이 공실률에서 채워지는 월 예약일, 눈금=흑자 전환에 필요한 일수
   var bookDays=Math.max(0,Math.min(30,Math.round(30*(1-p/100))))
   var bePos=Math.max(0,Math.min(30,beDaysRaw))
+  var bePctPos=revW>0?bePos/30*100:0
   document.getElementById('o_gfill').style.width=(bookDays/30*100)+'%'
-  document.getElementById('o_gmark').style.left=(revW>0?bePos/30*100:0)+'%'
+  document.getElementById('o_gmark').style.left=bePctPos+'%'
+  // 라벨은 눈금 위에 띄우되, 양끝에서 카드 밖으로 삐져나가지 않게 가둔다
+  var flag=document.getElementById('o_gflag')
+  flag.style.left=Math.max(9,Math.min(91,bePctPos))+'%'
+  flag.style.display=revW>0?'block':'none'
+  document.getElementById('o_gmark').style.display=revW>0?'block':'none'
+  document.getElementById('o_gbeflag').textContent=revW>0?beDays:'-'
   document.getElementById('o_gvac').textContent=p
   document.getElementById('o_gdays').textContent=bookDays
-  document.getElementById('o_gbe').textContent=revW>0?beDays:'-'
   document.getElementById('o_gslack').textContent=revW>0?Math.max(0,bookDays-beDays):'-'
   var ctaHead=document.getElementById('o_ctahead')
   if(ctaHead) ctaHead.innerHTML=revW>0?
