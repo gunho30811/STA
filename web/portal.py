@@ -869,10 +869,11 @@ CALC_PAGE = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
 <link rel=stylesheet href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard-dynamic-subset.css">
 <style>
 *{box-sizing:border-box}
-/* Figma Make export(design/culc_redesign, theme.css)에서 그대로 가져온 정확한 토큰값 */
-:root{--brand:#5856D6;--brand-hover:#4544B0;--brand-tint:#EDEDF8;--profit:#1a7f5a;--loss:#c0373f;
---profit-bg:#f2faf6;--loss-bg:#fdf4f4;--gold-bg:#fdf7f0;
---bg:#F2F3FA;--text:#1B1B3A;--text-sub:#8080A8;--line:#E2E2F0;--gold:#a86012;--field-bg:#EDEDF8}
+/* 포인트 색상(브랜드/수익/손실/골드)은 Figma 값 대신 사용자가 기존에 정의해둔 디자인
+   토큰으로 — 배경·텍스트·보더 등 구조색은 Figma Make export 값 유지 */
+:root{--brand:#4D2EE9;--brand-hover:#3A1FC9;--brand-tint:#ECEAF8;--profit:#148A5E;--loss:#D24545;
+--profit-bg:#EAF6F0;--loss-bg:#FBEAEA;--gold-bg:#FDF8ED;
+--bg:#F2F3FA;--text:#1B1B3A;--text-sub:#8080A8;--line:#E2E2F0;--gold:#D89700;--field-bg:#EDEDF8}
 body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
 background:var(--bg);min-height:100vh;color:var(--text);padding:20px 14px 60px}
 .hd{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);
