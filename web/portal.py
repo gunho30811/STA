@@ -956,7 +956,7 @@ border-radius:12px;font-size:12.5px;font-weight:600}
 .vac-insight.safe{background:var(--profit-bg);color:var(--profit)}
 .vac-insight.unsafe{background:var(--loss-bg);color:var(--loss)}
 .pos{color:var(--profit)}.pos-brand{color:var(--brand)}.neg{color:var(--loss)}
-.vac{margin-top:28px}
+.vac{margin-top:0}
 .vac h2{margin-top:0;display:flex;align-items:center;font-size:20px}
 .vac h2 .ic{margin-right:7px}
 .vac-scroll{overflow-x:auto}
@@ -1044,7 +1044,7 @@ padding-top:16px;border-top:1px solid var(--line)}
 .market-stat-v span{font-size:12px;color:var(--text-sub);font-weight:500;margin-left:2px}
 .market-foot{font-size:11px;color:var(--text-sub);margin:12px 0 0;line-height:1.6}
 .market-foot span.sep{margin:0 6px;color:var(--line)}
-.kpi3{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:20px}
+.kpi3{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:0}
 @media(max-width:480px){.kpi3{grid-template-columns:1fr}}
 .kpi3-cell{background:var(--field-bg);border-radius:16px;padding:16px 18px}
 .kpi3-cell.warn{background:var(--gold-bg)}
