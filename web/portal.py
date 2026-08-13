@@ -1079,9 +1079,9 @@ margin-bottom:6px;cursor:pointer}
   <div class=top-controls>
     <div class=type-tabs>
       <span class=type-label>매물 유형</span>
-      <button type=button class="tab active" id=tab_studio>원룸</button>
-      <button type=button class=tab id=tab_villa>빌라·주택</button>
-      <button type=button class=tab id=tab_officetel>오피스텔</button>
+      <button type=button class="tab active" data-type="원룸">원룸</button>
+      <button type=button class=tab data-type="빌라·주택">빌라·주택</button>
+      <button type=button class=tab data-type="오피스텔">오피스텔</button>
     </div>
     <button type=button class=reset-btn id=btn_reset><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
@@ -1094,32 +1094,32 @@ margin-bottom:6px;cursor:pointer}
     <div class=card-head><h2>월 고정 지출</h2><span class=sum-badge>합계<b id=o_fixedsum>-</b></span></div>
     <div class=field-grid2>
       <div class=field><label>월 임대료</label>
-        <div class=field-box><input id=i_rent type=number value={{rent or 85}}><span class=unit>만원</span></div></div>
+        <div class=field-box><input id=i_rent type=number value={{rent or 60}}><span class=unit>만원</span></div></div>
       <div class=field><label>보증금</label>
-        <div class=field-box><input id=i_dep type=number value={{dep or 1000}}><span class=unit>만원</span></div></div>
+        <div class=field-box><input id=i_dep type=number value={{dep or 500}}><span class=unit>만원</span></div></div>
     </div>
     <div class=field-full><label>월 관리비</label>
-      <div class=field-box><input id=i_mgmt type=number value=30><span class=unit>만원</span></div></div>
+      <div class=field-box><input id=i_mgmt type=number value=150000 step=10000><span class=unit>원</span></div></div>
     <div class=field-grid2>
       <div class=field><label>보증금 이자율</label>
-        <div class=field-box><input id=i_deprate type=number value=5 step=0.5><span class=unit>%/연</span></div></div>
+        <div class=field-box><input id=i_deprate type=number value=3.5 step=0.1><span class=unit>%/연</span></div></div>
       <div class=field><label>통신비</label>
-        <div class=field-box><input id=i_net type=number value=3.3 step=0.1><span class=unit>만원</span></div></div>
+        <div class=field-box><input id=i_net type=number value=20000 step=1000><span class=unit>원</span></div></div>
     </div>
     <div class=field-grid2>
       <div class=field><label>청소 소모품(주당)</label>
-        <div class=field-box><input id=i_clean type=number value=1000 step=100><span class=unit>원</span></div></div>
+        <div class=field-box><input id=i_clean type=number value=15000 step=1000><span class=unit>원</span></div></div>
       <div class=field><label>렌탈 용품(주당)</label>
-        <div class=field-box><input id=i_supply type=number value=1000 step=100><span class=unit>원</span></div></div>
+        <div class=field-box><input id=i_supply type=number value=20000 step=1000><span class=unit>원</span></div></div>
     </div>
   </div>
   <div class=box>
     <div class=card-head><h2>예상 수익</h2><span class=sum-badge>주 순수익<b id=o_wnetbadge>-</b></span></div>
     <div class=field-grid2>
       <div class=field><label>주간 임대료</label>
-        <div class=field-box><input id=i_wrent type=number value=31><span class=unit>만원</span></div></div>
+        <div class=field-box><input id=i_wrent type=number value=30><span class=unit>만원</span></div></div>
       <div class=field><label>청소·관리비</label>
-        <div class=field-box><input id=i_wmgmt type=number value=12><span class=unit>만원</span></div></div>
+        <div class=field-box><input id=i_wmgmt type=number value=6><span class=unit>만원</span></div></div>
     </div>
     <div class=field-grid2>
       <div class="field field-opt">
@@ -1128,7 +1128,7 @@ margin-bottom:6px;cursor:pointer}
       </div>
       <div class="field field-opt">
         <label class=opt><input type=checkbox id=i_vat_on><span>부가가치세</span></label>
-        <div class=field-box><input id=i_vat type=number value=10 step=1 min=0 disabled><span class=unit>%</span></div>
+        <div class=field-box><input id=i_vat type=number value=0 step=0.1 min=0 disabled><span class=unit>%</span></div>
       </div>
     </div>
     <p class=opts-hint>둘 다 매출(임대료+관리비) 기준으로 뺍니다 · 부가세는 매입세액 공제 미반영</p>
@@ -1224,7 +1224,7 @@ function signed(x){return (x>=0?'+':'')+Math.round(x).toLocaleString()}
 function calc(){
   var v=function(id){return parseFloat(document.getElementById(id).value)||0}
   var rentY=v('i_rent')*10000*12, depFee=v('i_dep')*10000*(v('i_deprate')/100),
-      mgmtY=v('i_mgmt')*10000*12, netY=v('i_net')*10000*12
+      mgmtY=v('i_mgmt')*12, netY=v('i_net')*12       // 월관리비·통신비는 원 단위 입력(만원 아님)
   var leaseY=rentY+depFee+mgmtY+netY            // 연 임차원가(소모품 제외)
   var leaseW=leaseY/52
   var supplyW=v('i_clean')+v('i_supply')
@@ -1315,6 +1315,38 @@ function calc(){
   })
   tb.innerHTML=h
 }
+// 매물유형 프리셋 — design/culc_redesign/src/app/App.tsx의 PRESETS/selectPropType 그대로 이식
+var PRESETS={
+  '원룸':{rent:60,dep:500,mgmt:150000,wrent:30,wmgmt:6},
+  '빌라·주택':{rent:70,dep:1000,mgmt:150000,wrent:38,wmgmt:7},
+  '오피스텔':{rent:80,dep:3000,mgmt:200000,wrent:45,wmgmt:7}
+}
+function setv(id,val){document.getElementById(id).value=val}
+function selectPropType(btn){
+  var type=btn.dataset.type
+  if(btn.classList.contains('active')){
+    // 이미 선택된 탭 재클릭 — 값은 그대로 두고 선택 표시만 해제
+    btn.classList.remove('active')
+    return
+  }
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active')})
+  btn.classList.add('active')
+  var p=PRESETS[type]
+  setv('i_rent',p.rent); setv('i_dep',p.dep); setv('i_mgmt',p.mgmt)
+  setv('i_wrent',p.wrent); setv('i_wmgmt',p.wmgmt)
+  // 유형과 무관하게 항상 이 고정값으로 리셋(App.tsx selectPropType과 동일)
+  setv('i_deprate',3.5); setv('i_net',20000); setv('i_clean',15000); setv('i_supply',20000)
+  setv('i_fee',3.3); setv('i_vat',0); setv('i_vacancy',3)
+  calc()
+}
+function resetAll(){
+  ['i_rent','i_dep','i_deprate','i_mgmt','i_net','i_clean','i_supply',
+   'i_wrent','i_wmgmt','i_fee','i_vat','i_vacancy'].forEach(function(id){setv(id,0)})
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active')})
+  calc()
+}
+document.querySelectorAll('.tab').forEach(function(btn){btn.addEventListener('click',function(){selectPropType(btn)})})
+document.getElementById('btn_reset').addEventListener('click',resetAll)
 document.querySelectorAll('input').forEach(function(e){e.addEventListener('input',calc)})
 document.querySelectorAll('.info-ic').forEach(function(el){el.addEventListener('click',function(e){
   e.stopPropagation();el.parentElement.classList.toggle('show')})})
