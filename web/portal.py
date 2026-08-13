@@ -927,7 +927,7 @@ white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
 /* card-head를 box 패딩 밖으로 블리드시켜 하단 보더로 구분된 별도 스트립처럼 보이게 */
 .card-head{display:flex;align-items:baseline;justify-content:space-between;
 margin:-20px -20px 16px;padding:16px 20px;border-bottom:1px solid var(--line)}
-.card-head h2{font-size:14px;font-weight:800;margin:0;color:var(--text)}
+.card-head h2{font-size:14px;font-weight:700;margin:0;color:var(--text)}
 .card-head .unit-badge{font-size:11px;font-weight:700;color:var(--text-sub)}
 .hint{font-size:12px;color:var(--text-sub);margin:0 0 16px}
 .field-primary{margin:14px 0}
@@ -940,13 +940,13 @@ color:var(--text);text-align:right;width:100%;font-family:inherit}
 .field-box .unit{font-size:12px;color:var(--text-sub);font-weight:500;white-space:nowrap}
 /* 접기(details) 없이 항상 펼친 상태 — 클릭해야 보이는 게 불친절하다는 피드백(장효령, 08-06) */
 .more{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
-.more-title{font-size:14px;font-weight:800;color:var(--text);line-height:1;margin:0 0 2px}
+.more-title{font-size:14px;font-weight:700;color:var(--text);line-height:1;margin:0 0 2px}
 /* 공실률 설정 카드 헤더 — 좌: 라벨+타이틀, 우: 큰 일수 숫자 */
 .vac-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:20px}
 .vac-eyebrow{font-size:12px;color:var(--text-sub);margin:0 0 2px}
-.vac-head h2{font-size:14px;font-weight:800;margin:0}
+.vac-head h2{font-size:14px;font-weight:700;margin:0}
 .vac-num{text-align:right}
-.vac-num b{display:block;font-size:28px;font-weight:800;color:var(--brand);line-height:1}
+.vac-num b{display:block;font-size:28px;font-weight:700;color:var(--brand);line-height:1}
 .vac-num span{display:block;font-size:11px;color:var(--text-sub);margin-top:2px}
 .vac-range{width:100%;accent-color:var(--brand)}
 .scale{display:flex;justify-content:space-between;font-size:11px;color:var(--text-sub);margin-top:6px}
@@ -961,19 +961,19 @@ border-radius:12px;font-size:12.5px;font-weight:600}
 .vac-scroll{overflow-x:auto}
 .vac table{width:100%;min-width:280px;border-collapse:collapse;font-size:12.5px}
 .vac th,.vac td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--line)}
-.vac th{color:var(--text-sub);font-weight:800}.vac td:first-child,.vac th:first-child{text-align:left}
+.vac th{color:var(--text-sub);font-weight:700}.vac td:first-child,.vac th:first-child{text-align:left}
 .vac tbody tr{cursor:pointer;transition:background .1s}
 .vac tbody tr:hover,.vac tbody tr.active{background:var(--field-bg)}
-.vac tbody tr.active td:first-child{color:var(--brand);font-weight:800}
+.vac tbody tr.active td:first-child{color:var(--brand);font-weight:700}
 .hero-card{padding:24px 22px}
 .hero-sub{font-size:12px;color:var(--text-sub);margin:0 0 8px}
 .hero-row{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
-.hero-num{font-size:36px;font-weight:800;letter-spacing:-.02em;white-space:nowrap}
+.hero-num{font-size:36px;font-weight:700;letter-spacing:-.02em;white-space:nowrap}
 .hero-annual{font-size:12px;color:var(--text-sub);white-space:nowrap;font-variant-numeric:tabular-nums}
 @media(max-width:480px){.hero-num{font-size:27px}}
 /* 매출에서 빠지는 선택 항목(플랫폼 수수료·부가세) — 체크 꺼짐이면 % 입력도 잠근다 */
 .opts{margin-top:20px;border-top:1px solid var(--line);padding-top:14px}
-.opts-title{font-size:13px;font-weight:800;color:var(--text);margin:0 0 10px}
+.opts-title{font-size:13px;font-weight:700;color:var(--text);margin:0 0 10px}
 .opts-sub{font-weight:600;color:var(--text-sub)}
 .opt-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
 .opt{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer}
@@ -981,7 +981,7 @@ border-radius:12px;font-size:12.5px;font-weight:600}
 .opt-val{display:flex;align-items:center;gap:5px;border:1.5px solid var(--line);border-radius:9px;
 padding:6px 10px;background:#fff}
 .opt-val input{border:none;outline:none;background:transparent;width:52px;text-align:right;
-font-size:14px;font-weight:800;color:var(--text);font-family:inherit}
+font-size:14px;font-weight:700;color:var(--text);font-family:inherit}
 .opt-val:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-tint)}
 .opt-val.off{opacity:.45}
 .opt-val .unit{font-size:12px;color:var(--text-sub);font-weight:600}
@@ -990,13 +990,13 @@ font-size:14px;font-weight:800;color:var(--text);font-family:inherit}
 .week-mini{margin-top:20px;border-top:1px solid var(--line);padding-top:14px;display:grid;gap:9px}
 .week-mini>div{display:flex;justify-content:space-between;align-items:baseline;font-size:13px}
 .week-mini span{color:var(--text-sub)}
-.week-mini b{font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
+.week-mini b{font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
 .week-mini .hl{margin-top:3px;padding-top:11px;border-top:1px dashed var(--line)}
 .week-mini .hl span{color:var(--text);font-weight:700}
 .week-mini .hl b{font-size:17px}
 /* 손익분기 슬라이더 — App.tsx 그대로: 초록 반투명 fill=안전구간(0~손익분기일),
    손잡이=지금 선택한 공실일수 위치(안전이면 브랜드색, 아니면 손실색) */
-.gauge-caption{font-size:13px;font-weight:800;margin:2px 0 14px}
+.gauge-caption{font-size:13px;font-weight:700;margin:2px 0 14px}
 .gauge2-track{position:relative;height:10px;background:var(--field-bg);border-radius:999px}
 .gauge2-safe{position:absolute;inset:0 auto 0 0;top:0;bottom:0;left:0;background:var(--profit);
 opacity:.15;border-radius:999px;transition:width .15s}
@@ -1006,18 +1006,18 @@ box-shadow:0 1px 4px rgba(27,27,58,.25);transition:left .15s,background .15s}
 .gauge2-thumb.unsafe{background:var(--loss)}
 .gauge2-cap{display:flex;justify-content:space-between;font-size:11px;font-weight:700;margin-top:10px}
 /* 공실률별 시나리오 막대그래프 — 클릭하면 공실일수 슬라이더 값이 그 날짜로 바뀐다 */
-.scenario-title{font-size:14px;font-weight:800;margin:2px 0 16px}
+.scenario-title{font-size:14px;font-weight:700;margin:2px 0 16px}
 .scenario-chart{display:flex;align-items:flex-end;gap:6px;height:96px;margin-bottom:16px}
 .sbar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;cursor:pointer}
 .sbar-track{flex:1;display:flex;align-items:flex-end;width:100%}
 .sbar{width:100%;border-radius:4px 4px 0 0;transition:opacity .15s}
 .sbar-label{font-size:10px;color:var(--text-sub);margin-top:6px}
-.sbar-col.active .sbar-label{color:var(--brand);font-weight:800}
+.sbar-col.active .sbar-label{color:var(--brand);font-weight:700}
 /* 비슷한 매물과 비교하면 — 지역 드롭다운 + 목업 분포 히스토그램(정적 데이터) */
 .market-card{margin-top:0}
 .market-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
 margin-bottom:20px;flex-wrap:wrap}
-.market-title{font-size:15px;font-weight:800;margin:0}
+.market-title{font-size:15px;font-weight:700;margin:0}
 /* 네이티브 select 화살표는 padding을 무시하고 우측 끝에 거의 붙어버려서
    appearance:none + 커스텀 화살표로 좌측 글자 여백(10px)과 동일하게 맞춘다 */
 .market-region{font-size:12px;border:none;background:var(--field-bg);color:var(--text);
@@ -1027,7 +1027,7 @@ background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/sv
 background-repeat:no-repeat;background-position:right 10px center;background-size:14px}
 .market-highlight{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;
 background:var(--field-bg);border-radius:12px;margin-bottom:20px}
-.market-mine{font-size:20px;font-weight:800;color:var(--brand);margin:0;font-variant-numeric:tabular-nums}
+.market-mine{font-size:20px;font-weight:700;color:var(--brand);margin:0;font-variant-numeric:tabular-nums}
 .market-badge{font-size:12px;font-weight:700;background:var(--brand-tint);color:var(--brand);
 padding:4px 10px;border-radius:999px}
 .market-badge.neg{background:var(--loss-bg);color:var(--loss)}
@@ -1039,7 +1039,7 @@ padding:4px 10px;border-radius:999px}
 .mbar-label{font-size:9.5px;color:var(--text-sub);margin-top:6px;text-align:center;line-height:1.3}
 .market-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px;
 padding-top:16px;border-top:1px solid var(--line)}
-.market-stat-v{font-size:16px;font-weight:800}
+.market-stat-v{font-size:16px;font-weight:700}
 .market-stat-v span{font-size:12px;color:var(--text-sub);font-weight:500;margin-left:2px}
 .market-foot{font-size:11px;color:var(--text-sub);margin:12px 0 0;line-height:1.6}
 .market-foot span.sep{margin:0 6px;color:var(--line)}
@@ -1051,7 +1051,7 @@ padding-top:16px;border-top:1px solid var(--line)}
 .kpi3-cell.posbg{background:var(--profit-bg)}
 .kpi3-cell .l{font-size:12.5px;color:var(--text-sub);margin-bottom:6px}
 .kpi3-cell.warn .l{color:var(--gold);font-weight:700}
-.kpi3-cell .v{font-size:20px;font-weight:800;white-space:nowrap}   /* '+145,385 / 원' 줄바꿈 방지 */
+.kpi3-cell .v{font-size:20px;font-weight:700;white-space:nowrap}   /* '+145,385 / 원' 줄바꿈 방지 */
 .kpi3-cell .v.warn{color:var(--gold)}.kpi3-cell .v.neg{color:var(--loss)}.kpi3-cell .v.pos{color:var(--profit)}
 .kpi3-paren{font-size:13px;font-weight:600;color:var(--text-sub)}
 .kpi3-sub{font-size:11.5px;color:var(--text-sub);margin-top:4px}
@@ -1068,15 +1068,15 @@ transform:rotate(45deg);border-radius:2px}
 font-weight:700;text-align:center;padding:6px 4px}
 .cta-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
 margin-top:16px;padding:24px;background:var(--brand);border-radius:16px}
-.cta-h1{font-size:15px;font-weight:800;color:#fff;margin:0 0 4px;line-height:1.4}
+.cta-h1{font-size:15px;font-weight:700;color:#fff;margin:0 0 4px;line-height:1.4}
 .cta-h2{font-size:13px;color:rgba(255,255,255,.7);margin:0;line-height:1.5}
 .cta-btn{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
-background:#fff;color:var(--brand);font-weight:800;font-size:13.5px;
+background:#fff;color:var(--brand);font-weight:700;font-size:13.5px;
 padding:11px 20px;border-radius:12px;text-decoration:none}
 .cta-btn:hover{opacity:.9}
 /* 카드 헤더 옆 요약 배지 — "합계 94만원" / "주 순수익 35만원" */
 .sum-badge{font-size:12px;color:var(--text-sub);display:flex;align-items:baseline;gap:6px}
-.sum-badge b{font-size:15px;font-weight:800;color:var(--text)}
+.sum-badge b{font-size:15px;font-weight:700;color:var(--text)}
 /* 입력 카드 내부 2열 필드 그리드(핵심/세부 구분 없이 전부 같은 무게) */
 .field-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
 .field-grid2:first-of-type{margin-top:16px}
