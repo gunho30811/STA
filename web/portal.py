@@ -939,11 +939,6 @@ color:var(--text);text-align:right;width:100%;font-family:inherit}
 /* 접기(details) 없이 항상 펼친 상태 — 클릭해야 보이는 게 불친절하다는 피드백(장효령, 08-06) */
 .more{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
 .more-title{font-size:14px;font-weight:800;color:var(--text);line-height:1;margin:0 0 2px}
-.field-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
-@media(max-width:480px){.field-grid{grid-template-columns:1fr}}
-.field-sm label{display:block;font-size:12px;color:var(--text-sub);margin-bottom:5px}
-.field-sm .field-box{padding:8px 10px}
-.field-sm .field-box input{font-size:14px;font-weight:700}
 /* 공실률 설정 카드 헤더 — 좌: 라벨+타이틀, 우: 큰 일수 숫자 */
 .vac-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:20px}
 .vac-eyebrow{font-size:12px;color:var(--text-sub);margin:0 0 2px}
@@ -961,7 +956,8 @@ border-radius:12px;font-size:12.5px;font-weight:600}
 .vac{margin-top:28px}
 .vac h2{margin-top:0;display:flex;align-items:center;font-size:20px}
 .vac h2 .ic{margin-right:7px}
-.vac table{width:100%;border-collapse:collapse;font-size:12.5px}
+.vac-scroll{overflow-x:auto}
+.vac table{width:100%;min-width:280px;border-collapse:collapse;font-size:12.5px}
 .vac th,.vac td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--line)}
 .vac th{color:var(--text-sub);font-weight:800}.vac td:first-child,.vac th:first-child{text-align:left}
 .vac tbody tr{cursor:pointer;transition:background .1s}
@@ -1017,7 +1013,8 @@ box-shadow:0 1px 4px rgba(27,27,58,.25);transition:left .15s,background .15s}
 .sbar-col.active .sbar-label{color:var(--brand);font-weight:800}
 /* 비슷한 매물과 비교하면 — 지역 드롭다운 + 목업 분포 히스토그램(정적 데이터) */
 .market-card{margin-top:0}
-.market-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:20px}
+.market-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+margin-bottom:20px;flex-wrap:wrap}
 .market-title{font-size:15px;font-weight:800;margin:0}
 .market-region{font-size:12px;border:none;background:var(--field-bg);color:var(--text);
 border-radius:10px;height:34px;padding:0 10px;min-width:120px;cursor:pointer;font-family:inherit}
@@ -1051,14 +1048,6 @@ padding-top:16px;border-top:1px solid var(--line)}
 .kpi3-cell .v.warn{color:var(--gold)}.kpi3-cell .v.neg{color:var(--loss)}.kpi3-cell .v.pos{color:var(--profit)}
 .kpi3-paren{font-size:13px;font-weight:600;color:var(--text-sub)}
 .kpi3-sub{font-size:11.5px;color:var(--text-sub);margin-top:4px}
-.calc-detail{margin-top:20px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px}
-.calc-detail .more-title{margin:0}
-.more-hint{font-size:12px;color:var(--text-sub);margin:6px 0 0}
-.calc-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;margin-top:14px}
-@media(max-width:480px){.calc-detail-grid{grid-template-columns:1fr}}
-.calc-detail-grid>div{display:flex;justify-content:space-between;font-size:13px}
-.cd-l{color:var(--text-sub)}
-.cd-v{font-weight:700;color:var(--text)}
 .info-wrap{position:relative;display:inline-flex;align-items:center;margin-left:7px}
 .info-ic{width:16px;height:16px;display:flex;align-items:center;justify-content:center;cursor:help}
 .info-ic svg{width:16px;height:16px;display:block}
@@ -1071,12 +1060,13 @@ transform:rotate(45deg);border-radius:2px}
 .be-row td{border-top:1px dashed var(--gold);border-bottom:none;color:var(--gold);font-size:11px;
 font-weight:700;text-align:center;padding:6px 4px}
 .cta-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
-margin-top:24px;padding:20px 22px;background:#fff;border:1px solid var(--line);border-radius:16px}
-.cta-h1{font-size:14.5px;font-weight:800;color:var(--text);margin:0 0 4px}
-.cta-h2{font-size:12.5px;color:var(--text-sub);margin:0}
-.cta-btn{flex:0 0 auto;white-space:nowrap;background:var(--brand);color:#fff;font-weight:800;font-size:13.5px;
-padding:12px 20px;border-radius:10px;text-decoration:none}
-.cta-btn:hover{background:var(--brand-hover)}
+margin-top:16px;padding:24px;background:var(--brand);border-radius:16px}
+.cta-h1{font-size:15px;font-weight:800;color:#fff;margin:0 0 4px;line-height:1.4}
+.cta-h2{font-size:13px;color:rgba(255,255,255,.7);margin:0;line-height:1.5}
+.cta-btn{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+background:#fff;color:var(--brand);font-weight:800;font-size:13.5px;
+padding:11px 20px;border-radius:12px;text-decoration:none}
+.cta-btn:hover{opacity:.9}
 /* 카드 헤더 옆 요약 배지 — "합계 94만원" / "주 순수익 35만원" */
 .sum-badge{font-size:12px;color:var(--text-sub);display:flex;align-items:baseline;gap:6px}
 .sum-badge b{font-size:15px;font-weight:800;color:var(--text)}
@@ -1215,8 +1205,10 @@ margin-bottom:6px;cursor:pointer}
 </svg></span><span class=info-tip>월 완전가동 순수익 x (1−공실일수/31) − 월 고정지출</span></span></p>
   <h2 class=scenario-title>월 순익 시나리오</h2>
   <div class=scenario-chart id=o_schart></div>
+  <div class=vac-scroll>
   <table><thead><tr><th>공실 일수</th><th>예약 일수</th><th>월 순익</th><th>연 순익</th></tr></thead>
   <tbody id=o_vac></tbody></table>
+  </div>
 </div>
   </div>
 </div>
@@ -1240,10 +1232,11 @@ margin-bottom:6px;cursor:pointer}
 {% if not user %}
 <div class=cta-row>
   <div class=cta-text>
-    <p class=cta-h1 id=o_ctahead>이 매물은 한 달 약 -일까지 채우면 흑자예요.</p>
-    <p class=cta-h2>그럼 애초에 공실 걱정 적은, 수요 높고 공급 부족한 자리는 어디일까요?</p>
+    <p class=cta-h1>공실 걱정 없는 매물, 따로 있어요</p>
+    <p class=cta-h2>수요는 많고 공급이 부족한 지역을 찾아 드릴게요.</p>
   </div>
-  <a class=cta-btn href="/auth/signup">★ 공급부족 스팟 보기</a>
+  <a class=cta-btn href="/auth/signup">공급 부족 지역 보기<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+<path d="m9 18 6-6-6-6"/></svg></a>
 </div>
 {% endif %}
 <script>
@@ -1377,10 +1370,6 @@ function calc(){
   var thumb=document.getElementById('o_gthumb')
   thumb.style.left='calc('+Math.min(97,vacancy/31*100)+'% - 8px)'
   thumb.className='gauge2-thumb'+(safeVacancy?'':' unsafe')
-
-  var ctaHead=document.getElementById('o_ctahead')
-  if(ctaHead) ctaHead.innerHTML=monthlyNet100>0?
-    ('이 매물은 한 달 <span class=pos>약 '+(beOccupiedDays===null?'-':beOccupiedDays)+'일</span>까지 채우면 흑자예요.'):'이 매물은 지금 조건으로는 흑자가 나지 않아요.'
 
   // 공실률별 시나리오 — App.tsx SCENARIOS_DAYS 그대로, 막대/표 행 클릭 시 공실일수 슬라이더 이동
   var scenarios=SCENARIOS_DAYS.map(function(days){
