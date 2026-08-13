@@ -1184,11 +1184,11 @@ margin-bottom:6px;cursor:pointer}
   <div class=right-col>
   <div class=box>
     <div class=vac-head>
-      <div><p class=vac-eyebrow>지금 분석 기준</p><h2>공실률 설정</h2></div>
-      <div class=vac-num><b id=o_vacpct>3일</b><span>월 공실 일수</span></div>
+      <div><p class=vac-eyebrow>한 달에 며칠이나 예약될까요?</p><h2>예약일수 설정</h2></div>
+      <div class=vac-num><b id=o_vacpct>0일 예약</b><span id=o_vacsub>31일 공실</span></div>
     </div>
-    <input type=range id=i_vacancy min=0 max=31 step=1 value=3 class=vac-range>
-    <div class=scale><span>0일 (풀예약)</span><span>31일 (한 달 공실)</span></div>
+    <input type=range id=i_vacancy min=0 max=31 step=1 value=28 class=vac-range>
+    <div class=scale><span>0일 (한 달 공실)</span><span>31일 (풀예약)</span></div>
     <div class=vac-insight id=o_vinsight>-</div>
   </div>
   <div class="box hero-card">
@@ -1336,7 +1336,10 @@ function calc(){
   var monthlyRent=v('i_rent'), deposit=v('i_dep'), depositRate=v('i_deprate')
   var mainFee=v('i_mgmt'), telecom=v('i_net'), supplies=v('i_clean'), rentalGoods=v('i_supply')
   var weeklyRent=v('i_wrent'), weeklyClean=v('i_wmgmt')
-  var commission=v('i_fee'), vat=v('i_vat'), vacancy=v('i_vacancy')
+  var commission=v('i_fee'), vat=v('i_vat')
+  // 슬라이더는 "예약일수"를 직접 받는다(0=한달공실~31=풀예약) — 기존 계산식은
+  // 전부 공실일수(vacancy) 기준이라 여기서 한 번만 뒤집어서 넘겨준다
+  var bookedDays=v('i_vacancy'), vacancy=31-bookedDays
 
   var weeklyGross=weeklyRent+weeklyClean
   var weeklyDeduct=weeklyGross*(commission+vat)/100
@@ -1370,7 +1373,8 @@ function calc(){
   set('o_ded_m','-'+fmtWon(weeklyDeduct))
   set('o_wnet_m',fmtWon(weeklyNet))
 
-  document.getElementById('o_vacpct').textContent=vacancy+'일'
+  document.getElementById('o_vacpct').textContent=bookedDays+'일 예약'
+  document.getElementById('o_vacsub').textContent=vacancy+'일 공실'
   var heroEl=document.getElementById('o_heromonth')
   heroEl.textContent=fmtWon(monthlyProfit,true)
   heroEl.className='hero-num '+(pos?'pos-brand':'neg')
@@ -1378,9 +1382,8 @@ function calc(){
 
   var insight=document.getElementById('o_vinsight')
   insight.className='vac-insight '+(safeVacancy?'safe':'unsafe')
-  insight.textContent=safeVacancy?
-    ('월 '+vacancy+'일 공실은 흑자예요. 공실 '+beVacancyDays+'일까지는 괜찮아요.'):
-    ('월 '+vacancy+'일 공실이면 적자예요. 공실 '+beVacancyDays+'일을 넘기면 수익이 나기 어려워요.')
+  insight.textContent='월 '+bookedDays+'일 예약이면 '+(safeVacancy?'흑자예요.':'적자예요.')+
+    ' 손익분기는 월 '+(beOccupiedDays===null?'-':beOccupiedDays)+'일이에요.'
 
   set('o_bevalue','월 '+(beOccupiedDays===null?'-':beOccupiedDays)+'일 예약')
   document.getElementById('o_besub').textContent='최대 '+beVacancyDays+'일 공실 허용'
@@ -1412,7 +1415,7 @@ function calc(){
   })
   chart.innerHTML=ch
   chart.querySelectorAll('.sbar-col').forEach(function(col){
-    col.addEventListener('click',function(){setv('i_vacancy',col.dataset.days);calc()})
+    col.addEventListener('click',function(){setv('i_vacancy',31-col.dataset.days);calc()})
   })
 
   var tb=document.getElementById('o_vac'),h2=''
@@ -1425,7 +1428,7 @@ function calc(){
   })
   tb.innerHTML=h2
   tb.querySelectorAll('tr').forEach(function(row){
-    row.addEventListener('click',function(){setv('i_vacancy',row.dataset.days);calc()})
+    row.addEventListener('click',function(){setv('i_vacancy',31-row.dataset.days);calc()})
   })
 
   renderMarket(monthlyProfit)
@@ -1452,7 +1455,7 @@ function selectPropType(btn){
   setv('i_wrent',p.wrent); setv('i_wmgmt',p.wmgmt)
   // 유형과 무관하게 항상 이 고정값으로 리셋(App.tsx selectPropType과 동일)
   setv('i_deprate',3.5); setv('i_net',20000); setv('i_clean',15000); setv('i_supply',20000)
-  setv('i_fee',3.3); setv('i_vat',0); setv('i_vacancy',3)
+  setv('i_fee',3.3); setv('i_vat',0); setv('i_vacancy',28)
   calc()
 }
 function resetAll(){
