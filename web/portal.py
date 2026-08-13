@@ -1025,13 +1025,24 @@ box-shadow:0 1px 4px rgba(27,27,58,.25);transition:left .15s,background .15s}
 .market-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
 margin-bottom:20px;flex-wrap:wrap}
 .market-title{font-size:15px;font-weight:700;margin:0}
-/* 네이티브 select 화살표는 padding을 무시하고 우측 끝에 거의 붙어버려서
-   appearance:none + 커스텀 화살표로 좌측 글자 여백(10px)과 동일하게 맞춘다 */
+/* 네이티브 select는 펼친 옵션 목록을 OS가 직접 그려서 CSS로 스타일링이 안 되므로
+   버튼+직접 그린 목록으로 만든 커스텀 드롭다운으로 교체 */
+.market-region-wrap{position:relative}
 .market-region{font-size:12px;border:none;background:var(--field-bg);color:var(--text);
-border-radius:10px;height:34px;padding:0 32px 0 10px;min-width:120px;cursor:pointer;font-family:inherit;
-appearance:none;-webkit-appearance:none;-moz-appearance:none;
-background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%238080A8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-background-repeat:no-repeat;background-position:right 10px center;background-size:14px}
+border-radius:10px;height:34px;padding:0 32px 0 12px;min-width:120px;cursor:pointer;font-family:inherit;
+display:inline-flex;align-items:center;position:relative}
+.market-region svg{position:absolute;right:10px;top:50%;transform:translateY(-50%);
+color:var(--text-sub);transition:transform .15s}
+.market-region.open svg{transform:translateY(-50%) rotate(180deg)}
+.market-region-menu{display:none;position:absolute;top:calc(100% + 6px);right:0;min-width:140px;
+background:#fff;border-radius:12px;box-shadow:0 12px 32px -8px rgba(27,27,58,.25);
+padding:6px;z-index:30}
+.market-region-menu.show{display:block}
+.market-region-opt{display:block;width:100%;text-align:left;padding:8px 12px;font-size:12.5px;
+border-radius:8px;cursor:pointer;background:none;border:none;font-family:inherit;
+color:var(--text);white-space:nowrap}
+.market-region-opt:hover{background:var(--field-bg)}
+.market-region-opt.active{background:var(--brand);color:#fff;font-weight:700}
 .market-highlight{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;
 background:var(--field-bg);border-radius:12px;margin-bottom:20px}
 .market-mine{font-size:20px;font-weight:700;color:var(--brand);margin:0;font-variant-numeric:tabular-nums}
@@ -1238,7 +1249,11 @@ margin-bottom:6px;cursor:pointer}
 <div class="box market-card">
   <div class=market-head>
     <div><p class=vac-eyebrow>비슷한 매물과 비교하면</p><h3 class=market-title>나는 얼마나 벌고 있을까요?</h3></div>
-    <select id=i_region class=market-region></select>
+    <div class=market-region-wrap>
+      <button type=button class=market-region id=i_region_btn><span id=i_region_label>전국</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+      <div class=market-region-menu id=i_region_menu></div>
+    </div>
   </div>
   <div class=market-highlight>
     <div><p class=vac-eyebrow>내 예상 월 수익</p><p class=market-mine id=o_mymonth>—</p></div>
@@ -1286,16 +1301,25 @@ var MARKET_DATA={
     {label:'80만원대',count:41,min:80,max:100},{label:'100만원대',count:18,min:100,max:120},
     {label:'120만원+',count:7,min:120,max:Infinity}],total:432,p25:35,median:55,p75:80}
 }
+var curRegion='전국'
 function renderMarket(monthlyProfit){
   var activeTab=document.querySelector('.tab.active')
   var propLabel=activeTab?activeTab.dataset.type:'원룸'
-  var sel=document.getElementById('i_region')
-  if(!sel.options.length||sel.dataset.label!==propLabel){
-    var cur=sel.value||'전국'
-    sel.innerHTML=REGIONS.map(function(r){return '<option value="'+r+'">'+r+' '+propLabel+'</option>'}).join('')
-    sel.value=cur; sel.dataset.label=propLabel
-  }
-  var region=sel.value||'전국'
+  document.getElementById('i_region_label').textContent=curRegion+' '+propLabel
+  var menu=document.getElementById('i_region_menu')
+  menu.innerHTML=REGIONS.map(function(r){
+    return '<button type=button class="market-region-opt'+(r===curRegion?' active':'')+
+      '" data-region="'+r+'">'+r+' '+propLabel+'</button>'
+  }).join('')
+  menu.querySelectorAll('.market-region-opt').forEach(function(opt){
+    opt.addEventListener('click',function(){
+      curRegion=opt.dataset.region
+      menu.classList.remove('show')
+      document.getElementById('i_region_btn').classList.remove('open')
+      calc()
+    })
+  })
+  var region=curRegion
   var key=region+' · '+propLabel
   var market=MARKET_DATA[key]||MARKET_DATA[region+' · 원룸']||MARKET_DATA['전국 · 원룸']
   var userBinIdx=-1
@@ -1434,7 +1458,15 @@ function calc(){
 
   renderMarket(monthlyProfit)
 }
-document.getElementById('i_region').addEventListener('change',function(){calc()})
+document.getElementById('i_region_btn').addEventListener('click',function(e){
+  e.stopPropagation()
+  this.classList.toggle('open')
+  document.getElementById('i_region_menu').classList.toggle('show')
+})
+document.addEventListener('click',function(){
+  document.getElementById('i_region_menu').classList.remove('show')
+  document.getElementById('i_region_btn').classList.remove('open')
+})
 // 매물유형 프리셋 — design/culc_redesign/src/app/App.tsx의 PRESETS/selectPropType 그대로 이식
 var PRESETS={
   '원룸':{rent:60,dep:500,mgmt:150000,wrent:30,wmgmt:6},
