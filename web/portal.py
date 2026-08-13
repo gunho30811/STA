@@ -902,10 +902,12 @@ h1{font-size:22px;font-weight:900;margin:4px 0 2px;letter-spacing:-.01em}
 /* 상단 — 왼쪽 제목/설명, 오른쪽 매물유형 탭 + 초기화 (좁은 화면에서 아래로 줄바꿈).
    원본은 header 밑에 별도 흰 스트립(풀블리드)이지만, 이 프로젝트는 body padding 기반이라
    카드 형태로 근사(리스크가 큰 풀블리드 마진 트릭은 .hd 하나로 충분). */
-.top-bar{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;
+/* App.tsx는 sm:items-end(하단 정렬) — 타이틀이 2줄이라 우측 컨트롤이 위쪽에 붕 뜨는 것보다
+   아래쪽에 맞춰야 자연스럽다는 원본 그대로 반영 */
+.top-bar{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;
 flex-wrap:wrap;background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(27,27,58,.06);
 padding:22px 24px;margin-bottom:16px}
-.top-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:2px}
+.top-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .type-tabs{display:flex;align-items:center;gap:6px}
 .type-label{font-size:12px;color:var(--text-sub);margin-right:4px}
 .tab{border:none;background:var(--field-bg);color:var(--text-sub);font-size:12.5px;
