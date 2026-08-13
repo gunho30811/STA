@@ -953,10 +953,12 @@ color:var(--text);text-align:right;width:100%;font-family:inherit}
 .vac-num span{display:block;font-size:11px;color:var(--text-sub);margin-top:2px}
 .vac-range{width:100%;accent-color:var(--brand)}
 .scale{display:flex;justify-content:space-between;font-size:11px;color:var(--text-sub);margin-top:6px}
-.vac-insight{display:flex;align-items:center;gap:8px;margin-top:16px;padding:10px 14px;
-border-radius:12px;font-size:12.5px;font-weight:600}
-.vac-insight.safe{background:var(--profit-bg);color:var(--profit)}
-.vac-insight.unsafe{background:var(--loss-bg);color:var(--loss)}
+/* 토스류 인라인 알림 패턴 — 옅은 틴트만으론 배경에 묻혀서 좌측 색 바 + 아이콘으로 위계를 줌 */
+.vac-insight{display:flex;align-items:center;gap:9px;margin-top:16px;padding:11px 14px 11px 12px;
+border-radius:12px;font-size:12.5px;font-weight:700;border-left:3px solid transparent}
+.vac-insight.safe{background:var(--profit-bg);color:var(--profit);border-left-color:var(--profit)}
+.vac-insight.unsafe{background:var(--loss-bg);color:var(--loss);border-left-color:var(--loss)}
+.vac-insight svg{flex:none}
 .pos{color:var(--profit)}.pos-brand{color:var(--brand)}.neg{color:var(--loss)}
 .vac{margin-top:0}
 .vac h2{margin-top:0;display:flex;align-items:center;font-size:20px}
@@ -1034,9 +1036,13 @@ background-repeat:no-repeat;background-position:right 10px center;background-siz
 .market-highlight{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;
 background:var(--field-bg);border-radius:12px;margin-bottom:20px}
 .market-mine{font-size:20px;font-weight:700;color:var(--brand);margin:0;font-variant-numeric:tabular-nums}
-.market-badge{font-size:12px;font-weight:700;background:var(--brand-tint);color:var(--brand);
-padding:4px 10px;border-radius:999px}
-.market-badge.neg{background:var(--loss-bg);color:var(--loss)}
+/* 옅은 틴트 뱃지는 하이라이트 박스(연보라 배경) 위에서 거의 안 보였음 —
+   토스류 상태칩처럼 색을 꽉 채운 solid fill + 흰 글자로 위계를 확실히 줌 */
+.market-badge{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:800;
+background:var(--brand);color:#fff;padding:6px 12px;border-radius:999px;
+box-shadow:0 3px 10px -3px rgba(77,46,233,.5)}
+.market-badge.neg{background:var(--loss);box-shadow:0 3px 10px -3px rgba(210,69,69,.5)}
+.market-badge svg{flex:none}
 .market-chart{display:flex;align-items:flex-end;gap:5px;height:120px;margin-bottom:16px}
 .mbar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%}
 .mbar-track{flex:1;display:flex;align-items:flex-end;width:100%}
@@ -1185,7 +1191,7 @@ margin-bottom:6px;cursor:pointer}
     </div>
     <input type=range id=i_vacancy min=0 max=31 step=1 value=3 class=vac-range>
     <div class=scale><span>0일 (완전가동)</span><span>31일 (한 달 공실)</span></div>
-    <div class=vac-insight id=o_vinsight><span id=o_vinsight_txt>-</span></div>
+    <div class=vac-insight id=o_vinsight><span>-</span></div>
   </div>
   <div class="box hero-card">
   <p class=hero-sub>월 순수익</p>
@@ -1263,6 +1269,8 @@ margin-bottom:6px;cursor:pointer}
 var WPM=365/7/12
 var SCENARIOS_DAYS=[3,6,10,15,20,25]
 var REGIONS=['전국','서울','경기']
+var ICON_UP='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg>'
+var ICON_DOWN='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/></svg>'
 var MARKET_DATA={
   '전국 · 원룸':{bins:[
     {label:'~20만원',count:89,min:-Infinity,max:20},{label:'20만원대',count:142,min:20,max:40},
@@ -1300,8 +1308,8 @@ function renderMarket(monthlyProfit){
 
   document.getElementById('o_mymonth').textContent=monthlyProfit>0?(Math.round(monthlyProfit)+'만원'):'—'
   var badge=document.getElementById('o_mytop')
-  if(topPct!==null&&monthlyProfit>0){badge.className='market-badge';badge.textContent='상위 '+topPct+'%';badge.style.display=''}
-  else if(monthlyProfit<=0){badge.className='market-badge neg';badge.textContent='적자 구간';badge.style.display=''}
+  if(topPct!==null&&monthlyProfit>0){badge.className='market-badge';badge.innerHTML=ICON_UP+'상위 '+topPct+'%';badge.style.display=''}
+  else if(monthlyProfit<=0){badge.className='market-badge neg';badge.innerHTML=ICON_DOWN+'적자 구간';badge.style.display=''}
   else{badge.style.display='none'}
 
   var maxCount=Math.max.apply(null,market.bins.map(function(b){return b.count}))
@@ -1372,9 +1380,9 @@ function calc(){
 
   var insight=document.getElementById('o_vinsight')
   insight.className='vac-insight '+(safeVacancy?'safe':'unsafe')
-  document.getElementById('o_vinsight_txt').textContent=safeVacancy?
+  insight.innerHTML=(safeVacancy?ICON_UP:ICON_DOWN)+'<span>'+(safeVacancy?
     ('월 '+vacancy+'일 공실은 흑자예요. 공실 '+beVacancyDays+'일까지는 괜찮아요.'):
-    ('월 '+vacancy+'일 공실이면 적자예요. 공실 '+beVacancyDays+'일을 넘기면 수익이 나기 어려워요.')
+    ('월 '+vacancy+'일 공실이면 적자예요. 공실 '+beVacancyDays+'일을 넘기면 수익이 나기 어려워요.'))+'</span>'
 
   set('o_bevalue','월 '+(beOccupiedDays===null?'-':beOccupiedDays)+'일 예약')
   document.getElementById('o_besub').textContent='최대 '+beVacancyDays+'일 공실 허용'
