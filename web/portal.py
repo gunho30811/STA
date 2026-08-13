@@ -1057,7 +1057,10 @@ padding-top:16px;border-top:1px solid var(--line)}
 .kpi3-paren{font-size:13px;font-weight:600;color:var(--text-sub)}
 .kpi3-sub{font-size:11.5px;color:var(--text-sub);margin-top:4px}
 .info-wrap{position:relative;display:inline-flex;align-items:center;margin-left:7px}
-.info-ic{width:16px;height:16px;display:flex;align-items:center;justify-content:center;cursor:help}
+/* 실제 아이콘은 16px로 유지하되 hover/클릭 히트 영역은 패딩+음수마진으로 넓혀서
+   (레이아웃 안 밀리게) 마우스가 살짝만 스쳐도 호버가 걸리도록 함 */
+.info-ic{width:16px;height:16px;display:flex;align-items:center;justify-content:center;cursor:help;
+padding:5px;margin:-5px;border-radius:50%}
 .info-ic svg{width:16px;height:16px;display:block}
 .info-tip{display:none;position:absolute;top:26px;left:-12px;background:#E4E4E7;color:var(--text);
 font-size:13px;font-weight:600;padding:10px 14px;border-radius:12px;white-space:nowrap;z-index:5;
