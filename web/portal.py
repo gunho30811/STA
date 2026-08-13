@@ -1177,7 +1177,7 @@ margin-bottom:6px;cursor:pointer}
     <div class=vac-insight id=o_vinsight><span id=o_vinsight_txt>-</span></div>
   </div>
   <div class="box hero-card">
-  <p class=hero-sub>한 달 순수익</p>
+  <p class=hero-sub>월 순수익</p>
   <div class=hero-row>
     <span class=hero-num id=o_heromonth>-</span>
     <span class=hero-annual id=o_heroyear>-</span>
@@ -1211,7 +1211,7 @@ margin-bottom:6px;cursor:pointer}
   <p class=vac-eyebrow>공실률별로 보면<span class=info-wrap><span class=info-ic tabindex=0><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4D2EE9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
 <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
 </svg></span><span class=info-tip>월 완전가동 순수익 x (1−공실일수/31) − 월 고정지출</span></span></p>
-  <h2 class=scenario-title>월 순익 시나리오</h2>
+  <h2 class=scenario-title>월 순수익 시나리오</h2>
   <div class=scenario-chart id=o_schart></div>
   <div class=vac-scroll>
   <table><thead><tr><th>공실 일수</th><th>예약 일수</th><th>월 순익</th><th>연 순익</th></tr></thead>
