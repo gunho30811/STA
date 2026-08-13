@@ -907,7 +907,7 @@ h1{font-size:22px;font-weight:900;margin:4px 0 2px;letter-spacing:-.01em}
    아래쪽에 맞춰야 자연스럽다는 원본 그대로 반영 */
 .top-bar{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;
 flex-wrap:wrap;background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(27,27,58,.06);
-padding:22px 24px;margin-bottom:16px}
+padding:22px 24px;margin-bottom:32px}
 .top-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .type-tabs{display:flex;align-items:center;gap:6px}
 .type-label{font-size:12px;color:var(--text-sub);margin-right:4px}
