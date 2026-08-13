@@ -1382,8 +1382,9 @@ function calc(){
 
   var insight=document.getElementById('o_vinsight')
   insight.className='vac-insight '+(safeVacancy?'safe':'unsafe')
-  insight.textContent='월 '+bookedDays+'일 예약이면 '+(safeVacancy?'흑자예요.':'적자예요.')+
-    ' 손익분기는 월 '+(beOccupiedDays===null?'-':beOccupiedDays)+'일이에요.'
+  insight.textContent='월 '+bookedDays+'일 예약이면 '+(safeVacancy?
+    '흑자예요. 아래에서 순수익을 확인해보세요.':
+    ('적자예요. 손익분기는 월 '+(beOccupiedDays===null?'-':beOccupiedDays)+'일이에요.'))
 
   set('o_bevalue','월 '+(beOccupiedDays===null?'-':beOccupiedDays)+'일 예약')
   document.getElementById('o_besub').textContent='최대 '+beVacancyDays+'일 공실 허용'
