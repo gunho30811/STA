@@ -1018,8 +1018,13 @@ box-shadow:0 1px 4px rgba(27,27,58,.25);transition:left .15s,background .15s}
 .market-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
 margin-bottom:20px;flex-wrap:wrap}
 .market-title{font-size:15px;font-weight:800;margin:0}
+/* 네이티브 select 화살표는 padding을 무시하고 우측 끝에 거의 붙어버려서
+   appearance:none + 커스텀 화살표로 좌측 글자 여백(10px)과 동일하게 맞춘다 */
 .market-region{font-size:12px;border:none;background:var(--field-bg);color:var(--text);
-border-radius:10px;height:34px;padding:0 10px;min-width:120px;cursor:pointer;font-family:inherit}
+border-radius:10px;height:34px;padding:0 32px 0 10px;min-width:120px;cursor:pointer;font-family:inherit;
+appearance:none;-webkit-appearance:none;-moz-appearance:none;
+background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%238080A8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+background-repeat:no-repeat;background-position:right 10px center;background-size:14px}
 .market-highlight{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;
 background:var(--field-bg);border-radius:12px;margin-bottom:20px}
 .market-mine{font-size:20px;font-weight:800;color:var(--brand);margin:0;font-variant-numeric:tabular-nums}
