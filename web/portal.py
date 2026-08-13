@@ -964,6 +964,9 @@ border-radius:12px;font-size:12.5px;font-weight:600}
 .vac table{width:100%;border-collapse:collapse;font-size:12.5px}
 .vac th,.vac td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--line)}
 .vac th{color:var(--text-sub);font-weight:800}.vac td:first-child,.vac th:first-child{text-align:left}
+.vac tbody tr{cursor:pointer;transition:background .1s}
+.vac tbody tr:hover,.vac tbody tr.active{background:var(--field-bg)}
+.vac tbody tr.active td:first-child{color:var(--brand);font-weight:800}
 .hero-card{padding:24px 22px}
 .hero-sub{font-size:12px;color:var(--text-sub);margin:0 0 8px}
 .hero-row{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
@@ -993,24 +996,25 @@ font-size:14px;font-weight:800;color:var(--text);font-family:inherit}
 .week-mini .hl{margin-top:3px;padding-top:11px;border-top:1px dashed var(--line)}
 .week-mini .hl span{color:var(--text);font-weight:700}
 .week-mini .hl b{font-size:17px}
-/* 손익분기 게이지 — 한 달 30일 중 예약일(막대)과 손익분기일(눈금)을 겹쳐 여유를 한눈에 */
-.gauge{margin-top:20px}
-/* 손익분기 눈금은 라벨을 달아 위에 띄운다(얇은 선만으론 안 보인다는 피드백, 08-07) */
-.gauge-wrap{position:relative;padding-top:30px}
-.gauge-track{position:relative;height:12px;border-radius:999px;background:#E9E6FB}
-.gauge-fill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:var(--brand);
-transition:width .18s}
-.gauge-mark{position:absolute;top:-6px;bottom:-6px;width:3px;border-radius:2px;background:var(--gold);
-box-shadow:0 0 0 2px #fff;transition:left .18s}
-.gauge-flag{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap;
-background:var(--gold);color:#fff;font-size:11.5px;font-weight:800;padding:4px 9px;border-radius:7px;
-transition:left .18s;box-shadow:0 1px 4px rgba(28,24,48,.18)}
-.gauge-flag::after{content:'';position:absolute;left:50%;top:100%;transform:translateX(-50%);
-border:5px solid transparent;border-top-color:var(--gold)}
-.gauge-cap{display:flex;justify-content:space-between;gap:10px;margin-top:9px;font-size:12.5px;
-color:var(--text-sub);flex-wrap:wrap}
-.gauge-cap b{color:var(--text);font-weight:800}
-.gauge-cap .be b{color:var(--gold)}
+/* 손익분기 슬라이더 — App.tsx 그대로: 초록 반투명 fill=안전구간(0~손익분기일),
+   손잡이=지금 선택한 공실일수 위치(안전이면 브랜드색, 아니면 손실색) */
+.gauge-caption{font-size:13px;font-weight:800;margin:2px 0 14px}
+.gauge2-track{position:relative;height:10px;background:var(--field-bg);border-radius:999px}
+.gauge2-safe{position:absolute;inset:0 auto 0 0;top:0;bottom:0;left:0;background:var(--profit);
+opacity:.15;border-radius:999px;transition:width .15s}
+.gauge2-thumb{position:absolute;top:50%;transform:translateY(-50%);width:16px;height:16px;
+border-radius:999px;background:var(--brand);border:2px solid #fff;
+box-shadow:0 1px 4px rgba(27,27,58,.25);transition:left .15s,background .15s}
+.gauge2-thumb.unsafe{background:var(--loss)}
+.gauge2-cap{display:flex;justify-content:space-between;font-size:11px;font-weight:700;margin-top:10px}
+/* 공실률별 시나리오 막대그래프 — 클릭하면 공실일수 슬라이더 값이 그 날짜로 바뀐다 */
+.scenario-title{font-size:14px;font-weight:800;margin:2px 0 16px}
+.scenario-chart{display:flex;align-items:flex-end;gap:6px;height:96px;margin-bottom:16px}
+.sbar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;cursor:pointer}
+.sbar-track{flex:1;display:flex;align-items:flex-end;width:100%}
+.sbar{width:100%;border-radius:4px 4px 0 0;transition:opacity .15s}
+.sbar-label{font-size:10px;color:var(--text-sub);margin-top:6px}
+.sbar-col.active .sbar-label{color:var(--brand);font-weight:800}
 .kpi3{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:20px}
 @media(max-width:480px){.kpi3{grid-template-columns:1fr}}
 .kpi3-cell{background:var(--field-bg);border-radius:16px;padding:16px 18px}
@@ -1170,25 +1174,24 @@ margin-bottom:6px;cursor:pointer}
   </div>
 </div>
 <div class="box gauge-card">
-  <h2>언제부터 돈을 벌까</h2>
-  <div class=gauge>
-    <div class=gauge-wrap>
-      <div class=gauge-flag id=o_gflag style="left:0%">손익분기 <b id=o_gbeflag>-</b>일</div>
-      <div class=gauge-track>
-        <div class=gauge-fill id=o_gfill style="width:0%"></div>
-        <i class=gauge-mark id=o_gmark style="left:0%"></i>
-      </div>
-    </div>
-    <div class=gauge-cap>
-      <span>공실 <b id=o_gvac>-</b>일 기준 월 <b id=o_gdays>-</b>일 예약</span>
-      <span class=be>여유 <b id=o_gslack>-</b>일</span>
-    </div>
+  <p class=vac-eyebrow>언제부터 돈을 벌까</p>
+  <p class=gauge-caption>월 <b id=o_gbeflag class=pos-brand>-</b>일 이하 공실이면 흑자</p>
+  <div class=gauge2-track>
+    <div class=gauge2-safe id=o_gsafe style="width:0%"></div>
+    <div class=gauge2-thumb id=o_gthumb style="left:0%"></div>
+  </div>
+  <div class=gauge2-cap>
+    <span class=pos>← 흑자 구간</span>
+    <span class=neg>적자 구간 →</span>
   </div>
 </div>
-<div class="box vac"><h2>공실률 시나리오<span class=info-wrap><span class=info-ic tabindex=0><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4D2EE9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+<div class="box vac">
+  <p class=vac-eyebrow>공실률별로 보면<span class=info-wrap><span class=info-ic tabindex=0><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4D2EE9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
 <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
-</svg></span><span class=info-tip>연 매출 x (1-공실률) x (1-수수료·부가세) - 연 임차원가</span></span></h2>
-  <table><thead><tr><th>공실률</th><th>월 예약(환산)</th><th>연 순수익</th><th>월 순수익</th></tr></thead>
+</svg></span><span class=info-tip>월 완전가동 순수익 x (1−공실일수/31) − 월 고정지출</span></span></p>
+  <h2 class=scenario-title>월 순익 시나리오</h2>
+  <div class=scenario-chart id=o_schart></div>
+  <table><thead><tr><th>공실 일수</th><th>예약 일수</th><th>월 순익</th><th>연 순익</th></tr></thead>
   <tbody id=o_vac></tbody></table>
 </div>
   </div>
@@ -1205,6 +1208,7 @@ margin-bottom:6px;cursor:pointer}
 <script>
 // design/culc_redesign/src/app/App.tsx의 useMemo 공식을 그대로 이식 (WPM=주/월 환산 상수)
 var WPM=365/7/12
+var SCENARIOS_DAYS=[3,6,10,15,20,25]
 function fmtWon(n,withSign){
   if(!isFinite(n)) return '∞'
   var neg=n<0, pfx=neg?'−':(withSign&&n>0?'+':''), abs=Math.abs(n)
@@ -1270,35 +1274,48 @@ function calc(){
   document.getElementById('o_marginsub').textContent='공실 '+vacancy+'일 기준'
   document.getElementById('o_kpi_margin').className='kpi3-cell '+(opMargin>20?'posbg':opMargin>0?'warn':'neg')
 
-  // 아래 게이지·시나리오 표는 다음 블록(4)에서 App.tsx 그대로 재설계 예정 — 지금은
-  // 깨지지 않게 새 공식으로만 값을 채워둠(막대 fill·시나리오 구간은 임시 근사치).
-  var bookDays=Math.max(0,Math.min(31,31-vacancy))
-  document.getElementById('o_gfill').style.width=(bookDays/31*100)+'%'
-  var bePctPos=beVacancyDays/31*100
-  document.getElementById('o_gmark').style.left=bePctPos+'%'
-  var flag=document.getElementById('o_gflag')
-  flag.style.left=Math.max(9,Math.min(91,bePctPos))+'%'
-  flag.style.display=monthlyNet100>0?'block':'none'
-  document.getElementById('o_gmark').style.display=monthlyNet100>0?'block':'none'
+  // 손익분기 슬라이더 — 안전구간 fill(0~beVacancyDays)은 고정, 손잡이는 현재 vacancy 위치
   document.getElementById('o_gbeflag').textContent=monthlyNet100>0?beVacancyDays:'-'
-  document.getElementById('o_gvac').textContent=vacancy
-  document.getElementById('o_gdays').textContent=bookDays
-  document.getElementById('o_gslack').textContent=monthlyNet100>0?Math.max(0,beVacancyDays-vacancy):'-'
+  document.getElementById('o_gsafe').style.width=Math.min(100,beVacancyDays/31*100)+'%'
+  var thumb=document.getElementById('o_gthumb')
+  thumb.style.left='calc('+Math.min(97,vacancy/31*100)+'% - 8px)'
+  thumb.className='gauge2-thumb'+(safeVacancy?'':' unsafe')
+
   var ctaHead=document.getElementById('o_ctahead')
   if(ctaHead) ctaHead.innerHTML=monthlyNet100>0?
     ('이 매물은 한 달 <span class=pos>약 '+(beOccupiedDays===null?'-':beOccupiedDays)+'일</span>까지 채우면 흑자예요.'):'이 매물은 지금 조건으로는 흑자가 나지 않아요.'
-  var tb=document.getElementById('o_vac'),h='', beShown=false
-  ;[0,10,15,20,30,50,70,100].forEach(function(p){
-    if(!beShown && monthlyNet100>0 && p>beVacancyPct){
-      h+='<tr class=be-row><td colspan=4>손익분기 (공실 '+Math.round(beVacancyPct)+'% · '+beVacancyDays+'일)</td></tr>'
-      beShown=true
-    }
-    var days=Math.round(31*(1-p/100)), daysTxt=(p===0?'':'약 ')+days+'일'
-    var nyMonth=monthlyNet100*(1-p/100)-totalCost, cls=nyMonth>=0?'pos-brand':'neg'
-    h+='<tr><td>'+p+'%</td><td>'+daysTxt+'</td><td class='+cls+'><b>'+fmtWon(nyMonth*12,true)+'</b></td>'+
-       '<td class='+cls+'>'+fmtWon(nyMonth,true)+'</td></tr>'
+
+  // 공실률별 시나리오 — App.tsx SCENARIOS_DAYS 그대로, 막대/표 행 클릭 시 공실일수 슬라이더 이동
+  var scenarios=SCENARIOS_DAYS.map(function(days){
+    return {days:days,profit:monthlyNet100*(1-days/31)-totalCost}
   })
-  tb.innerHTML=h
+  var maxAbs=Math.max.apply(null,scenarios.map(function(s){return Math.abs(s.profit)}))||1
+  var chart=document.getElementById('o_schart'),ch=''
+  scenarios.forEach(function(s){
+    var active=s.days===vacancy
+    var h=Math.max(4,Math.abs(s.profit)/maxAbs*100)
+    var color=s.profit>=0?'var(--profit)':'var(--loss)'
+    ch+='<div class="sbar-col'+(active?' active':'')+'" data-days='+s.days+'>'+
+        '<div class=sbar-track><div class=sbar style="height:'+h+'%;background:'+color+';opacity:'+(active?1:.35)+'"></div></div>'+
+        '<span class=sbar-label>'+s.days+'일</span></div>'
+  })
+  chart.innerHTML=ch
+  chart.querySelectorAll('.sbar-col').forEach(function(col){
+    col.addEventListener('click',function(){setv('i_vacancy',col.dataset.days);calc()})
+  })
+
+  var tb=document.getElementById('o_vac'),h2=''
+  scenarios.forEach(function(s){
+    var active=s.days===vacancy, bookedDays=31-s.days, cls=s.profit>=0?'pos-brand':'neg'
+    h2+='<tr class="'+(active?'active':'')+'" data-days='+s.days+'>'+
+       '<td><b>'+s.days+'일</b></td><td>'+bookedDays+'일</td>'+
+       '<td class='+cls+'><b>'+fmtWon(s.profit,true)+'</b></td>'+
+       '<td class='+cls+'>'+fmtWon(s.profit*12,true)+'</td></tr>'
+  })
+  tb.innerHTML=h2
+  tb.querySelectorAll('tr').forEach(function(row){
+    row.addEventListener('click',function(){setv('i_vacancy',row.dataset.days);calc()})
+  })
 }
 // 매물유형 프리셋 — design/culc_redesign/src/app/App.tsx의 PRESETS/selectPropType 그대로 이식
 var PRESETS={
