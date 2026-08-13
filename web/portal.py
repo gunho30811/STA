@@ -869,8 +869,10 @@ CALC_PAGE = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
 <link rel=stylesheet href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard-dynamic-subset.css">
 <style>
 *{box-sizing:border-box}
-:root{--brand:#4D2EE9;--brand-hover:#3A1FC9;--brand-tint:#ECEAF8;--profit:#148A5E;--loss:#D24545;
---bg:#F4F6FB;--text:#1C1830;--text-sub:#6E6D68;--line:#E7E5DE;--gold:#D89700}
+/* Figma Make export(design/culc_redesign, theme.css)에서 그대로 가져온 정확한 토큰값 */
+:root{--brand:#5856D6;--brand-hover:#4544B0;--brand-tint:#EDEDF8;--profit:#1a7f5a;--loss:#c0373f;
+--profit-bg:#f2faf6;--loss-bg:#fdf4f4;--gold-bg:#fdf7f0;
+--bg:#F2F3FA;--text:#1B1B3A;--text-sub:#8080A8;--line:#E2E2F0;--gold:#a86012;--field-bg:#EDEDF8}
 body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
 background:var(--bg);min-height:100vh;color:var(--text);padding:20px 14px 60px}
 .hd{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);
@@ -888,7 +890,7 @@ padding:8px 15px;border-radius:8px;text-decoration:none}
    매치돼 네비바가 문서 앞쪽 엉뚱한 자리에 삽입되는 버그가 난다(실제로 겪음) — 그래서
    이 주석에서도 그 문자열 형태를 그대로 쓰지 않는다. */
 #__nav{margin:-20px -14px 20px}
-.wrap{max-width:1160px;margin:0 auto}
+.wrap{max-width:1120px;margin:0 auto}
 .back{display:inline-block;margin-bottom:14px;color:var(--text-sub);text-decoration:none;font-size:13px;font-weight:700}
 .back:hover{color:var(--brand)}
 .ic{display:inline-flex;vertical-align:-0.15em;margin-right:6px}
@@ -897,37 +899,43 @@ padding:8px 15px;border-radius:8px;text-decoration:none}
 h1{font-size:22px;font-weight:900;margin:4px 0 2px;letter-spacing:-.01em}
 .sub{color:var(--text-sub);font-size:13px;margin:0;line-height:1.6}
 .sec-label{font-size:17px;font-weight:700;color:var(--text-sub);margin:0 0 9px}
-/* 상단 — 왼쪽 제목/설명, 오른쪽 매물유형 탭 + 초기화 (좁은 화면에서 아래로 줄바꿈) */
+/* 상단 — 왼쪽 제목/설명, 오른쪽 매물유형 탭 + 초기화 (좁은 화면에서 아래로 줄바꿈).
+   원본은 header 밑에 별도 흰 스트립(풀블리드)이지만, 이 프로젝트는 body padding 기반이라
+   카드 형태로 근사(리스크가 큰 풀블리드 마진 트릭은 .hd 하나로 충분). */
 .top-bar{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;
-flex-wrap:wrap;margin-bottom:24px}
-.top-controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-top:2px}
-.type-tabs{display:flex;align-items:center;gap:8px}
-.type-label{font-size:12.5px;color:var(--text-sub);font-weight:700;margin-right:2px}
-.tab{border:1px solid var(--line);background:#fff;color:var(--text-sub);font-size:13px;
-font-weight:700;padding:8px 14px;border-radius:9px;cursor:pointer;font-family:inherit;
-white-space:nowrap}
-.tab.active{background:var(--brand);border-color:var(--brand);color:#fff}
-.reset-btn{border:1px solid var(--line);background:#fff;color:var(--text-sub);font-size:13px;
-font-weight:700;padding:8px 14px;border-radius:9px;cursor:pointer;font-family:inherit;
-white-space:nowrap}
-.reset-btn:hover{color:var(--brand);border-color:var(--brand)}
+flex-wrap:wrap;background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(27,27,58,.06);
+padding:22px 24px;margin-bottom:16px}
+.top-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:2px}
+.type-tabs{display:flex;align-items:center;gap:6px}
+.type-label{font-size:12px;color:var(--text-sub);margin-right:4px}
+.tab{border:none;background:var(--field-bg);color:var(--text-sub);font-size:12.5px;
+font-weight:600;padding:7px 14px;border-radius:999px;cursor:pointer;font-family:inherit;
+white-space:nowrap;transition:background .15s,color .15s}
+.tab:hover{color:var(--text)}
+.tab.active{background:var(--brand);color:#fff}
+.reset-btn{border:none;background:var(--field-bg);color:var(--text-sub);font-size:12.5px;
+font-weight:600;padding:7px 14px;border-radius:999px;cursor:pointer;font-family:inherit;
+white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.reset-btn:hover{color:var(--text);background:#E2E2F0}
 /* 좌(입력)/우(결과) 2단 — align-items:start로 카드가 서로 키를 맞추지 않게(빈 공간 방지) */
-.layout{display:grid;grid-template-columns:400px 1fr;gap:16px;margin-bottom:32px;align-items:start}
+.layout{display:grid;grid-template-columns:410px 1fr;gap:16px;margin-bottom:32px;align-items:start}
 .left-col,.right-col{display:flex;flex-direction:column;gap:16px}
 @media(max-width:900px){.layout{grid-template-columns:1fr}}
-.box{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px}
-.card-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px}
-.card-head h2{font-size:15px;font-weight:800;margin:0;color:var(--text)}
+.box{background:#fff;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(27,27,58,.06)}
+/* card-head를 box 패딩 밖으로 블리드시켜 하단 보더로 구분된 별도 스트립처럼 보이게 */
+.card-head{display:flex;align-items:baseline;justify-content:space-between;
+margin:-20px -20px 16px;padding:16px 20px;border-bottom:1px solid var(--line)}
+.card-head h2{font-size:14px;font-weight:800;margin:0;color:var(--text)}
 .card-head .unit-badge{font-size:11px;font-weight:700;color:var(--text-sub)}
 .hint{font-size:12px;color:var(--text-sub);margin:0 0 16px}
 .field-primary{margin:14px 0}
 .field-primary label{display:block;font-size:13px;color:var(--text-sub);margin-bottom:6px}
-.field-box{display:flex;align-items:center;justify-content:flex-end;gap:6px;border:1.5px solid var(--line);
-border-radius:10px;padding:12px 14px;background:#fff}
-.field-box:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-tint)}
-.field-box input{border:none;outline:none;background:transparent;font-size:22px;font-weight:800;
+.field-box{display:flex;align-items:center;justify-content:flex-end;gap:6px;border:1px solid transparent;
+border-radius:12px;padding:10px 14px;background:var(--field-bg)}
+.field-box:focus-within{border-color:var(--brand);background:#fff;box-shadow:0 0 0 3px var(--brand-tint)}
+.field-box input{border:none;outline:none;background:transparent;font-size:15px;font-weight:600;
 color:var(--text);text-align:right;width:100%;font-family:inherit}
-.field-box .unit{font-size:13px;color:var(--text-sub);font-weight:600;white-space:nowrap}
+.field-box .unit{font-size:12px;color:var(--text-sub);font-weight:500;white-space:nowrap}
 /* 접기(details) 없이 항상 펼친 상태 — 클릭해야 보이는 게 불친절하다는 피드백(장효령, 08-06) */
 .more{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
 .more-title{font-size:14px;font-weight:800;color:var(--text);line-height:1;margin:0 0 2px}
@@ -1001,8 +1009,10 @@ color:var(--text-sub);flex-wrap:wrap}
 .gauge-cap .be b{color:var(--gold)}
 .kpi3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}
 @media(max-width:700px){.kpi3{grid-template-columns:1fr}}
-.kpi3-cell{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px}
-.kpi3-cell.warn{border-color:#F0DCA0;background:#FDF8ED}
+.kpi3-cell{background:var(--field-bg);border-radius:16px;padding:16px 18px}
+.kpi3-cell.warn{background:var(--gold-bg)}
+.kpi3-cell.neg{background:var(--loss-bg)}
+.kpi3-cell.posbg{background:var(--profit-bg)}
 .kpi3-cell .l{font-size:12.5px;color:var(--text-sub);margin-bottom:6px}
 .kpi3-cell.warn .l{color:var(--gold);font-weight:700}
 .kpi3-cell .v{font-size:20px;font-weight:800;white-space:nowrap}   /* '+145,385 / 원' 줄바꿈 방지 */
@@ -1073,7 +1083,9 @@ margin-bottom:6px;cursor:pointer}
       <button type=button class=tab id=tab_villa>빌라·주택</button>
       <button type=button class=tab id=tab_officetel>오피스텔</button>
     </div>
-    <button type=button class=reset-btn id=btn_reset>초기화</button>
+    <button type=button class=reset-btn id=btn_reset><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+</svg>초기화</button>
   </div>
 </div>
 <div class=layout>
