@@ -1073,7 +1073,7 @@ white-space:normal;text-align:left;z-index:20;box-shadow:0 12px 32px rgba(0,0,0,
 .be-row td{border-top:1px dashed var(--gold);border-bottom:none;color:var(--gold);font-size:11px;
 font-weight:700;text-align:center;padding:6px 4px}
 .cta-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
-margin-top:16px;padding:24px;background:var(--brand);border-radius:16px}
+margin-top:32px;padding:24px;background:var(--brand);border-radius:16px}
 .cta-h1{font-size:15px;font-weight:700;color:#fff;margin:0 0 4px;line-height:1.4}
 .cta-h2{font-size:13px;color:rgba(255,255,255,.7);margin:0;line-height:1.5}
 .cta-btn{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
