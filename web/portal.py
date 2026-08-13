@@ -971,8 +971,11 @@ border-radius:12px;font-size:12.5px;font-weight:600}
 .hero-card{padding:24px 22px}
 .hero-sub{font-size:12px;color:var(--text-sub);margin:0 0 8px}
 .hero-row{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
-.hero-num{font-size:36px;font-weight:700;letter-spacing:-.02em;white-space:nowrap}
-.hero-annual{font-size:12px;color:var(--text-sub);white-space:nowrap;font-variant-numeric:tabular-nums}
+/* line-height 명시 필수 — 유니코드 마이너스(−)가 Pretendard에 없어 폴백 폰트로
+   렌더되면서 그 줄만 줄높이가 커져 카드가 세로로 늘어나는 버그가 있었음.
+   ASCII 하이픈으로 통일했지만 향후 재발 방지 차원에서도 고정해둔다. */
+.hero-num{font-size:36px;line-height:1.15;font-weight:700;letter-spacing:-.02em;white-space:nowrap}
+.hero-annual{font-size:12px;line-height:1.4;color:var(--text-sub);white-space:nowrap;font-variant-numeric:tabular-nums}
 @media(max-width:480px){.hero-num{font-size:27px}}
 /* 매출에서 빠지는 선택 항목(플랫폼 수수료·부가세) — 체크 꺼짐이면 % 입력도 잠근다 */
 .opts{margin-top:20px;border-top:1px solid var(--line);padding-top:14px}
@@ -1317,7 +1320,7 @@ function renderMarket(monthlyProfit){
 }
 function fmtWon(n,withSign){
   if(!isFinite(n)) return '∞'
-  var neg=n<0, pfx=neg?'−':(withSign&&n>0?'+':''), abs=Math.abs(n)
+  var neg=n<0, pfx=neg?'-':(withSign&&n>0?'+':''), abs=Math.abs(n)
   if(abs>=10000) return pfx+(abs/10000).toFixed(2)+'억원'
   if(abs<0.05) return pfx+'0만원'
   return pfx+Math.round(abs).toLocaleString()+'만원'
@@ -1358,7 +1361,7 @@ function calc(){
   set('o_fixedsum',fmtWon(totalCost))
   set('o_wnetbadge',fmtWon(weeklyNet))
   set('o_wrev_m',fmtWon(weeklyGross))
-  set('o_ded_m','−'+fmtWon(weeklyDeduct))
+  set('o_ded_m','-'+fmtWon(weeklyDeduct))
   set('o_wnet_m',fmtWon(weeklyNet))
 
   document.getElementById('o_vacpct').textContent=vacancy+'일'
