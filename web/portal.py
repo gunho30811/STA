@@ -1015,6 +1015,30 @@ box-shadow:0 1px 4px rgba(27,27,58,.25);transition:left .15s,background .15s}
 .sbar{width:100%;border-radius:4px 4px 0 0;transition:opacity .15s}
 .sbar-label{font-size:10px;color:var(--text-sub);margin-top:6px}
 .sbar-col.active .sbar-label{color:var(--brand);font-weight:800}
+/* 비슷한 매물과 비교하면 — 지역 드롭다운 + 목업 분포 히스토그램(정적 데이터) */
+.market-card{margin-top:0}
+.market-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:20px}
+.market-title{font-size:15px;font-weight:800;margin:0}
+.market-region{font-size:12px;border:none;background:var(--field-bg);color:var(--text);
+border-radius:10px;height:34px;padding:0 10px;min-width:120px;cursor:pointer;font-family:inherit}
+.market-highlight{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;
+background:var(--field-bg);border-radius:12px;margin-bottom:20px}
+.market-mine{font-size:20px;font-weight:800;color:var(--brand);margin:0;font-variant-numeric:tabular-nums}
+.market-badge{font-size:12px;font-weight:700;background:var(--brand-tint);color:var(--brand);
+padding:4px 10px;border-radius:999px}
+.market-badge.neg{background:var(--loss-bg);color:var(--loss)}
+.market-chart{display:flex;align-items:flex-end;gap:5px;height:120px;margin-bottom:16px}
+.mbar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%}
+.mbar-track{flex:1;display:flex;align-items:flex-end;width:100%}
+.mbar{width:100%;border-radius:3px 3px 0 0;background:var(--line);transition:background .15s}
+.mbar.user{background:var(--brand)}
+.mbar-label{font-size:9.5px;color:var(--text-sub);margin-top:6px;text-align:center;line-height:1.3}
+.market-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px;
+padding-top:16px;border-top:1px solid var(--line)}
+.market-stat-v{font-size:16px;font-weight:800}
+.market-stat-v span{font-size:12px;color:var(--text-sub);font-weight:500;margin-left:2px}
+.market-foot{font-size:11px;color:var(--text-sub);margin:12px 0 0;line-height:1.6}
+.market-foot span.sep{margin:0 6px;color:var(--line)}
 .kpi3{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:20px}
 @media(max-width:480px){.kpi3{grid-template-columns:1fr}}
 .kpi3-cell{background:var(--field-bg);border-radius:16px;padding:16px 18px}
@@ -1196,6 +1220,23 @@ margin-bottom:6px;cursor:pointer}
 </div>
   </div>
 </div>
+<div class="box market-card">
+  <div class=market-head>
+    <div><p class=vac-eyebrow>비슷한 매물과 비교하면</p><h3 class=market-title>나는 얼마나 벌고 있을까요?</h3></div>
+    <select id=i_region class=market-region></select>
+  </div>
+  <div class=market-highlight>
+    <div><p class=vac-eyebrow>내 예상 월 수익</p><p class=market-mine id=o_mymonth>—</p></div>
+    <span id=o_mytop class=market-badge></span>
+  </div>
+  <div class=market-chart id=o_mchart></div>
+  <div class=market-stats>
+    <div><div class=vac-eyebrow>하위 25%</div><div class=market-stat-v id=o_mp25>-</div></div>
+    <div><div class=vac-eyebrow>중앙값</div><div class=market-stat-v id=o_mmedian>-</div></div>
+    <div><div class=vac-eyebrow>상위 25%</div><div class=market-stat-v id=o_mp75>-</div></div>
+  </div>
+  <p class=market-foot id=o_mfoot>-</p>
+</div>
 {% if not user %}
 <div class=cta-row>
   <div class=cta-text>
@@ -1209,6 +1250,62 @@ margin-bottom:6px;cursor:pointer}
 // design/culc_redesign/src/app/App.tsx의 useMemo 공식을 그대로 이식 (WPM=주/월 환산 상수)
 var WPM=365/7/12
 var SCENARIOS_DAYS=[3,6,10,15,20,25]
+var REGIONS=['전국','서울','경기']
+var MARKET_DATA={
+  '전국 · 원룸':{bins:[
+    {label:'~20만원',count:89,min:-Infinity,max:20},{label:'20만원대',count:142,min:20,max:40},
+    {label:'40만원대',count:203,min:40,max:60},{label:'60만원대',count:155,min:60,max:80},
+    {label:'80만원대',count:87,min:80,max:100},{label:'100만원대',count:45,min:100,max:120},
+    {label:'120만원+',count:22,min:120,max:Infinity}],total:743,p25:32,median:52,p75:78},
+  '서울 · 원룸':{bins:[
+    {label:'~20만원',count:34,min:-Infinity,max:20},{label:'20만원대',count:71,min:20,max:40},
+    {label:'40만원대',count:118,min:40,max:60},{label:'60만원대',count:94,min:60,max:80},
+    {label:'80만원대',count:52,min:80,max:100},{label:'100만원대',count:28,min:100,max:120},
+    {label:'120만원+',count:15,min:120,max:Infinity}],total:412,p25:38,median:60,p75:87},
+  '경기 · 원룸':{bins:[
+    {label:'~20만원',count:45,min:-Infinity,max:20},{label:'20만원대',count:98,min:20,max:40},
+    {label:'40만원대',count:134,min:40,max:60},{label:'60만원대',count:89,min:60,max:80},
+    {label:'80만원대',count:41,min:80,max:100},{label:'100만원대',count:18,min:100,max:120},
+    {label:'120만원+',count:7,min:120,max:Infinity}],total:432,p25:35,median:55,p75:80}
+}
+function renderMarket(monthlyProfit){
+  var activeTab=document.querySelector('.tab.active')
+  var propLabel=activeTab?activeTab.dataset.type:'원룸'
+  var sel=document.getElementById('i_region')
+  if(!sel.options.length||sel.dataset.label!==propLabel){
+    var cur=sel.value||'전국'
+    sel.innerHTML=REGIONS.map(function(r){return '<option value="'+r+'">'+r+' '+propLabel+'</option>'}).join('')
+    sel.value=cur; sel.dataset.label=propLabel
+  }
+  var region=sel.value||'전국'
+  var key=region+' · '+propLabel
+  var market=MARKET_DATA[key]||MARKET_DATA[region+' · 원룸']||MARKET_DATA['전국 · 원룸']
+  var userBinIdx=-1
+  market.bins.forEach(function(b,i){if(monthlyProfit>=b.min&&monthlyProfit<b.max) userBinIdx=i})
+  var aboveCount=0
+  if(userBinIdx>=0) market.bins.slice(userBinIdx+1).forEach(function(b){aboveCount+=b.count})
+  var topPct=userBinIdx<0?null:Math.round(aboveCount/market.total*100)
+
+  document.getElementById('o_mymonth').textContent=monthlyProfit>0?(Math.round(monthlyProfit)+'만원'):'—'
+  var badge=document.getElementById('o_mytop')
+  if(topPct!==null&&monthlyProfit>0){badge.className='market-badge';badge.textContent='상위 '+topPct+'%';badge.style.display=''}
+  else if(monthlyProfit<=0){badge.className='market-badge neg';badge.textContent='적자 구간';badge.style.display=''}
+  else{badge.style.display='none'}
+
+  var maxCount=Math.max.apply(null,market.bins.map(function(b){return b.count}))
+  var chart=document.getElementById('o_mchart'),ch=''
+  market.bins.forEach(function(b,i){
+    var isUser=i===userBinIdx
+    ch+='<div class=mbar-col><div class=mbar-track><div class="mbar'+(isUser?' user':'')+
+        '" style="height:'+(b.count/maxCount*100)+'%"></div></div><span class=mbar-label>'+b.label+'</span></div>'
+  })
+  chart.innerHTML=ch
+
+  document.getElementById('o_mp25').innerHTML=market.p25+'<span>만원</span>'
+  document.getElementById('o_mmedian').innerHTML=market.median+'<span>만원</span>'
+  document.getElementById('o_mp75').innerHTML=market.p75+'<span>만원</span>'
+  document.getElementById('o_mfoot').innerHTML=market.total+'건 기준 추정치<span class=sep>|</span>예약률 20% 이상 매물<span class=sep>|</span>오늘 기준 1개월 롤링'
+}
 function fmtWon(n,withSign){
   if(!isFinite(n)) return '∞'
   var neg=n<0, pfx=neg?'−':(withSign&&n>0?'+':''), abs=Math.abs(n)
@@ -1316,7 +1413,10 @@ function calc(){
   tb.querySelectorAll('tr').forEach(function(row){
     row.addEventListener('click',function(){setv('i_vacancy',row.dataset.days);calc()})
   })
+
+  renderMarket(monthlyProfit)
 }
+document.getElementById('i_region').addEventListener('change',function(){calc()})
 // 매물유형 프리셋 — design/culc_redesign/src/app/App.tsx의 PRESETS/selectPropType 그대로 이식
 var PRESETS={
   '원룸':{rent:60,dep:500,mgmt:150000,wrent:30,wmgmt:6},
