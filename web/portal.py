@@ -907,7 +907,7 @@ h1{font-size:22px;font-weight:900;margin:4px 0 2px;letter-spacing:-.01em}
    아래쪽에 맞춰야 자연스럽다는 원본 그대로 반영 */
 .top-bar{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;
 flex-wrap:wrap;background:#fff;border-radius:16px;
-box-shadow:0 1px 2px rgba(27,27,58,.05),0 14px 28px -16px rgba(27,27,58,.22);
+box-shadow:0 1px 2px rgba(27,27,58,.04),0 14px 28px -16px rgba(27,27,58,.15);
 padding:22px 24px;margin-bottom:32px}
 .top-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .type-tabs{display:flex;align-items:center;gap:6px}
@@ -926,7 +926,7 @@ white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
 .left-col,.right-col{display:flex;flex-direction:column;gap:16px}
 @media(max-width:900px){.layout{grid-template-columns:1fr}}
 .box{background:#fff;border-radius:16px;padding:20px;
-box-shadow:0 1px 2px rgba(27,27,58,.05),0 14px 28px -16px rgba(27,27,58,.22)}
+box-shadow:0 1px 2px rgba(27,27,58,.04),0 14px 28px -16px rgba(27,27,58,.15)}
 /* card-head를 box 패딩 밖으로 블리드시켜 하단 보더로 구분된 별도 스트립처럼 보이게 */
 .card-head{display:flex;align-items:baseline;justify-content:space-between;
 margin:-20px -20px 16px;padding:16px 20px;border-bottom:1px solid var(--line)}
@@ -1076,7 +1076,7 @@ white-space:normal;text-align:left;z-index:20;box-shadow:0 12px 32px rgba(0,0,0,
 font-weight:700;text-align:center;padding:6px 4px}
 .cta-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
 margin-top:32px;padding:24px;background:var(--brand);border-radius:16px;
-box-shadow:0 14px 28px -14px rgba(77,46,233,.35)}
+box-shadow:0 14px 28px -14px rgba(77,46,233,.25)}
 .cta-h1{font-size:15px;font-weight:700;color:#fff;margin:0 0 4px;line-height:1.4}
 .cta-h2{font-size:13px;color:rgba(255,255,255,.7);margin:0;line-height:1.5}
 .cta-btn{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
