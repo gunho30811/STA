@@ -1089,6 +1089,8 @@ cursor:help;border-radius:50%}
 width:max-content;max-width:200px;background:rgba(27,27,58,.95);color:#F2F3FA;
 font-size:12px;font-weight:500;line-height:1.6;padding:10px 12px;border-radius:12px;
 white-space:normal;text-align:left;z-index:20;box-shadow:0 12px 32px rgba(0,0,0,.25)}
+/* 짧은 문구는 굳이 200px에서 꺾이지 않고 한 줄로 — 내용 길이에 맞춰 폭이 늘어난다 */
+.info-tip.nowrap{white-space:nowrap;max-width:none}
 .info-wrap:hover .info-tip,.info-wrap.show .info-tip{display:block}
 .be-row td{border-top:1px dashed var(--gold);border-bottom:none;color:var(--gold);font-size:11px;
 font-weight:700;text-align:center;padding:6px 4px}
@@ -1175,11 +1177,11 @@ margin-bottom:6px;cursor:pointer}
     <div class=field-grid2>
       <div class=field><label>주간 임대료<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><span class=info-tip>1주 기준 게스트에게 받는 임대료</span></span></label>
         <div class=field-box><input id=i_wrent type=number value=30><span class=unit>만원</span></div></div>
-      <div class=field><label>청소·관리비<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><span class=info-tip>퇴실 시 게스트에게 별도 청구하는 청소비</span></span></label>
+      <div class=field><label>청소·관리비<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><span class="info-tip nowrap">퇴실 시 게스트에게 별도 청구하는 청소비</span></span></label>
         <div class=field-box><input id=i_wmgmt type=number value=6><span class=unit>만원</span></div></div>
     </div>
     <div class=field-grid2>
-      <div class=field><label>플랫폼 수수료<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><span class=info-tip>삼삼엠투 등 플랫폼 수수료율 (총 매출 기준)</span></span></label>
+      <div class=field><label>플랫폼 수수료<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><span class=info-tip>삼삼엠투 등 플랫폼 수수료율<br>(총 매출 기준)</span></span></label>
         <div class=field-box><input id=i_fee type=number value=3.3 step=0.1 min=0><span class=unit>%</span></div></div>
       <div class=field><label>부가가치세<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><span class=info-tip>일반과세자 10%, 간이과세자 0%</span></span></label>
         <div class=field-box><input id=i_vat type=number value=0 step=0.1 min=0><span class=unit>%</span></div></div>
@@ -1236,7 +1238,7 @@ margin-bottom:6px;cursor:pointer}
 <div class="box vac">
   <p class=vac-eyebrow>공실률별로 보면<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4D2EE9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
 <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
-</svg></span><span class=info-tip>월 완전가동 순수익 x (1−공실일수/31) − 월 고정지출</span></span></p>
+</svg></span><span class="info-tip nowrap">월 완전가동 순수익 x (1−공실일수/31) − 월 고정지출</span></span></p>
   <h2 class=scenario-title>순수익 시나리오</h2>
   <div class=scenario-chart id=o_schart></div>
   <div class=vac-scroll>
