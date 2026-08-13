@@ -1063,10 +1063,7 @@ margin-bottom:6px;cursor:pointer}
 <a class=back href="/">← 대시보드</a>
 <div class=top-bar>
   <div class=top-copy>
-    <h1><span class="ic ic-brand"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
-<rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/>
-<path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/>
-</svg></span>단기임대 수익 계산기{% if dong %} — {{dong}}{% endif %}</h1>
+    <h1>단기임대 수익 계산기{% if dong %} — {{dong}}{% endif %}</h1>
     <p class=sub>내 매물로 한 달에 얼마 버는지 바로 확인해보세요.<br>원룸 기준으로 미리 채워져 있어요. 월 임대료, 보증금, 주당 숙박료만 내 매물에 맞게 바꾸면 됩니다.{% if rent %} <b style="color:var(--brand)">{{dong}} 시세(월세 {{rent}}만·보증금 {{dep}}만)를 자동 입력했어요.</b>{% endif %}</p>
   </div>
   <div class=top-controls>
@@ -1076,18 +1073,13 @@ margin-bottom:6px;cursor:pointer}
       <button type=button class=tab id=tab_villa>빌라·주택</button>
       <button type=button class=tab id=tab_officetel>오피스텔</button>
     </div>
-    <button type=button class=reset-btn id=btn_reset><span class=ic><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
-<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
-</svg></span> 초기화</button>
+    <button type=button class=reset-btn id=btn_reset>초기화</button>
   </div>
 </div>
 <div class=layout>
   <div class=left-col>
   <div class=box>
-    <div class=card-head><h2><span class="ic ic-brand"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
-<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>
-<path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
-</svg></span>월 고정 지출</h2><span class=sum-badge>합계<b id=o_fixedsum>-</b></span></div>
+    <div class=card-head><h2>월 고정 지출</h2><span class=sum-badge>합계<b id=o_fixedsum>-</b></span></div>
     <div class=field-grid2>
       <div class=field><label>월 임대료</label>
         <div class=field-box><input id=i_rent type=number value={{rent or 85}}><span class=unit>만원</span></div></div>
@@ -1110,10 +1102,7 @@ margin-bottom:6px;cursor:pointer}
     </div>
   </div>
   <div class=box>
-    <div class=card-head><h2><span class="ic ic-brand"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
-<path d="M11 17h3v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3a3.16 3.16 0 0 0 2-2h1a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-1a5 5 0 0 0-2-4V3a4 4 0 0 0-3.2 1.6l-.3.4H11a6 6 0 0 0-6 6v1a5 5 0 0 0 2 4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1z"/>
-<path d="M16 10h.01"/><path d="M2 8v1a2 2 0 0 0 2 2h1"/>
-</svg></span>예상 수익</h2><span class=sum-badge>주 순수익<b id=o_wnetbadge>-</b></span></div>
+    <div class=card-head><h2>예상 수익</h2><span class=sum-badge>주 순수익<b id=o_wnetbadge>-</b></span></div>
     <div class=field-grid2>
       <div class=field><label>주간 임대료</label>
         <div class=field-box><input id=i_wrent type=number value=31><span class=unit>만원</span></div></div>
@@ -1158,9 +1147,7 @@ margin-bottom:6px;cursor:pointer}
   </div>
   <div class=kpi3>
   <div class="kpi3-cell warn">
-    <div class=l><span class=ic><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
-<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>
-</svg></span>손익분기</div>
+    <div class=l>손익분기</div>
     <div class=v>월 약 <b id=o_bedays>-</b>일 <span class=kpi3-paren>(공실 <span id=o_bepct>-</span>%)</span></div>
     <div class=kpi3-sub>이 아래로 채우면 적자</div>
   </div>
@@ -1201,9 +1188,7 @@ margin-bottom:6px;cursor:pointer}
   </div>
 </div>
 
-<div class="box vac"><h2><span class="ic ic-brand"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
-<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>
-</svg></span>공실률 시나리오<span class=info-wrap><span class=info-ic tabindex=0><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4D2EE9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+<div class="box vac"><h2>공실률 시나리오<span class=info-wrap><span class=info-ic tabindex=0><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4D2EE9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
 <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
 </svg></span><span class=info-tip>연 매출 x (1-공실률) x (1-수수료·부가세) - 연 임차원가</span></span></h2>
   <table><thead><tr><th>공실률</th><th>월 예약(환산)</th><th>연 순수익</th><th>월 순수익</th></tr></thead>
