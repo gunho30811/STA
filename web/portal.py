@@ -1188,7 +1188,7 @@ margin-bottom:6px;cursor:pointer}
       <div class=vac-num><b id=o_vacpct>3일</b><span>월 공실 일수</span></div>
     </div>
     <input type=range id=i_vacancy min=0 max=31 step=1 value=3 class=vac-range>
-    <div class=scale><span>0일 (완전가동)</span><span>31일 (한 달 공실)</span></div>
+    <div class=scale><span>0일 (풀예약)</span><span>31일 (한 달 공실)</span></div>
     <div class=vac-insight id=o_vinsight>-</div>
   </div>
   <div class="box hero-card">
