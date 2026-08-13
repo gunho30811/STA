@@ -1056,17 +1056,18 @@ padding-top:16px;border-top:1px solid var(--line)}
 .kpi3-cell .v.warn{color:var(--gold)}.kpi3-cell .v.neg{color:var(--loss)}.kpi3-cell .v.pos{color:var(--profit)}
 .kpi3-paren{font-size:13px;font-weight:600;color:var(--text-sub)}
 .kpi3-sub{font-size:11.5px;color:var(--text-sub);margin-top:4px}
-.info-wrap{position:relative;display:inline-flex;align-items:center;margin-left:7px}
-/* 실제 아이콘은 16px로 유지하되 hover/클릭 히트 영역은 패딩+음수마진으로 넓혀서
-   (레이아웃 안 밀리게) 마우스가 살짝만 스쳐도 호버가 걸리도록 함 */
+/* vertical-align:middle 필수 — 히트 영역 확장용 패딩 때문에 인라인 박스가 커져서
+   기본 baseline 정렬로는 라벨 글자와 어긋나 보인다(가운데 정렬로 고정) */
+.info-wrap{position:relative;display:inline-flex;align-items:center;vertical-align:middle;margin-left:6px}
+/* 아이콘 시각 크기는 16px 유지, 히트 영역만 패딩+음수마진으로 넓힘(레이아웃엔 영향 없음) */
 .info-ic{width:16px;height:16px;display:flex;align-items:center;justify-content:center;cursor:help;
 padding:5px;margin:-5px;border-radius:50%}
 .info-ic svg{width:16px;height:16px;display:block}
-.info-tip{display:none;position:absolute;top:26px;left:-12px;background:#E4E4E7;color:var(--text);
-font-size:13px;font-weight:600;padding:10px 14px;border-radius:12px;white-space:nowrap;z-index:5;
-box-shadow:0 2px 8px rgba(0,0,0,.08)}
-.info-tip::before{content:'';position:absolute;top:-5px;left:14px;width:11px;height:11px;background:#E4E4E7;
-transform:rotate(45deg);border-radius:2px}
+/* culc_redesign(App.tsx Hint 컴포넌트) 그대로: 어두운 카드, 200px 폭에서 줄바꿈, 여유 있는 패딩 */
+.info-tip{display:none;position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);
+width:max-content;max-width:200px;background:rgba(27,27,58,.95);color:#F2F3FA;
+font-size:12px;font-weight:500;line-height:1.6;padding:10px 12px;border-radius:12px;
+white-space:normal;text-align:left;z-index:20;box-shadow:0 12px 32px rgba(0,0,0,.25)}
 .info-wrap:hover .info-tip,.info-wrap.show .info-tip{display:block}
 .be-row td{border-top:1px dashed var(--gold);border-bottom:none;color:var(--gold);font-size:11px;
 font-weight:700;text-align:center;padding:6px 4px}
