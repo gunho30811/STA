@@ -1056,15 +1056,14 @@ padding-top:16px;border-top:1px solid var(--line)}
 .kpi3-cell .v.warn{color:var(--gold)}.kpi3-cell .v.neg{color:var(--loss)}.kpi3-cell .v.pos{color:var(--profit)}
 .kpi3-paren{font-size:13px;font-weight:600;color:var(--text-sub)}
 .kpi3-sub{font-size:11.5px;color:var(--text-sub);margin-top:4px}
-/* vertical-align:middle 필수 — 히트 영역 확장용 패딩 때문에 인라인 박스가 커져서
-   기본 baseline 정렬로는 라벨 글자와 어긋나 보인다(가운데 정렬로 고정) */
+/* 박스는 아이콘(13x13) 크기 그대로 — vertical-align:middle로 라벨 글자와 정확히
+   가운데 정렬. 히트 영역 확장은 박스 크기에 전혀 영향 없는 ::before 유령 레이어로
+   처리(이전엔 padding/margin으로 박스 자체를 키우다가 정렬이 계속 어긋났음) */
 .info-wrap{position:relative;display:inline-flex;align-items:center;vertical-align:middle;margin-left:6px}
-/* 히트 영역은 26px 박스(음수마진으로 레이아웃엔 영향 없음), 안의 아이콘은 16x16 고정.
-   전역 box-sizing:border-box라 padding으로 박스를 키우면 오히려 안쪽 아이콘이
-   눌려 작아 보이는 버그가 있었음 — width/height를 직접 키우는 방식으로 수정 */
-.info-ic{width:26px;height:26px;margin:-5px;display:flex;align-items:center;justify-content:center;
+.info-wrap::before{content:'';position:absolute;inset:-6px;cursor:help}
+.info-ic{width:13px;height:13px;display:flex;align-items:center;justify-content:center;
 cursor:help;border-radius:50%}
-.info-ic svg{width:13px;height:13px;display:block;flex:none}
+.info-ic svg{width:13px;height:13px;display:block}
 /* culc_redesign(App.tsx Hint 컴포넌트) 그대로: 어두운 카드, 200px 폭에서 줄바꿈, 여유 있는 패딩 */
 .info-tip{display:none;position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);
 width:max-content;max-width:200px;background:rgba(27,27,58,.95);color:#F2F3FA;
