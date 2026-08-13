@@ -953,11 +953,10 @@ color:var(--text);text-align:right;width:100%;font-family:inherit}
 .vac-num span{display:block;font-size:11px;color:var(--text-sub);margin-top:2px}
 .vac-range{width:100%;accent-color:var(--brand)}
 .scale{display:flex;justify-content:space-between;font-size:11px;color:var(--text-sub);margin-top:6px}
-/* 토스류 인라인 알림 패턴 — 옅은 틴트만으론 배경에 묻혀서 좌측 색 바 + 아이콘으로 위계를 줌 */
-.vac-insight{display:flex;align-items:center;gap:9px;margin-top:16px;padding:11px 14px 11px 12px;
-border-radius:12px;font-size:12.5px;font-weight:700;border-left:3px solid transparent}
-.vac-insight.safe{background:var(--profit-bg);color:var(--profit);border-left-color:var(--profit)}
-.vac-insight.unsafe{background:var(--loss-bg);color:var(--loss);border-left-color:var(--loss)}
+.vac-insight{display:flex;align-items:center;gap:8px;margin-top:16px;padding:10px 14px;
+border-radius:12px;font-size:12.5px;font-weight:600}
+.vac-insight.safe{background:var(--profit-bg);color:var(--profit)}
+.vac-insight.unsafe{background:var(--loss-bg);color:var(--loss)}
 .vac-insight svg{flex:none}
 .pos{color:var(--profit)}.pos-brand{color:var(--brand)}.neg{color:var(--loss)}
 .vac{margin-top:0}
@@ -1039,9 +1038,8 @@ background:var(--field-bg);border-radius:12px;margin-bottom:20px}
 /* 옅은 틴트 뱃지는 하이라이트 박스(연보라 배경) 위에서 거의 안 보였음 —
    토스류 상태칩처럼 색을 꽉 채운 solid fill + 흰 글자로 위계를 확실히 줌 */
 .market-badge{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:800;
-background:var(--brand);color:#fff;padding:6px 12px;border-radius:999px;
-box-shadow:0 3px 10px -3px rgba(77,46,233,.5)}
-.market-badge.neg{background:var(--loss);box-shadow:0 3px 10px -3px rgba(210,69,69,.5)}
+background:var(--brand);color:#fff;padding:6px 12px;border-radius:999px}
+.market-badge.neg{background:var(--loss)}
 .market-badge svg{flex:none}
 .market-chart{display:flex;align-items:flex-end;gap:5px;height:120px;margin-bottom:16px}
 .mbar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%}
@@ -1191,7 +1189,7 @@ margin-bottom:6px;cursor:pointer}
     </div>
     <input type=range id=i_vacancy min=0 max=31 step=1 value=3 class=vac-range>
     <div class=scale><span>0일 (완전가동)</span><span>31일 (한 달 공실)</span></div>
-    <div class=vac-insight id=o_vinsight><span>-</span></div>
+    <div class=vac-insight id=o_vinsight>-</div>
   </div>
   <div class="box hero-card">
   <p class=hero-sub>월 순수익</p>
@@ -1380,9 +1378,9 @@ function calc(){
 
   var insight=document.getElementById('o_vinsight')
   insight.className='vac-insight '+(safeVacancy?'safe':'unsafe')
-  insight.innerHTML=(safeVacancy?ICON_UP:ICON_DOWN)+'<span>'+(safeVacancy?
+  insight.textContent=safeVacancy?
     ('월 '+vacancy+'일 공실은 흑자예요. 공실 '+beVacancyDays+'일까지는 괜찮아요.'):
-    ('월 '+vacancy+'일 공실이면 적자예요. 공실 '+beVacancyDays+'일을 넘기면 수익이 나기 어려워요.'))+'</span>'
+    ('월 '+vacancy+'일 공실이면 적자예요. 공실 '+beVacancyDays+'일을 넘기면 수익이 나기 어려워요.')
 
   set('o_bevalue','월 '+(beOccupiedDays===null?'-':beOccupiedDays)+'일 예약')
   document.getElementById('o_besub').textContent='최대 '+beVacancyDays+'일 공실 허용'
