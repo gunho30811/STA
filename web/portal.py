@@ -284,6 +284,94 @@ def dashboard_insights():
     except Exception:
         return None
 
+
+# ── 계산기 '나는 얼마나 벌고 있을까요?' 시장 비교 실데이터 ──────────────────────
+# net_profit(삼삼×네이버 매칭 결과)의 기대 월순수익 분포. 정의는 /profit 페이지와 동일:
+#   예약률 = 예약일 / (31 - 막힘일),  실현매출 = 최대수익 × 예약률,
+#   기대 월순수익 = 실현매출 - 네이버월총(환산월세+관리비)
+# 시안 단계에선 하드코딩 예시 숫자를 썼는데, 실제 분포와 크게 달라(중앙값 52만 vs 실제 3~13만)
+# 그대로 두면 사용자를 오도한다 → 여기서 계산해 넣는다.
+_MARKET_CACHE = {"t": 0.0, "data": None}
+MARKET_MIN_N = 30          # 이보다 표본이 적은 조합은 내보내지 않는다(JS가 전국으로 폴백)
+MARKET_MIN_OCC = 20        # 화면 문구와 동일: 예약률 20% 이상만
+# (라벨, 하한, 상한) — 하한/상한 None = 열린 구간. 실제 분포가 적자까지 걸쳐 있어 음수 구간 포함.
+MARKET_BINS = [("적자", None, 0), ("0~20만원", 0, 20), ("20만원대", 20, 40), ("40만원대", 40, 60),
+               ("60만원대", 60, 80), ("80만원대", 80, 100), ("100만원+", 100, None)]
+MARKET_TYPES = {"원룸": {"원룸건물"},
+                "빌라·주택": {"연립빌라", "단독주택", "상가주택"},
+                "오피스텔": {"오피스텔"}}
+MARKET_REGIONS = [("전국", None), ("서울", "서울"), ("경기", "경기"),
+                  ("인천", "인천"), ("부산", "부산")]
+
+
+def _pct(sorted_vals, q):
+    """선형보간 분위수(numpy 없이) — 표본이 적어도 안정적."""
+    if not sorted_vals:
+        return None
+    i = (len(sorted_vals) - 1) * q
+    lo, hi = int(i), min(int(i) + 1, len(sorted_vals) - 1)
+    return sorted_vals[lo] + (sorted_vals[hi] - sorted_vals[lo]) * (i - lo)
+
+
+def market_stats():
+    """{'data': {'서울 · 원룸': {bins,total,p25,median,p75}}, 'regions': [...], 'asof': 'YYYY-MM-DD'}"""
+    now = time.time()
+    if _MARKET_CACHE["data"] is not None and now - _MARKET_CACHE["t"] < 600:
+        return _MARKET_CACHE["data"]
+    out = {"data": {}, "regions": ["전국"], "asof": ""}
+    try:
+        conn = db.connect()
+        rows = conn.execute(
+            "SELECT sido, btype,"
+            " maxrev * LEAST(100, bk / GREATEST(31 - COALESCE(bl,0), 1) * 100) / 100 - ntotal"
+            " FROM net_profit"
+            " WHERE maxrev IS NOT NULL AND ntotal IS NOT NULL AND bk IS NOT NULL"
+            "   AND LEAST(100, bk / GREATEST(31 - COALESCE(bl,0), 1) * 100) >= %s",
+            [MARKET_MIN_OCC]).fetchall()
+        try:
+            d = conn.execute("SELECT MAX(snapshot_date) FROM samsam_snapshots").fetchone()[0]
+            out["asof"] = str(d)[:10] if d else ""
+        except Exception:
+            pass
+        conn.close()
+    except Exception:
+        return out
+
+    buckets = {}   # (지역, 유형) → [기대 월순수익…]
+    for sido, btype, net in rows:
+        if net is None:
+            continue
+        tname = next((t for t, codes in MARKET_TYPES.items() if btype in codes), None)
+        if not tname:
+            continue
+        for rname, prefix in MARKET_REGIONS:
+            if prefix is None or (sido or "").startswith(prefix):
+                buckets.setdefault((rname, tname), []).append(float(net))
+
+    regions = []
+    for rname, _ in MARKET_REGIONS:
+        keys = [(rname, t) for t in MARKET_TYPES]
+        if not any(len(buckets.get(k, [])) >= MARKET_MIN_N for k in keys):
+            continue                      # 어느 유형도 표본이 없으면 지역 선택지에서 제외
+        regions.append(rname)
+        for _, tname in keys:
+            vals = sorted(buckets.get((rname, tname), []))
+            if len(vals) < MARKET_MIN_N:
+                continue
+            bins = []
+            for label, lo, hi in MARKET_BINS:
+                n = sum(1 for x in vals
+                        if (lo is None or x >= lo) and (hi is None or x < hi))
+                bins.append({"label": label, "count": n, "min": lo, "max": hi})
+            out["data"][f"{rname} · {tname}"] = {
+                "bins": bins, "total": len(vals),
+                "p25": round(_pct(vals, 0.25)), "median": round(_pct(vals, 0.5)),
+                "p75": round(_pct(vals, 0.75))}
+    out["regions"] = regions or ["전국"]
+    _MARKET_CACHE.update(t=now, data=out)
+    return out
+
+
 LANDING = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
 <meta name=viewport content="width=device-width,initial-scale=1"><title>rendit · 단기임대 분석</title>
 <meta property="og:type" content="website">
@@ -921,10 +1009,14 @@ white-space:nowrap;transition:background .15s,color .15s}
 font-weight:600;padding:7px 14px;border-radius:999px;cursor:pointer;font-family:inherit;
 white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
 .reset-btn:hover{color:var(--text);background:#E2E2F0}
-/* 좌(입력)/우(결과) 2단 — align-items:start로 카드가 서로 키를 맞추지 않게(빈 공간 방지) */
-.layout{display:grid;grid-template-columns:410px 1fr;gap:16px;margin-bottom:32px;align-items:start}
+/* 좌(결과)/우(입력) 2단 — align-items:start로 카드가 서로 키를 맞추지 않게(빈 공간 방지).
+   DOM은 입력이 먼저지만(모바일에서 입력→결과 순서가 자연스러움) 데스크톱에선 order로 자리를
+   바꾼다: 결과가 왼쪽(1fr), 입력이 오른쪽(410px) — 폭은 그대로. */
+.layout{display:grid;grid-template-columns:1fr 410px;gap:16px;margin-bottom:32px;align-items:start}
 .left-col,.right-col{display:flex;flex-direction:column;gap:16px}
-@media(max-width:900px){.layout{grid-template-columns:1fr}}
+.left-col{order:2}
+.right-col{order:1}
+@media(max-width:900px){.layout{grid-template-columns:1fr}.left-col{order:1}.right-col{order:2}}
 .box{background:#fff;border-radius:16px;padding:20px;
 box-shadow:0 1px 2px rgba(27,27,58,.04),0 14px 28px -16px rgba(27,27,58,.15)}
 /* card-head를 box 패딩 밖으로 블리드시켜 하단 보더로 구분된 별도 스트립처럼 보이게 */
@@ -1055,7 +1147,9 @@ background:var(--brand);color:#fff;padding:6px 12px;border-radius:999px}
 .market-chart{display:flex;align-items:flex-end;gap:5px;height:120px;margin-bottom:16px}
 .mbar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%}
 .mbar-track{flex:1;display:flex;align-items:flex-end;width:100%}
-.mbar{width:100%;border-radius:3px 3px 0 0;background:var(--line);transition:background .15s}
+/* min-height: 건수가 0에 가까운 구간도 막대가 보이게(내 구간이 하필 거기면 강조가 사라진다) */
+.mbar{width:100%;min-height:4px;border-radius:3px 3px 0 0;background:var(--line);
+transition:background .15s}
 .mbar.user{background:var(--brand)}
 .mbar-label{font-size:9.5px;color:var(--text-sub);margin-top:6px;text-align:center;line-height:1.3}
 .market-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px;
@@ -1283,26 +1377,19 @@ margin-bottom:6px;cursor:pointer}
 // design/culc_redesign/src/app/App.tsx의 useMemo 공식을 그대로 이식 (WPM=주/월 환산 상수)
 var WPM=365/7/12
 var SCENARIOS_DAYS=[3,6,10,15,20,25]
-var REGIONS=['전국','서울','경기']
+var REGIONS={{ market_regions|safe }}
+var MARKET_ASOF={{ market_asof|tojson }}
 var ICON_UP='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg>'
 var ICON_DOWN='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/></svg>'
-var MARKET_DATA={
-  '전국 · 원룸':{bins:[
-    {label:'~20만원',count:89,min:-Infinity,max:20},{label:'20만원대',count:142,min:20,max:40},
-    {label:'40만원대',count:203,min:40,max:60},{label:'60만원대',count:155,min:60,max:80},
-    {label:'80만원대',count:87,min:80,max:100},{label:'100만원대',count:45,min:100,max:120},
-    {label:'120만원+',count:22,min:120,max:Infinity}],total:743,p25:32,median:52,p75:78},
-  '서울 · 원룸':{bins:[
-    {label:'~20만원',count:34,min:-Infinity,max:20},{label:'20만원대',count:71,min:20,max:40},
-    {label:'40만원대',count:118,min:40,max:60},{label:'60만원대',count:94,min:60,max:80},
-    {label:'80만원대',count:52,min:80,max:100},{label:'100만원대',count:28,min:100,max:120},
-    {label:'120만원+',count:15,min:120,max:Infinity}],total:412,p25:38,median:60,p75:87},
-  '경기 · 원룸':{bins:[
-    {label:'~20만원',count:45,min:-Infinity,max:20},{label:'20만원대',count:98,min:20,max:40},
-    {label:'40만원대',count:134,min:40,max:60},{label:'60만원대',count:89,min:60,max:80},
-    {label:'80만원대',count:41,min:80,max:100},{label:'100만원대',count:18,min:100,max:120},
-    {label:'120만원+',count:7,min:120,max:Infinity}],total:432,p25:35,median:55,p75:80}
-}
+// 서버(portal.market_stats)가 net_profit 실집계를 넣어준다. 열린 구간은 JSON에 Infinity를
+// 못 담아 null로 오므로 여기서 ±Infinity로 되살린다.
+var MARKET_DATA={{ market_json|safe }}
+Object.keys(MARKET_DATA).forEach(function(k){
+  MARKET_DATA[k].bins.forEach(function(b){
+    if(b.min===null) b.min=-Infinity
+    if(b.max===null) b.max=Infinity
+  })
+})
 var curRegion='전국'
 function renderMarket(monthlyProfit){
   var activeTab=document.querySelector('.tab.active')
@@ -1323,7 +1410,13 @@ function renderMarket(monthlyProfit){
   })
   var region=curRegion
   var key=region+' · '+propLabel
-  var market=MARKET_DATA[key]||MARKET_DATA[region+' · 원룸']||MARKET_DATA['전국 · 원룸']
+  // 표본(30건) 미달 조합은 서버가 안 내려준다. 그때 전국으로 대신 보여주되, 그 사실을 아래에 밝힌다
+  // (안 밝히면 '인천 원룸'이라 써놓고 전국 숫자를 보여주게 된다).
+  var market=MARKET_DATA[key], fellBack=false
+  if(!market){
+    market=MARKET_DATA['전국 · '+propLabel]||MARKET_DATA['전국 · 원룸']
+    fellBack=true
+  }
   var userBinIdx=-1
   market.bins.forEach(function(b,i){if(monthlyProfit>=b.min&&monthlyProfit<b.max) userBinIdx=i})
   var aboveCount=0
@@ -1348,7 +1441,10 @@ function renderMarket(monthlyProfit){
   document.getElementById('o_mp25').innerHTML=market.p25+'<span>만원</span>'
   document.getElementById('o_mmedian').innerHTML=market.median+'<span>만원</span>'
   document.getElementById('o_mp75').innerHTML=market.p75+'<span>만원</span>'
-  document.getElementById('o_mfoot').innerHTML=market.total+'건 기준 추정치<span class=sep>|</span>예약률 20% 이상 매물<span class=sep>|</span>오늘 기준 1개월 롤링'
+  document.getElementById('o_mfoot').innerHTML=
+    (fellBack?'<b>'+region+' '+propLabel+'</b>은 표본이 적어 <b>전국</b> 기준으로 보여드려요<span class=sep>|</span>':'')+
+    market.total.toLocaleString()+'건 기준(삼삼×네이버 매칭)<span class=sep>|</span>예약률 20% 이상 매물'+
+    (MARKET_ASOF?'<span class=sep>|</span>'+MARKET_ASOF+' 크롤 기준':'')
 }
 function fmtWon(n,withSign){
   if(!isFinite(n)) return '∞'
@@ -1515,9 +1611,13 @@ def calc():
     # 무료 공개 — 로그인 불필요(수익 계산기는 진입장벽 낮춰 가입 유도).
     # 로그인 상태면 auth._inject_nav가 공통 네비바를 자동 주입하므로, 여기 헤더는 비로그인일 때만 렌더.
     from flask import request as _rq
+    mk = market_stats()      # 시장 비교 카드 실데이터(10분 캐시)
     return render_template_string(CALC_PAGE, user=current_user(), dong=_rq.args.get("dong", ""),
                                   rent=_rq.args.get("rent", type=int),
-                                  dep=_rq.args.get("dep", type=int))
+                                  dep=_rq.args.get("dep", type=int),
+                                  market_json=json.dumps(mk["data"], ensure_ascii=False),
+                                  market_regions=json.dumps(mk["regions"], ensure_ascii=False),
+                                  market_asof=mk["asof"])
 
 
 @portal.route("/map")
