@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { getJSON, sendJSON } from '../shared/api.js'
-import { fmtTime, roomTitle } from './helpers.js'
+import { fmtTime, roomTitle, providerLabel, canReply } from './helpers.js'
 
 // 통합 채팅함: 왼쪽 방 목록 + 오른쪽 스레드/전송.
 // props:
@@ -100,6 +100,7 @@ export default function Inbox({ rooms, onReloadRooms }) {
         <div className="threadwrap">
           {curInfo && (
             <div className="threadhdr">
+              <span className={`provider-tag ${curInfo.provider || 'samsam'}`}>{providerLabel(curInfo.provider)}</span>
               {roomTitle(curInfo)}
               {curInfo.room_name && curInfo.counterpart_nickname && (
                 <span className="sub">{curInfo.room_name}</span>
@@ -129,7 +130,7 @@ export default function Inbox({ rooms, onReloadRooms }) {
             ))}
           </div>
 
-          {curRoom && (
+          {curRoom && (canReply(curInfo && curInfo.provider) ? (
             <div className="sendbar">
               <textarea
                 placeholder="답장을 입력해 주세요"
@@ -139,7 +140,11 @@ export default function Inbox({ rooms, onReloadRooms }) {
               />
               <button className="btn btn-go" disabled={sending} onClick={send}>전송</button>
             </div>
-          )}
+          ) : (
+            <div className="sendbar-off">
+              리브애니웨어는 <b>수신 전용</b>이라 여기서 답장을 보낼 수 없어요. 리브애니웨어 앱에서 답장해 주세요.
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -156,7 +161,10 @@ function RoomRow({ room, active, onOpen }) {
           {room.unread && <span className="dot" />}
           {roomTitle(room)}
         </span>
-        <span className="lbl">{room.label || room.samsam_email}</span>
+        <span className="rn-tags">
+          <span className={`provider-tag ${room.provider || 'samsam'}`}>{providerLabel(room.provider)}</span>
+          <span className="lbl">{room.label || room.samsam_email}</span>
+        </span>
       </div>
       <div className="last">{last}</div>
       <div className="time">{fmtTime(room.last_message_time)}</div>

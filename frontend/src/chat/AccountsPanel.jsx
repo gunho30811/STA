@@ -1,18 +1,11 @@
 import { useState } from 'react'
 import { sendJSON } from '../shared/api.js'
-import { statusLabel } from './helpers.js'
+import { statusLabel, PROVIDERS, providerLabel } from './helpers.js'
 
 // 연결된 렌트 계정 목록 + 새 계정 연결 폼.
 // props:
 //   accounts   - 계정 배열
 //   onChanged  - 계정이 추가/삭제됐을 때(목록·방 재로딩) 호출
-// 공급자 코드 → 표시 이름.
-const PROVIDERS = [
-  { value: 'samsam', label: '삼삼엠투' },
-  { value: 'liveanywhere', label: '리브애니웨어' },
-]
-const providerLabel = (p) => (PROVIDERS.find((x) => x.value === p) || PROVIDERS[0]).label
-
 export default function AccountsPanel({ accounts, onChanged }) {
   const [provider, setProvider] = useState('samsam')
   const [email, setEmail] = useState('')
