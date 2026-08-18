@@ -163,12 +163,32 @@ h2.sec {
   color: #4b5563;
 }
 
-.fg input {
+.fg input,
+.fg select {
   padding: 7px 9px;
   border: 1px solid #d1d5db;
   border-radius: 7px;
   font-size: 13px;
   min-width: 160px;
+  background: #fff;
+}
+
+.fg select {
+  min-width: 130px;
+  cursor: pointer;
+}
+
+/* 계정 카드의 공급자 배지(삼삼엠투 / 리브애니웨어) */
+.provider-tag {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #4f46e5;
+  background: #eef2ff;
+  border-radius: 5px;
+  padding: 1px 6px;
+  margin-right: 6px;
+  vertical-align: 1px;
 }
 
 .msg {
