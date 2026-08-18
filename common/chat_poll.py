@@ -24,9 +24,11 @@ load_dotenv(os.path.join(BASE_DIR, '.env'))
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 import chat_auth
+import chat_liveanywhere as chat_la
 import crypto_util
 import db
 import kakao_notify
+import json as _json
 
 MSG_LIMIT = 50  # 폴링마다 방당 최근 메시지 N개만 조회 — 신규분만 있으면 충분, 전체 이력 아님
 CHAT_URL = f"https://{os.environ.get('RENDIT_DOMAIN', 'rendits.duckdns.org')}/samsam/chat/"
@@ -314,15 +316,96 @@ def process_outbox(conn):
     return len(items)
 
 
+def poll_liveanywhere_account(conn, acct):
+    """리브애니웨어 수신 폴러 — 쿠키 세션으로 Sendbird 채널(my-channels) 조회 →
+    신규 수신 메시지에 카톡 알림. 답장(전송)은 미지원(수신 전용).
+
+    인증은 httpOnly 쿠키(atoken/rtoken)라 refresh_token_enc 에 쿠키 번들(JSON)을 암호화 저장.
+    갱신은 순수 HTTP(refresh_cookies), 만료 시 저장 비번으로 재로그인(Playwright)."""
+    acct_id = acct['id']
+    if (acct.get('status') or '') == 'reauth_needed':
+        log(f"  [LA]계정#{acct_id} 재연결 필요 상태 — 자동 재시도 생략")
+        return
+    first_poll = not acct['refresh_token_enc']   # 최초 연결(아직 쿠키 없음)
+
+    cookies = None
+    if acct['refresh_token_enc']:
+        try:
+            cookies = chat_la.refresh_cookies(_json.loads(crypto_util.decrypt(acct['refresh_token_enc'])))
+        except Exception as e:
+            log(f"  [LA]계정#{acct_id} 쿠키 갱신 실패({repr(e)[:50]}) — 저장 비번으로 재로그인 시도")
+    if cookies is None:
+        if not acct['password_enc']:
+            _mark_status(conn, acct_id, 'reauth_needed', '저장된 비밀번호 없음 — 재연결 필요')
+            return
+        if not chat_la.playwright_available():
+            log(f"  [LA]계정#{acct_id} 로그인 필요하지만 이 환경엔 Playwright 없음 — 스킵")
+            return
+        try:
+            cookies = chat_la.login_and_get_cookies(
+                acct['samsam_email'], crypto_util.decrypt(acct['password_enc']))
+        except Exception as e:
+            log(f"  [LA]계정#{acct_id} 로그인 실패: {repr(e)[:100]}")
+            _mark_status(conn, acct_id, 'reauth_needed', repr(e)[:200])
+            return
+
+    try:
+        channels = chat_la.list_channels(cookies)
+    except Exception as e:
+        log(f"  [LA]계정#{acct_id} 채널 조회 실패: {repr(e)[:100]}")
+        _mark_status(conn, acct_id, 'error', repr(e)[:200])
+        return
+
+    for ch in channels:
+        if not ch.get('channel_url'):
+            continue
+        room = {'room_name': ch['room_name'], 'host_or_guest': 'host',
+                'member': ch['counterpart_member'], 'contract_status': None,
+                'chat_room_status': None, 'start_date': None, 'end_date': None,
+                'last_message': ch['last_message'], 'last_message_time': ch['last_message_time']}
+        st = conn.execute(
+            "SELECT last_notified_time FROM samsam_chat_rooms WHERE account_id=%s AND samsam_room_key=%s",
+            (acct_id, ch['channel_url'])).fetchone()
+        prev_notif = (st['last_notified_time'] if st else None) or 0
+        room_id = _upsert_room(conn, acct_id, ch['channel_url'], room, ch['counterpart_nickname'])
+        lmt = ch['last_message_time'] or 0
+        # 신규 수신 = 최초폴 아님 + 안읽음 있음 + 마지막메시지 시각이 직전 알림보다 최신. (fail-safe)
+        if (not first_poll) and ch.get('unread', 0) > 0 and lmt > prev_notif:
+            label = acct.get('label') or acct.get('samsam_email') or '리브애니웨어'
+            preview = (ch.get('last_message') or '').strip().replace('\n', ' ')[:60]
+            text = (f"[rendit] 리브애니웨어 새 문의\n계정: {label}\n"
+                    f"{ch.get('counterpart_nickname') or '게스트'}: {preview or '(내용 없음)'}")
+            try:
+                if kakao_notify.send_to_member(conn, acct['member_id'], text, CHAT_URL, "채팅 열기"):
+                    log(f"    [LA]카톡 알림 발송(room {room_id}, member#{acct['member_id']})")
+            except Exception as e:
+                log(f"    [LA]카톡 알림 오류: {repr(e)[:100]}")
+        if lmt > prev_notif:
+            conn.execute("UPDATE samsam_chat_rooms SET last_notified_time=%s WHERE id=%s", (lmt, room_id))
+            conn.commit()
+
+    conn.execute(
+        "UPDATE samsam_accounts SET refresh_token_enc=%s, status='ok', last_error=NULL, "
+        "last_polled_at=%s WHERE id=%s",
+        (crypto_util.encrypt(_json.dumps(cookies)), _now(), acct_id))
+    conn.commit()
+    log(f"  [LA]계정#{acct_id}({acct['label'] or acct['samsam_email']}) 채널 {len(channels)}개 갱신")
+
+
+def poll_one(conn, acct):
+    """공급자별 폴러 디스패처."""
+    if (acct.get('provider') or 'samsam') == 'liveanywhere':
+        return poll_liveanywhere_account(conn, acct)
+    return poll_account(conn, acct)
+
+
 def poll_all(conn):
-    """연결된(비활성 아닌) 전체 계정을 폴링. GH Actions(main)와 Vercel cron 엔드포인트가 공용으로 씀."""
-    # 삼삼 폴러 — 삼삼 공급자 계정만. 리브애니웨어 등 다른 공급자는 각자 폴러가 처리(삼삼 로그인 금지).
+    """연결된(비활성 아닌) 전체 계정을 공급자별로 폴링. 서버 크론·GH Actions가 공용으로 씀."""
     accounts = conn.execute(
-        "SELECT id, member_id, samsam_email, label, password_enc, refresh_token_enc, "
-        "samsam_member_id, status FROM samsam_accounts WHERE status != 'disabled' "
-        "AND (provider IS NULL OR provider='samsam')").fetchall()
+        "SELECT id, member_id, provider, samsam_email, label, password_enc, refresh_token_enc, "
+        "samsam_member_id, status FROM samsam_accounts WHERE status != 'disabled'").fetchall()
     for acct in accounts:
-        poll_account(conn, dict(acct))
+        poll_one(conn, dict(acct))
     return len(accounts)
 
 
