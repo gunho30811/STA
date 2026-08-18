@@ -1369,7 +1369,7 @@ def chat_api_rooms():
     conn = db.connect()
     rows = conn.execute(
         "SELECT r.id, r.room_name, r.counterpart_nickname, r.last_message, r.last_message_time, "
-        "r.last_read_at, r.chat_room_status, r.contract_status, a.label, a.samsam_email "
+        "r.last_read_at, r.chat_room_status, r.contract_status, a.label, a.samsam_email, a.provider "
         "FROM samsam_chat_rooms r JOIN samsam_accounts a ON a.id = r.account_id "
         "WHERE a.member_id=%s AND r.host_or_guest='host' "
         "ORDER BY r.last_message_time DESC NULLS LAST", (u["id"],)).fetchall()
@@ -1420,11 +1420,15 @@ def chat_api_send_message(room_id):
         return jsonify({"error": "메시지를 입력해주세요."}), 400
     conn = db.connect()
     owner = conn.execute(
-        "SELECT r.id FROM samsam_chat_rooms r JOIN samsam_accounts a ON a.id = r.account_id "
+        "SELECT r.id, a.provider FROM samsam_chat_rooms r JOIN samsam_accounts a ON a.id = r.account_id "
         "WHERE r.id=%s AND a.member_id=%s", (room_id, u["id"])).fetchone()
     if not owner:
         conn.close()
         return jsonify({"error": "not found"}), 404
+    # 리브애니웨어는 수신 전용 — 답장(전송) 미지원. 삼삼 발송 경로로 잘못 큐잉되지 않게 차단.
+    if (owner["provider"] or "samsam") == "liveanywhere":
+        conn.close()
+        return jsonify({"error": "리브애니웨어는 답장을 지원하지 않습니다(수신 전용)."}), 400
     conn.execute(
         "INSERT INTO samsam_chat_outbox (room_id, message, status, created_at) "
         "VALUES (%s,%s,'pending',%s)",
