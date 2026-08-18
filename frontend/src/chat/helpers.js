@@ -4,6 +4,7 @@
 export function statusLabel(status) {
   if (status === 'ok') return '정상'
   if (status === 'pending_login') return '연결 처리 중'
+  if (status === 'pending_provider') return '연동 준비 중'
   if (status === 'reauth_needed') return '재연결 필요'
   return '오류'
 }

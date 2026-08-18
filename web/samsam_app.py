@@ -1260,12 +1260,12 @@ def chat_api_add_account():
         return jsonify({"ok": True, "pending": True,
                          "message": message or "로그인 처리 중입니다. 잠시 후(보통 1분 이내) 새로고침해주세요."})
 
-    # 리브애니웨어: 수신 폴러(providers/liveanywhere)가 아직 미구현 — 계정 정보만 저장해두고
-    # 연동 준비가 끝나면 자동 활성화. 삼삼 로그인(33m2)을 절대 시도하지 않는다.
+    # 리브애니웨어: 삼삼 로그인(33m2)을 절대 시도하지 않는다. 비번만 암호화 큐잉해두면
+    # 수신 폴러(chat_liveanywhere)가 다음 주기에 쿠키 로그인 후 채널을 불러온다.
     if provider == "liveanywhere":
         return _queue_pending(
-            status="pending_provider",
-            message="리브애니웨어 계정이 저장되었습니다. 수신 연동을 준비 중이며 곧 활성화됩니다.")
+            status="pending_login",
+            message="리브애니웨어 계정이 저장되었습니다. 잠시 후(보통 1분 이내) 새로고침해주세요.")
 
     if not chat_auth.playwright_available():
         return _queue_pending()
@@ -1308,12 +1308,11 @@ def chat_api_poll():
     u = current_user()
     conn = db.connect()
     accounts = conn.execute(
-        "SELECT id, member_id, samsam_email, label, password_enc, refresh_token_enc, "
-        "samsam_member_id FROM samsam_accounts WHERE member_id=%s AND status != 'disabled' "
-        "AND (provider IS NULL OR provider='samsam')",
+        "SELECT id, member_id, provider, samsam_email, label, password_enc, refresh_token_enc, "
+        "samsam_member_id, status FROM samsam_accounts WHERE member_id=%s AND status != 'disabled'",
         (u["id"],)).fetchall()
     for acct in accounts:
-        chat_poll.poll_account(conn, dict(acct))
+        chat_poll.poll_one(conn, dict(acct))
     conn.close()
     return jsonify({"ok": True, "polled": len(accounts)})
 
