@@ -501,6 +501,7 @@ def init_db(force=False):
     CREATE TABLE IF NOT EXISTS samsam_accounts (
         id                 SERIAL PRIMARY KEY,
         member_id          INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+        provider           TEXT DEFAULT 'samsam',
         samsam_email       TEXT NOT NULL,
         label              TEXT,
         password_enc       TEXT,
@@ -529,6 +530,8 @@ def init_db(force=False):
         updated_at          TEXT,
         UNIQUE (account_id, samsam_room_key)
     )""")
+    # 계정 공급자: 'samsam'(삼삼엠투, 기본) | 'liveanywhere'(리브애니웨어). 통합채팅 다중 공급자용.
+    conn.execute("ALTER TABLE samsam_accounts ADD COLUMN IF NOT EXISTS provider TEXT DEFAULT 'samsam'")
     conn.execute("ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS host_or_guest TEXT")
     # 마지막으로 이 방을 읽은 시점(last_message_time과 같은 epoch ms) — 미확인 방 표시용.
     conn.execute("ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS last_read_at BIGINT")

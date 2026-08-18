@@ -1224,7 +1224,7 @@ def chat_api_accounts():
     u = current_user()
     conn = db.connect()
     rows = conn.execute(
-        "SELECT id, samsam_email, label, status, last_error, last_polled_at "
+        "SELECT id, provider, samsam_email, label, status, last_error, last_polled_at "
         "FROM samsam_accounts WHERE member_id=%s ORDER BY id", (u["id"],)).fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
@@ -1237,24 +1237,35 @@ def chat_api_add_account():
     email = (data.get("email") or "").strip()
     password = data.get("password") or ""
     label = (data.get("label") or "").strip()
+    provider = (data.get("provider") or "samsam").strip().lower()
+    if provider not in ("samsam", "liveanywhere"):
+        return jsonify({"error": "알 수 없는 공급자입니다."}), 400
     if not email or not password:
         return jsonify({"error": "이메일/비밀번호를 입력해주세요."}), 400
 
-    def _queue_pending():
-        # 이 프로세스에서 Playwright 로그인을 못 끝내는 경우(모듈/브라우저 없음 등):
-        # 비번만 암호화해 큐잉해두면 Playwright 있는 환경(서버 크론/GH Actions)이
+    def _queue_pending(status="pending_login", message=None):
+        # 이 프로세스에서 로그인을 지금 끝내지 못하는 경우(Playwright 없음 / 아직 미구현 공급자):
+        # 비번만 암호화해 큐잉해두면 로그인 가능한 환경/공급자 구현이 준비됐을 때
         # 다음 폴링 주기에 로그인을 대신 완료한다.
         conn = db.connect()
         conn.execute(
-            "INSERT INTO samsam_accounts (member_id, samsam_email, label, password_enc, "
-            "status, created_at) VALUES (%s,%s,%s,%s,'pending_login',%s)",
-            (u["id"], email, label or email, crypto_util.encrypt(password),
-             datetime.now().isoformat(timespec="seconds")))
+            "INSERT INTO samsam_accounts (member_id, provider, samsam_email, label, "
+            "password_enc, status, created_at) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+            (u["id"], provider, email, label or email, crypto_util.encrypt(password),
+             status, datetime.now().isoformat(timespec="seconds")))
         conn.commit()
         conn.close()
-        _trigger_chat_poll_workflow()
+        if provider == "samsam":
+            _trigger_chat_poll_workflow()
         return jsonify({"ok": True, "pending": True,
-                         "message": "로그인 처리 중입니다. 잠시 후(보통 1분 이내) 새로고침해주세요."})
+                         "message": message or "로그인 처리 중입니다. 잠시 후(보통 1분 이내) 새로고침해주세요."})
+
+    # 리브애니웨어: 수신 폴러(providers/liveanywhere)가 아직 미구현 — 계정 정보만 저장해두고
+    # 연동 준비가 끝나면 자동 활성화. 삼삼 로그인(33m2)을 절대 시도하지 않는다.
+    if provider == "liveanywhere":
+        return _queue_pending(
+            status="pending_provider",
+            message="리브애니웨어 계정이 저장되었습니다. 수신 연동을 준비 중이며 곧 활성화됩니다.")
 
     if not chat_auth.playwright_available():
         return _queue_pending()
@@ -1270,10 +1281,10 @@ def chat_api_add_account():
 
     conn = db.connect()
     conn.execute(
-        "INSERT INTO samsam_accounts (member_id, samsam_email, label, password_enc, "
+        "INSERT INTO samsam_accounts (member_id, provider, samsam_email, label, password_enc, "
         "refresh_token_enc, samsam_member_id, status, created_at) "
-        "VALUES (%s,%s,%s,%s,%s,%s,'ok',%s)",
-        (u["id"], email, label or email, crypto_util.encrypt(password),
+        "VALUES (%s,%s,%s,%s,%s,%s,%s,'ok',%s)",
+        (u["id"], provider, email, label or email, crypto_util.encrypt(password),
          crypto_util.encrypt(res["refresh_token"]), res["samsam_member_id"],
          datetime.now().isoformat(timespec="seconds")))
     conn.commit()
@@ -1298,7 +1309,8 @@ def chat_api_poll():
     conn = db.connect()
     accounts = conn.execute(
         "SELECT id, member_id, samsam_email, label, password_enc, refresh_token_enc, "
-        "samsam_member_id FROM samsam_accounts WHERE member_id=%s AND status != 'disabled'",
+        "samsam_member_id FROM samsam_accounts WHERE member_id=%s AND status != 'disabled' "
+        "AND (provider IS NULL OR provider='samsam')",
         (u["id"],)).fetchall()
     for acct in accounts:
         chat_poll.poll_account(conn, dict(acct))

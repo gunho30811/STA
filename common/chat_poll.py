@@ -316,9 +316,11 @@ def process_outbox(conn):
 
 def poll_all(conn):
     """연결된(비활성 아닌) 전체 계정을 폴링. GH Actions(main)와 Vercel cron 엔드포인트가 공용으로 씀."""
+    # 삼삼 폴러 — 삼삼 공급자 계정만. 리브애니웨어 등 다른 공급자는 각자 폴러가 처리(삼삼 로그인 금지).
     accounts = conn.execute(
         "SELECT id, member_id, samsam_email, label, password_enc, refresh_token_enc, "
-        "samsam_member_id, status FROM samsam_accounts WHERE status != 'disabled'").fetchall()
+        "samsam_member_id, status FROM samsam_accounts WHERE status != 'disabled' "
+        "AND (provider IS NULL OR provider='samsam')").fetchall()
     for acct in accounts:
         poll_account(conn, dict(acct))
     return len(accounts)
