@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { sendJSON } from '../shared/api.js'
-import { statusLabel } from './helpers.js'
+import { statusLabel, PROVIDERS, providerLabel } from './helpers.js'
 
 // 연결된 렌트 계정 목록 + 새 계정 연결 폼.
 // props:
 //   accounts   - 계정 배열
 //   onChanged  - 계정이 추가/삭제됐을 때(목록·방 재로딩) 호출
 export default function AccountsPanel({ accounts, onChanged }) {
+  const [provider, setProvider] = useState('samsam')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [label, setLabel] = useState('')
@@ -22,6 +23,7 @@ export default function AccountsPanel({ accounts, onChanged }) {
     setAdding(true)
     try {
       const { ok, data } = await sendJSON('api/accounts', 'POST', {
+        provider,
         email: email.trim(),
         password,
         label: label.trim(),
@@ -63,7 +65,10 @@ export default function AccountsPanel({ accounts, onChanged }) {
         {accounts.map((a) => (
           <div className="acct" key={a.id}>
             <button className="del" title="연결 해제" onClick={() => deleteAccount(a.id)}>✕</button>
-            <div className="label">{a.label || a.samsam_email}</div>
+            <div className="label">
+              <span className="provider-tag">{providerLabel(a.provider)}</span>
+              {a.label || a.samsam_email}
+            </div>
             <div className="email">{a.samsam_email}</div>
             <span className={`status ${a.status}`}>{statusLabel(a.status)}</span>
           </div>
@@ -72,7 +77,15 @@ export default function AccountsPanel({ accounts, onChanged }) {
 
       <div className="addform">
         <div className="fg">
-          <label>렌트 이메일</label>
+          <label>공급자</label>
+          <select value={provider} onChange={(e) => setProvider(e.target.value)}>
+            {PROVIDERS.map((p) => (
+              <option key={p.value} value={p.value}>{p.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="fg">
+          <label>{providerLabel(provider)} 이메일</label>
           <input
             type="email"
             placeholder="you@example.com"

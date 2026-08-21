@@ -1,9 +1,23 @@
 // 통합 채팅 공용 헬퍼.
 
+// 공급자 코드 → 표시 이름. 계정 연결 드롭다운·계정 카드·방 목록 배지에서 공용.
+export const PROVIDERS = [
+  { value: 'samsam', label: '삼삼엠투' },
+  { value: 'liveanywhere', label: '리브애니웨어' },
+]
+export function providerLabel(p) {
+  return (PROVIDERS.find((x) => x.value === p) || PROVIDERS[0]).label
+}
+// 리브애니웨어는 현재 수신 전용(답장 미지원).
+export function canReply(provider) {
+  return (provider || 'samsam') !== 'liveanywhere'
+}
+
 // 계정 상태 코드 → 한글 배지 문구
 export function statusLabel(status) {
   if (status === 'ok') return '정상'
   if (status === 'pending_login') return '연결 처리 중'
+  if (status === 'pending_provider') return '연동 준비 중'
   if (status === 'reauth_needed') return '재연결 필요'
   return '오류'
 }

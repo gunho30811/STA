@@ -243,6 +243,40 @@ def _seed_admin(conn):
 _INITED = False
 
 
+# ── 기존 테이블 신규 컬럼 마이그레이션의 '단일 출처' ───────────────────────────────
+# ⚠️ 새 컬럼을 추가할 땐 반드시 이 목록에 넣는다. init_db 의 '기존 DB 빠른 경로'가
+#    바로 이 목록을 돌려 운영 DB에 반영한다 — 본문 CREATE TABLE 만 고치면 이미 존재하는
+#    운영 DB엔 새 컬럼이 절대 들어가지 않는다(2026-08 provider 컬럼 누락 사고의 원인).
+# 전부 ADD COLUMN IF NOT EXISTS 라 멱등하고, 신규 DB(전체 경로)에서도 그대로 재실행된다.
+_COLUMN_MIGRATIONS = [
+    "ALTER TABLE naver_listings ADD COLUMN IF NOT EXISTS building_type_code TEXT",
+    "ALTER TABLE naver_listings ADD COLUMN IF NOT EXISTS tags TEXT",
+    "ALTER TABLE naver_listings ADD COLUMN IF NOT EXISTS bldg_dong TEXT",
+    "ALTER TABLE samsam_listings ADD COLUMN IF NOT EXISTS month_occ TEXT",
+    "ALTER TABLE samsam_snapshots ADD COLUMN IF NOT EXISTS avg_occ_2m REAL",
+    "ALTER TABLE members ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT FALSE",
+    "ALTER TABLE members ADD COLUMN IF NOT EXISTS kakao_id TEXT",
+    "ALTER TABLE members ADD COLUMN IF NOT EXISTS kakao_refresh_token_enc TEXT",
+    "ALTER TABLE members ADD COLUMN IF NOT EXISTS kakao_notify BOOLEAN DEFAULT FALSE",
+    "ALTER TABLE samsam_accounts ADD COLUMN IF NOT EXISTS provider TEXT DEFAULT 'samsam'",
+    "ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS host_or_guest TEXT",
+    "ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS last_read_at BIGINT",
+    "ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS counterpart_nickname TEXT",
+    "ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS last_notified_time BIGINT",
+]
+
+
+def _run_column_migrations(conn):
+    """신규 컬럼 보강(_COLUMN_MIGRATIONS)을 개별 실행. 한 문장이 실패해도(예: 아직
+    없는 테이블) 나머지는 계속 — autocommit 연결이라 문장 간 격리됨."""
+    for sql in _COLUMN_MIGRATIONS:
+        try:
+            conn.execute(sql)
+        except Exception as e:
+            print(f"[db] 마이그레이션 스킵: {sql[:55]}… ({repr(e)[:60]})", flush=True)
+    conn.commit()
+
+
 def init_db(force=False):
     # 프로세스당 1회만 스키마 점검(서버리스 콜드스타트에서 앱마다 중복 실행 방지).
     global _INITED
@@ -254,12 +288,9 @@ def init_db(force=False):
     if not force:
         try:
             if conn.execute("SELECT to_regclass('public.members')").fetchone()[0]:
-                # 기존 DB: 신규 컬럼 마이그레이션만 실행
-                conn.execute("ALTER TABLE members ADD COLUMN IF NOT EXISTS kakao_id TEXT")
-                conn.execute("ALTER TABLE members ADD COLUMN IF NOT EXISTS kakao_refresh_token_enc TEXT")
-                conn.execute("ALTER TABLE members ADD COLUMN IF NOT EXISTS kakao_notify BOOLEAN DEFAULT FALSE")
-                conn.execute("ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS last_notified_time BIGINT")
-                conn.commit()
+                # 기존 DB: 전체 CREATE/INDEX(락 경합·시간 소요)는 건너뛰고, 신규 컬럼
+                # 마이그레이션(_COLUMN_MIGRATIONS)만 실행한다. 새 컬럼은 여기로 반드시 반영됨.
+                _run_column_migrations(conn)
                 _INITED = True
                 conn.close()
                 return
@@ -383,10 +414,7 @@ def init_db(force=False):
         cortarno                      TEXT,
         crawled_at                    TEXT
     )""")
-    # CREATE TABLE IF NOT EXISTS 는 기존 테이블에 새 컬럼을 추가하지 않으므로 별도 ALTER 로 보강.
-    conn.execute("ALTER TABLE naver_listings ADD COLUMN IF NOT EXISTS building_type_code TEXT")
-    conn.execute("ALTER TABLE naver_listings ADD COLUMN IF NOT EXISTS tags TEXT")
-    conn.execute("ALTER TABLE naver_listings ADD COLUMN IF NOT EXISTS bldg_dong TEXT")
+    # (기존 테이블 신규 컬럼 보강은 아래 _run_column_migrations 로 일괄 처리 — _COLUMN_MIGRATIONS)
     conn.execute("""
     CREATE TABLE IF NOT EXISTS samsam_listings (
         room_id               INTEGER PRIMARY KEY,
@@ -426,8 +454,7 @@ def init_db(force=False):
         dong                  TEXT,
         collected_at          TEXT
     )""")
-    # 달력월별 예약률(JSON: {'YYYY-MM':{bk,bl,days}}) — 롤링(1/2/3달)과 별개로 특정 달 조회용. 앞으로 크롤분부터.
-    conn.execute("ALTER TABLE samsam_listings ADD COLUMN IF NOT EXISTS month_occ TEXT")
+    # (samsam_listings.month_occ 등 신규 컬럼은 _COLUMN_MIGRATIONS 로 보강)
     # 예약률 스냅샷(지역×유형 집계). 크롤 회차마다 snapshot.py 가 적재 → 인기 트렌드 추적.
     conn.execute("""
     CREATE TABLE IF NOT EXISTS samsam_snapshots (
@@ -443,7 +470,6 @@ def init_db(force=False):
         avg_week       REAL,
         PRIMARY KEY (snapshot_date, sido, sigungu, dong, building_type)
     )""")
-    conn.execute("ALTER TABLE samsam_snapshots ADD COLUMN IF NOT EXISTS avg_occ_2m REAL")
     # 삼삼×네이버 통합 수익성 매칭 결과. 예전엔 data/net_profit_integrated.csv 파일로 주고받았으나
     # 크롤/웹 분리(계약=DB)로 이 테이블에 적재한다. 컬럼명은 웹(profit_app) 내부 짧은키와 동일.
     # 크롤 파이프라인(build_integrated → export_net_profit)이 upsert, 웹은 SELECT.
@@ -488,12 +514,7 @@ def init_db(force=False):
         verify_expires  TEXT,
         created_at      TEXT
     )""")
-    # 기존 테이블에 신규 컬럼 보강(이미 있으면 무시)
-    conn.execute("ALTER TABLE members ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT FALSE")
-    conn.execute("ALTER TABLE members ADD COLUMN IF NOT EXISTS kakao_id TEXT")
-    # 카카오톡 '나에게 보내기' 알림용 — talk_message 동의 후 저장한 refreshToken(암호화)과 수신 on/off.
-    conn.execute("ALTER TABLE members ADD COLUMN IF NOT EXISTS kakao_refresh_token_enc TEXT")
-    conn.execute("ALTER TABLE members ADD COLUMN IF NOT EXISTS kakao_notify BOOLEAN DEFAULT FALSE")
+    # (members.approved / kakao_* 등 신규 컬럼은 _COLUMN_MIGRATIONS 로 보강)
     _seed_admin(conn)
 
     # 삼삼엠투 통합 채팅: 회원이 연결한 삼삼 계정(비번·refreshToken은 암호화해 저장).
@@ -501,6 +522,7 @@ def init_db(force=False):
     CREATE TABLE IF NOT EXISTS samsam_accounts (
         id                 SERIAL PRIMARY KEY,
         member_id          INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+        provider           TEXT DEFAULT 'samsam',
         samsam_email       TEXT NOT NULL,
         label              TEXT,
         password_enc       TEXT,
@@ -529,13 +551,8 @@ def init_db(force=False):
         updated_at          TEXT,
         UNIQUE (account_id, samsam_room_key)
     )""")
-    conn.execute("ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS host_or_guest TEXT")
-    # 마지막으로 이 방을 읽은 시점(last_message_time과 같은 epoch ms) — 미확인 방 표시용.
-    conn.execute("ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS last_read_at BIGINT")
-    # 상대방(counterpart_member) 닉네임 — RTDB live/users/{id}에서 조회해 채팅 목록에 표시.
-    conn.execute("ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS counterpart_nickname TEXT")
-    # 카톡 알림을 마지막으로 보낸 수신 메시지 시각(epoch ms) — '방별 첫 신규만' 중복 발송 방지.
-    conn.execute("ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS last_notified_time BIGINT")
+    # (samsam_accounts.provider / samsam_chat_rooms.host_or_guest·last_read_at·
+    #  counterpart_nickname·last_notified_time 등 신규 컬럼은 _COLUMN_MIGRATIONS 로 보강)
     # 채팅방별 메시지(RTDB live/messagelist/{room_key}).
     conn.execute("""
     CREATE TABLE IF NOT EXISTS samsam_chat_messages (
@@ -585,6 +602,8 @@ def init_db(force=False):
         room_id  INTEGER PRIMARY KEY,
         sido     TEXT
     )""")
+    # 신규 DB에서도 CREATE에 없는 컬럼(month_occ·kakao_*·provider 등)을 동일 목록으로 보강.
+    _run_column_migrations(conn)
     for idx in [
         "CREATE INDEX IF NOT EXISTS ix_l_region ON listings(sido,sigungu,dong)",
         "CREATE INDEX IF NOT EXISTS ix_l_deposit ON listings(deposit)",

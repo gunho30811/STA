@@ -163,13 +163,37 @@ h2.sec {
   color: #4b5563;
 }
 
-.fg input {
+.fg input,
+.fg select {
   padding: 7px 9px;
   border: 1px solid #d1d5db;
   border-radius: 7px;
   font-size: 13px;
   min-width: 160px;
+  background: #fff;
 }
+
+.fg select {
+  min-width: 130px;
+  cursor: pointer;
+}
+
+/* 계정 카드의 공급자 배지(삼삼엠투 / 리브애니웨어) */
+.provider-tag {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #4f46e5;
+  background: #eef2ff;
+  border-radius: 5px;
+  padding: 1px 6px;
+  margin-right: 6px;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+/* 공급자별 색 구분 — 삼삼=인디고, 리브애니웨어=틸 */
+.provider-tag.samsam { color: #4f46e5; background: #eef2ff; }
+.provider-tag.liveanywhere { color: #0d9488; background: #d3f3ee; }
 
 .msg {
   font-size: 12px;
@@ -219,6 +243,18 @@ h2.sec {
   gap: 6px;
 }
 
+.room .rn .rn-tags {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+/* 방 목록 안에선 공급자 배지를 조금 작게 */
+.room .rn .provider-tag {
+  font-size: 9px;
+  padding: 0 5px;
+  margin-right: 0;
+}
 .room .rn .lbl {
   font-size: 10.5px;
   font-weight: 700;
@@ -228,6 +264,17 @@ h2.sec {
   border-radius: 6px;
   white-space: nowrap;
 }
+
+/* 리브애니웨어(수신 전용) 방의 답장 불가 안내 */
+.sendbar-off {
+  font-size: 12px;
+  color: #6b7280;
+  background: #f8fafc;
+  border-top: 1px solid #e5e7eb;
+  padding: 12px 14px;
+  line-height: 1.5;
+}
+.sendbar-off b { color: #0d9488; }
 
 .room .last {
   color: #6b7280;
