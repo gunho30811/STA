@@ -985,7 +985,7 @@ padding:8px 15px;border-radius:8px;text-decoration:none}
 .ic{display:inline-flex;vertical-align:-0.15em;margin-right:6px}
 .ic svg{width:1em;height:1em;display:block}
 .ic-brand{color:var(--brand)}
-h1{font-size:22px;font-weight:900;margin:4px 0 2px;letter-spacing:-.01em}
+h1{font-size:28px;font-weight:900;margin:4px 0;letter-spacing:-.01em}
 .sub{color:var(--text-sub);font-size:13px;margin:0;line-height:1.6}
 .sec-label{font-size:17px;font-weight:700;color:var(--text-sub);margin:0 0 9px}
 /* 상단 — 왼쪽 제목/설명, 오른쪽 매물유형 탭 + 초기화 (좁은 화면에서 아래로 줄바꿈).
@@ -1000,12 +1000,12 @@ padding:22px 24px;margin-bottom:32px}
 .top-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .type-tabs{display:flex;align-items:center;gap:6px}
 .type-label{font-size:12px;color:var(--text-sub);margin-right:4px}
-.tab{border:none;background:var(--field-bg);color:var(--text-sub);font-size:12.5px;
+.tab{border:none;background:var(--field-bg);color:var(--text-sub);font-size:12px;
 font-weight:600;padding:7px 14px;border-radius:999px;cursor:pointer;font-family:inherit;
 white-space:nowrap;transition:background .15s,color .15s}
 .tab:hover{color:var(--text)}
 .tab.active{background:var(--brand);color:#fff}
-.reset-btn{border:none;background:var(--field-bg);color:var(--text-sub);font-size:12.5px;
+.reset-btn{border:none;background:var(--field-bg);color:var(--text-sub);font-size:12px;
 font-weight:600;padding:7px 14px;border-radius:999px;cursor:pointer;font-family:inherit;
 white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
 .reset-btn:hover{color:var(--text);background:#E2E2F0}
@@ -1036,33 +1036,34 @@ color:var(--text);text-align:right;width:100%;font-family:inherit}
 /* 접기(details) 없이 항상 펼친 상태 — 클릭해야 보이는 게 불친절하다는 피드백(장효령, 08-06) */
 .more{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
 .more-title{font-size:14px;font-weight:700;color:var(--text);line-height:1;margin:0 0 2px}
-/* 공실률 설정 카드 헤더 — 좌: 라벨+타이틀, 우: 큰 일수 숫자 */
-.vac-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:20px}
+/* 공실률 설정 카드 헤더 — 왼쪽→오른쪽으로 읽는 순서에 맞춰 세로 스택(2026-08-21 이전엔
+   예약일수 숫자가 우측에 따로 떨어져 있어 눈이 갈 곳이 헷갈린다는 피드백으로 변경) —
+   안내문구 → 타이틀 → 숫자값 순서로, 전부 왼쪽 정렬 */
+.vac-head{margin-bottom:20px}
 .vac-eyebrow{font-size:12px;color:var(--text-sub);margin:0 0 2px}
+/* docs/design-system.md 결과 존 규칙: 공유 클래스 .vac-eyebrow의 margin(2px)은 시나리오/시장비교
+   쪽에도 쓰여서 여기서 직접 못 고침 — .vac-head 안에서만 4px로 스코프해서 덮어씀 */
+.vac-head .vac-eyebrow{margin:0 0 4px}
 .vac-head h2{font-size:14px;font-weight:700;margin:0}
-.vac-num{text-align:right}
-.vac-num b{display:block;font-size:28px;font-weight:700;color:var(--brand);line-height:1}
-.vac-num span{display:block;font-size:11px;color:var(--text-sub);margin-top:2px}
+.vac-num{display:flex;align-items:baseline;gap:8px;margin-top:12px}
+.vac-num b{font-size:24px;font-weight:700;color:var(--brand);line-height:1}
+.vac-num span{font-size:12px;color:var(--text-sub)}
 .vac-range{width:100%;accent-color:var(--brand)}
-.scale{display:flex;justify-content:space-between;font-size:11px;color:var(--text-sub);margin-top:6px}
-.vac-insight{display:flex;align-items:center;gap:8px;margin-top:16px;padding:10px 14px;
-border-radius:12px;font-size:12.5px;font-weight:600}
-.vac-insight.safe{background:var(--profit-bg);color:var(--profit)}
-.vac-insight.unsafe{background:var(--loss-bg);color:var(--loss)}
+.scale{display:flex;justify-content:space-between;font-size:12px;color:var(--text-sub);margin-top:8px}
+.vac-insight{display:flex;align-items:center;gap:12px;margin-top:16px;padding:12px 16px;
+background:#fff;border:1px solid #3d25b5;border-radius:12px;font-size:14px;font-weight:600;color:var(--text)}
 .vac-insight svg{flex:none}
 .pos{color:var(--profit)}.pos-brand{color:var(--brand)}.neg{color:var(--loss)}
 .vac{margin-top:0}
-.vac h2{margin-top:0;display:flex;align-items:center;font-size:20px}
-.vac h2 .ic{margin-right:7px}
 .vac-scroll{overflow-x:auto}
-.vac table{width:100%;min-width:280px;border-collapse:collapse;font-size:12.5px}
+.vac table{width:100%;min-width:280px;border-collapse:collapse;font-size:12px}
 .vac th,.vac td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--line)}
 .vac th{color:var(--text-sub);font-weight:700}.vac td:first-child,.vac th:first-child{text-align:left}
 .vac tbody tr{cursor:pointer;transition:background .1s}
 .vac tbody tr:hover,.vac tbody tr.active{background:var(--field-bg)}
 .vac tbody tr.active td:first-child{color:var(--brand);font-weight:700}
-.hero-card{padding:24px 22px}
-.hero-sub{font-size:12px;color:var(--text-sub);margin:0 0 8px}
+.hero-card{padding:24px 24px}
+.hero-sub{font-size:14px;color:var(--text-sub);margin:0 0 8px}
 .hero-row{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
 /* line-height 명시 필수 — 유니코드 마이너스(−)가 Pretendard에 없어 폴백 폰트로
    렌더되면서 그 줄만 줄높이가 커져 카드가 세로로 늘어나는 버그가 있었음.
@@ -1095,17 +1096,17 @@ font-size:14px;font-weight:700;color:var(--text);font-family:inherit}
 .week-mini .hl b{font-size:17px}
 /* 손익분기 슬라이더 — App.tsx 그대로: 초록 반투명 fill=안전구간(0~손익분기일),
    손잡이=지금 선택한 공실일수 위치(안전이면 브랜드색, 아니면 손실색) */
-.gauge-caption{font-size:13px;font-weight:700;margin:2px 0 14px}
+.gauge-caption{font-size:20px;font-weight:700;margin:4px 0 16px}
 .gauge2-track{position:relative;height:10px;background:var(--field-bg);border-radius:999px}
 .gauge2-safe{position:absolute;inset:0 auto 0 0;top:0;bottom:0;left:0;background:var(--profit);
 opacity:.15;border-radius:999px;transition:width .15s}
 .gauge2-thumb{position:absolute;top:50%;transform:translateY(-50%);width:16px;height:16px;
 border-radius:999px;background:var(--brand);border:2px solid #fff;
-box-shadow:0 1px 4px rgba(27,27,58,.25);transition:left .15s,background .15s}
+transition:left .15s,background .15s}
 .gauge2-thumb.unsafe{background:var(--loss)}
-.gauge2-cap{display:flex;justify-content:space-between;font-size:11px;font-weight:700;margin-top:10px}
+.gauge2-cap{display:flex;justify-content:space-between;font-size:12px;font-weight:700;margin-top:12px}
 /* 공실률별 시나리오 막대그래프 — 클릭하면 공실일수 슬라이더 값이 그 날짜로 바뀐다 */
-.scenario-title{font-size:14px;font-weight:700;margin:2px 0 16px}
+.scenario-title{font-size:20px;font-weight:700;margin:2px 0 16px}
 .scenario-chart{display:flex;align-items:flex-end;gap:6px;height:96px;margin-bottom:16px}
 .sbar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;cursor:pointer}
 .sbar-track{flex:1;display:flex;align-items:flex-end;width:100%}
@@ -1116,7 +1117,7 @@ box-shadow:0 1px 4px rgba(27,27,58,.25);transition:left .15s,background .15s}
 .market-card{margin-top:0}
 .market-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
 margin-bottom:20px;flex-wrap:wrap}
-.market-title{font-size:15px;font-weight:700;margin:0}
+.market-title{font-size:20px;font-weight:700;margin:0}
 /* 네이티브 select는 펼친 옵션 목록을 OS가 직접 그려서 CSS로 스타일링이 안 되므로
    버튼+직접 그린 목록으로 만든 커스텀 드롭다운으로 교체 */
 .market-region-wrap{position:relative}
@@ -1130,7 +1131,7 @@ color:var(--text-sub);transition:transform .15s}
 background:#fff;border-radius:12px;box-shadow:0 12px 32px -8px rgba(27,27,58,.25);
 padding:6px;z-index:30}
 .market-region-menu.show{display:block}
-.market-region-opt{display:block;width:100%;text-align:left;padding:8px 12px;font-size:12.5px;
+.market-region-opt{display:block;width:100%;text-align:left;padding:8px 12px;font-size:12px;
 border-radius:8px;cursor:pointer;background:none;border:none;font-family:inherit;
 color:var(--text);white-space:nowrap}
 .market-region-opt:hover{background:var(--field-bg)}
@@ -1140,7 +1141,7 @@ background:var(--field-bg);border-radius:12px;margin-bottom:20px}
 .market-mine{font-size:20px;font-weight:700;color:var(--brand);margin:0;font-variant-numeric:tabular-nums}
 /* 옅은 틴트 뱃지는 하이라이트 박스(연보라 배경) 위에서 거의 안 보였음 —
    토스류 상태칩처럼 색을 꽉 채운 solid fill + 흰 글자로 위계를 확실히 줌 */
-.market-badge{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:800;
+.market-badge{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;
 background:var(--brand);color:#fff;padding:6px 12px;border-radius:999px}
 .market-badge.neg{background:var(--loss)}
 .market-badge svg{flex:none}
@@ -1160,16 +1161,15 @@ padding-top:16px;border-top:1px solid var(--line)}
 .market-foot span.sep{margin:0 6px;color:var(--line)}
 .kpi3{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:0}
 @media(max-width:480px){.kpi3{grid-template-columns:1fr}}
-.kpi3-cell{background:var(--field-bg);border-radius:16px;padding:16px 18px}
+.kpi3-cell{background:var(--field-bg);border-radius:16px;padding:16px 16px}
 .kpi3-cell.warn{background:var(--gold-bg)}
 .kpi3-cell.neg{background:var(--loss-bg)}
 .kpi3-cell.posbg{background:var(--profit-bg)}
-.kpi3-cell .l{font-size:12.5px;color:var(--text-sub);margin-bottom:6px}
-.kpi3-cell.warn .l{color:var(--gold);font-weight:700}
+.kpi3-cell .l{font-size:14px;color:var(--text-sub);margin-top:0;margin-bottom:8px}
 .kpi3-cell .v{font-size:20px;font-weight:700;white-space:nowrap}   /* '+145,385 / 원' 줄바꿈 방지 */
 .kpi3-cell .v.warn{color:var(--gold)}.kpi3-cell .v.neg{color:var(--loss)}.kpi3-cell .v.pos{color:var(--profit)}
 .kpi3-paren{font-size:13px;font-weight:600;color:var(--text-sub)}
-.kpi3-sub{font-size:11.5px;color:var(--text-sub);margin-top:4px}
+.kpi3-sub{font-size:12px;color:var(--text-sub);margin-top:4px}
 /* 박스는 아이콘(13x13) 크기 그대로 — vertical-align:middle로 라벨 글자와 정확히
    가운데 정렬. 히트 영역 확장은 박스 크기에 전혀 영향 없는 ::before 유령 레이어로
    처리(이전엔 padding/margin으로 박스 자체를 키우다가 정렬이 계속 어긋났음) */
@@ -1204,11 +1204,11 @@ padding:11px 20px;border-radius:12px;text-decoration:none}
 .field-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
 .field-grid2:first-of-type{margin-top:16px}
 @media(max-width:480px){.field-grid2{grid-template-columns:1fr}}
-.field label{display:block;font-size:12.5px;color:var(--text-sub);margin-bottom:6px}
+.field label{display:block;font-size:12px;color:var(--text-sub);margin-bottom:6px}
 .field-full{margin-top:14px}
-.field-full label{display:block;font-size:12.5px;color:var(--text-sub);margin-bottom:6px}
+.field-full label{display:block;font-size:12px;color:var(--text-sub);margin-bottom:6px}
 /* 수수료·부가세 — 체크박스+% 입력을 field-grid2 셀 하나에 맞춤 */
-.field-opt label.opt{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-sub);
+.field-opt label.opt{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-sub);
 margin-bottom:6px;cursor:pointer}
 .field-opt .opt input[type=checkbox]{width:14px;height:14px;accent-color:var(--brand);cursor:pointer}
 .host-fee-note{font-size:12px;color:var(--text-sub);line-height:1.6;margin:2px 4px 0}
@@ -1271,12 +1271,16 @@ margin-bottom:6px;cursor:pointer}
     <div class=field-grid2>
       <div class=field><label>주간 임대료<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><span class=info-tip>1주 기준 게스트에게 받는 임대료</span></span></label>
         <div class=field-box><input id=i_wrent type=number value=30><span class=unit>만원</span></div></div>
-      <div class=field><label>청소·관리비<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><span class="info-tip nowrap">퇴실 시 게스트에게 별도 청구하는 청소비</span></span></label>
-        <div class=field-box><input id=i_wmgmt type=number value=6><span class=unit>만원</span></div></div>
+      <div class=field><label>관리비<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><span class="info-tip nowrap">1주 기준 게스트에게 받는 관리비</span></span></label>
+        <div class=field-box><input id=i_wmgmt type=number value=5><span class=unit>만원</span></div></div>
     </div>
     <div class=field-grid2>
-      <div class=field><label>플랫폼 수수료<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><span class=info-tip>삼삼엠투 등 플랫폼 수수료율<br>(총 매출 기준)</span></span></label>
+      <div class=field><label>청소비<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><span class="info-tip nowrap">퇴실 시 게스트에게 별도 청구하는 청소비. 편의상 월 1회 정산으로 계산(수수료·부가세 미적용)</span></span></label>
+        <div class=field-box><input id=i_wclean type=number value=5><span class=unit>만원</span></div></div>
+      <div class=field><label>플랫폼 수수료<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><span class=info-tip>삼삼엠투 등 플랫폼 수수료율<br>(주간 임대료+관리비 기준. 청소비는 미포함)</span></span></label>
         <div class=field-box><input id=i_fee type=number value=3.3 step=0.1 min=0><span class=unit>%</span></div></div>
+    </div>
+    <div class=field-grid2>
       <div class=field><label>부가가치세<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><span class=info-tip>일반과세자 10%, 간이과세자 0%</span></span></label>
         <div class=field-box><input id=i_vat type=number value=0 step=0.1 min=0><span class=unit>%</span></div></div>
     </div>
@@ -1291,7 +1295,7 @@ margin-bottom:6px;cursor:pointer}
   <div class=right-col>
   <div class=box>
     <div class=vac-head>
-      <div><p class=vac-eyebrow>한 달에 며칠이나 예약될까요?</p><h2>예약일수 설정</h2></div>
+      <h2>예약일수 설정</h2>
       <div class=vac-num><b id=o_vacpct>0일 예약</b><span id=o_vacsub>31일 공실</span></div>
     </div>
     <input type=range id=i_vacancy min=0 max=31 step=1 value=28 class=vac-range>
@@ -1299,7 +1303,7 @@ margin-bottom:6px;cursor:pointer}
     <div class=vac-insight id=o_vinsight>-</div>
   </div>
   <div class="box hero-card">
-  <p class=hero-sub>월 순수익</p>
+  <h2 class=hero-sub>월 순수익</h2>
   <div class=hero-row>
     <span class=hero-num id=o_heromonth>-</span>
     <span class=hero-annual id=o_heroyear>-</span>
@@ -1307,19 +1311,18 @@ margin-bottom:6px;cursor:pointer}
   </div>
   <div class=kpi3>
   <div class="kpi3-cell warn" id=o_kpi_be>
-    <div class=l>손익분기</div>
+    <h2 class=l>손익분기</h2>
     <div class=v id=o_bevalue>월 -일 예약</div>
     <div class=kpi3-sub id=o_besub>최대 -일 공실 허용</div>
   </div>
   <div class="kpi3-cell warn" id=o_kpi_margin>
-    <div class=l>영업이익률</div>
+    <h2 class=l>영업이익률</h2>
     <div class=v id=o_margin>-</div>
     <div class=kpi3-sub id=o_marginsub>공실 -일 기준</div>
   </div>
 </div>
 <div class="box gauge-card">
-  <p class=vac-eyebrow>언제부터 돈을 벌까</p>
-  <p class=gauge-caption>월 <b id=o_gbeflag class=pos-brand>-</b>일 이하 공실이면 흑자</p>
+  <h2 class=gauge-caption>월 <b id=o_gbeflag class=pos-brand>-</b>일 이하 공실이면 흑자</h2>
   <div class=gauge2-track>
     <div class=gauge2-safe id=o_gsafe style="width:0%"></div>
     <div class=gauge2-thumb id=o_gthumb style="left:0%"></div>
@@ -1344,7 +1347,7 @@ margin-bottom:6px;cursor:pointer}
 </div>
 <div class="box market-card">
   <div class=market-head>
-    <div><p class=vac-eyebrow>비슷한 매물과 비교하면</p><h3 class=market-title>나는 얼마나 벌고 있을까요?</h3></div>
+    <div><p class=vac-eyebrow>비슷한 매물과 비교하면</p><h2 class=market-title>나는 얼마나 벌고 있을까요?</h2></div>
     <div class=market-region-wrap>
       <button type=button class=market-region id=i_region_btn><span id=i_region_label>전국</span>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
@@ -1457,27 +1460,32 @@ function calc(){
   var v=function(id){return parseFloat(document.getElementById(id).value)||0}
   var monthlyRent=v('i_rent'), deposit=v('i_dep'), depositRate=v('i_deprate')
   var mainFee=v('i_mgmt'), telecom=v('i_net'), supplies=v('i_clean'), rentalGoods=v('i_supply')
-  var weeklyRent=v('i_wrent'), weeklyClean=v('i_wmgmt')
+  var weeklyRent=v('i_wrent'), weeklyMgmt=v('i_wmgmt'), cleaningFee=v('i_wclean')
   var commission=v('i_fee'), vat=v('i_vat')
   // 슬라이더는 "예약일수"를 직접 받는다(0=한달공실~31=풀예약) — 기존 계산식은
   // 전부 공실일수(vacancy) 기준이라 여기서 한 번만 뒤집어서 넘겨준다
   var bookedDays=v('i_vacancy'), vacancy=31-bookedDays
 
-  var weeklyGross=weeklyRent+weeklyClean
+  var weeklyGross=weeklyRent+weeklyMgmt
   var weeklyDeduct=weeklyGross*(commission+vat)/100
   var weeklyNet=weeklyGross-weeklyDeduct
+  // 청소비: 관리비와 달리 매주 반복이 아니라 편의상 월 1회 정산으로 계산. 플랫폼
+  // 수수료·부가세도 안 붙고(순수 청소비 그대로), 공실률과 무관하게 매달 고정으로 더한다.
+  var cleaningMo=cleaningFee
 
   var depositInterest=deposit*depositRate/100/12
   var supplyMo=(supplies+rentalGoods)/10000*WPM
   var totalCost=monthlyRent+depositInterest+mainFee/10000+telecom/10000+supplyMo
 
-  var monthlyNet100=weeklyNet*WPM   // 완전가동(공실 0일) 가정 월 순수익(비용 반영 전)
-  var beVacancyPct=monthlyNet100>0?Math.min(99,Math.max(0,(1-totalCost/monthlyNet100)*100)):0
+  var monthlyNet100=weeklyNet*WPM   // 완전가동(공실 0일) 가정 월 순수익(청소비·고정지출 반영 전)
+  // 청소비는 공실률과 무관한 고정 수익이라, 손익분기 계산에서는 고정지출에서 미리 뺀 것과 같다
+  var fixedNet=totalCost-cleaningMo
+  var beVacancyPct=monthlyNet100>0?Math.min(99,Math.max(0,(1-fixedNet/monthlyNet100)*100)):0
   var beVacancyDays=Math.floor(beVacancyPct/100*31)
-  var beOccupiedRaw=totalCost/(monthlyNet100/31)
+  var beOccupiedRaw=fixedNet/(monthlyNet100/31)
   var beOccupiedDays=isFinite(beOccupiedRaw)?Math.ceil(beOccupiedRaw):null   // 0/0 → NaN 가드
 
-  var effRevenue=monthlyNet100*(1-vacancy/31)
+  var effRevenue=monthlyNet100*(1-vacancy/31)+cleaningMo
   var monthlyProfit=effRevenue-totalCost
   var annualProfit=monthlyProfit*12
   var opMargin=effRevenue>0?(monthlyProfit/effRevenue)*100:(monthlyProfit>0?100:-100)
@@ -1503,17 +1511,22 @@ function calc(){
   document.getElementById('o_heroyear').textContent='연간 '+fmtWon(annualProfit,true)
 
   var insight=document.getElementById('o_vinsight')
-  insight.className='vac-insight '+(safeVacancy?'safe':'unsafe')
-  insight.textContent='월 '+bookedDays+'일 예약이면 '+(safeVacancy?
-    '흑자예요. 아래에서 순수익을 확인해보세요.':
-    ('적자예요. 손익분기는 월 '+(beOccupiedDays===null?'-':beOccupiedDays)+'일이에요.'))
+  if(safeVacancy){
+    insight.style.display='none'
+  }else{
+    insight.style.display=''
+    insight.className='vac-insight unsafe'
+    var moreDays=beOccupiedDays===null?null:Math.max(0,beOccupiedDays-bookedDays)
+    insight.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>'+
+      (moreDays===null?'예약을 늘리면':moreDays+'일 더 예약되면')+' 흑자로 바뀌어요</span>'
+  }
 
-  set('o_bevalue','월 '+(beOccupiedDays===null?'-':beOccupiedDays)+'일 예약')
+  set('o_bevalue','월 '+(beOccupiedDays===null?'-':beOccupiedDays)+'일 예약',safeVacancy?'pos':'neg')
   document.getElementById('o_besub').textContent='최대 '+beVacancyDays+'일 공실 허용'
-  document.getElementById('o_kpi_be').className='kpi3-cell '+(safeVacancy?'warn':'neg')
-  set('o_margin',opMargin.toFixed(1)+'%',opMargin>20?'pos':opMargin>0?'warn':'neg')
+  document.getElementById('o_kpi_be').className='kpi3-cell '+(safeVacancy?'posbg':'neg')
+  set('o_margin',opMargin.toFixed(1)+'%',opMargin>0?'pos':'neg')
   document.getElementById('o_marginsub').textContent='공실 '+vacancy+'일 기준'
-  document.getElementById('o_kpi_margin').className='kpi3-cell '+(opMargin>20?'posbg':opMargin>0?'warn':'neg')
+  document.getElementById('o_kpi_margin').className='kpi3-cell '+(opMargin>0?'posbg':'neg')
 
   // 손익분기 슬라이더 — 안전구간 fill(0~beVacancyDays)은 고정, 손잡이는 현재 vacancy 위치
   document.getElementById('o_gbeflag').textContent=monthlyNet100>0?beVacancyDays:'-'
@@ -1524,7 +1537,7 @@ function calc(){
 
   // 공실률별 시나리오 — App.tsx SCENARIOS_DAYS 그대로, 막대/표 행 클릭 시 공실일수 슬라이더 이동
   var scenarios=SCENARIOS_DAYS.map(function(days){
-    return {days:days,profit:monthlyNet100*(1-days/31)-totalCost}
+    return {days:days,profit:monthlyNet100*(1-days/31)+cleaningMo-totalCost}
   })
   var maxAbs=Math.max.apply(null,scenarios.map(function(s){return Math.abs(s.profit)}))||1
   var chart=document.getElementById('o_schart'),ch=''
@@ -1567,9 +1580,9 @@ document.addEventListener('click',function(){
 })
 // 매물유형 프리셋 — design/culc_redesign/src/app/App.tsx의 PRESETS/selectPropType 그대로 이식
 var PRESETS={
-  '원룸':{rent:60,dep:500,mgmt:150000,wrent:30,wmgmt:6},
-  '빌라·주택':{rent:70,dep:1000,mgmt:150000,wrent:38,wmgmt:7},
-  '오피스텔':{rent:80,dep:3000,mgmt:200000,wrent:45,wmgmt:7}
+  '원룸':{rent:60,dep:500,mgmt:150000,wrent:30,wmgmt:5,wclean:5},
+  '빌라·주택':{rent:70,dep:1000,mgmt:150000,wrent:38,wmgmt:9,wclean:8},
+  '오피스텔':{rent:80,dep:3000,mgmt:200000,wrent:45,wmgmt:6,wclean:5}
 }
 function setv(id,val){document.getElementById(id).value=val}
 function selectPropType(btn){
@@ -1583,7 +1596,7 @@ function selectPropType(btn){
   btn.classList.add('active')
   var p=PRESETS[type]
   setv('i_rent',p.rent); setv('i_dep',p.dep); setv('i_mgmt',p.mgmt)
-  setv('i_wrent',p.wrent); setv('i_wmgmt',p.wmgmt)
+  setv('i_wrent',p.wrent); setv('i_wmgmt',p.wmgmt); setv('i_wclean',p.wclean)
   // 유형과 무관하게 항상 이 고정값으로 리셋(App.tsx selectPropType과 동일)
   setv('i_deprate',3.5); setv('i_net',20000); setv('i_clean',15000); setv('i_supply',20000)
   setv('i_fee',3.3); setv('i_vat',0); setv('i_vacancy',28)
@@ -1591,7 +1604,7 @@ function selectPropType(btn){
 }
 function resetAll(){
   ['i_rent','i_dep','i_deprate','i_mgmt','i_net','i_clean','i_supply',
-   'i_wrent','i_wmgmt','i_fee','i_vat','i_vacancy'].forEach(function(id){setv(id,0)})
+   'i_wrent','i_wmgmt','i_wclean','i_fee','i_vat','i_vacancy'].forEach(function(id){setv(id,0)})
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active')})
   calc()
 }
