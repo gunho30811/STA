@@ -952,46 +952,73 @@ def init_auth(app, demo_endpoints=None):
 
 
 def _nav_html():
-    admin = ('<a href="/auth/crawl">크롤 현황</a><a href="/auth/members">회원 관리</a>'
+    """로그인 상태 공통 헤더. 흰 배경 + 하단 hairline + 현재 메뉴 활성표시(토스식 정리).
+    이전엔 진한 남색(#0f172a) 바라 페이지 본문(흰/연회색)과 톤이 끊겼고, 비로그인 헤더와도
+    생김새가 달랐다. 둘을 같은 규격(높이 56px·브랜드 20px·메뉴 15px)으로 맞춘다."""
+    path = request.path or "/"
+    def item(href, label, exact=False):
+        on = (path == href) if exact else path.startswith(href)
+        return f'<a href="{href}"{" class=on" if on else ""}>{label}</a>'
+
+    admin = (item("/auth/crawl", "크롤 현황") + item("/auth/members", "회원 관리")
              if session.get("role") == "admin" else "")
-    # 브랜드 로고 + 메뉴. 데스크탑은 가로 메뉴, 모바일은 햄버거(순수 CSS 체크박스 토글, JS 불필요).
     return f"""<input type=checkbox id=__navtog hidden>
 <nav id=__nav>
   <div class=__inner>
     <a class=__brand href="/">ren<b>dit</b></a>
-    <label for=__navtog class=__ham aria-label="메뉴">☰</label>
+    <label for=__navtog class=__ham aria-label="메뉴">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </label>
     <div class=__menu>
-      <a href="/profit/">수익성</a>
-      <a href="/samsam/">렌트 분석</a>
-      <a href="/map">지도</a>
-      <a href="/calc">계산기</a>
-      <a href="/gangnam/">부동산매물</a>
-      <a href="/samsam/chat/">통합채팅</a>
-      <a href="/auth/kakao?notify=1" title="새 채팅이 오면 내 카카오톡으로 알림">🔔 카톡알림</a>
+      {item("/profit/", "수익성")}
+      {item("/samsam/chat/", "통합채팅")}
+      {item("/samsam/", "렌트 분석")}
+      {item("/map", "지도", True)}
+      {item("/calc", "계산기", True)}
+      {item("/gangnam/", "부동산매물")}
       {admin}
-      <a href="/auth/logout" class=__logout>로그아웃</a>
+      <div class=__right>
+        <a href="/auth/kakao?notify=1" class=__notify title="새 채팅이 오면 내 카카오톡으로 알림">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path
+            d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0
+            .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>
+          </svg>카톡알림</a>
+        <a href="/auth/logout" class=__logout>로그아웃</a>
+      </div>
     </div>
   </div>
 </nav>
 <style>
-#__nav{{position:sticky;top:0;z-index:9999;background:#0f172a;color:#e2e8f0;
-font-family:'Pretendard','Malgun Gothic',sans-serif;box-shadow:0 1px 6px rgba(0,0,0,.2)}}
-/* 풀폭 좌측 정렬 — 지도 등 풀스크린 페이지에서 로고가 화면 좌측에 붙게(중앙 쏠림 제거) */
-#__nav .__inner{{width:100%;
-display:flex;align-items:center;gap:8px;padding:14px 24px}}
-#__nav .__brand{{font-size:24px;font-weight:900;color:#fff;text-decoration:none;letter-spacing:-.02em;margin-right:auto}}
-#__nav .__brand b{{color:#8b7dff;font-weight:900}}
-#__nav .__menu{{display:flex;align-items:center;gap:4px}}
-#__nav .__menu a{{color:#cbd5e1;text-decoration:none;padding:8px 14px;border-radius:8px;font-weight:600;font-size:15px;white-space:nowrap}}
-#__nav .__menu a:hover{{background:#1e293b;color:#fff}}
-#__nav .__menu .__logout{{color:#94a3b8}}
-#__nav .__ham{{display:none;font-size:24px;color:#e2e8f0;cursor:pointer;padding:2px 8px;user-select:none}}
-@media(max-width:640px){{
-  #__nav .__inner{{padding:12px 18px}}
-  #__nav .__ham{{display:block}}
-  #__nav .__menu{{display:none;position:absolute;top:100%;left:0;right:0;background:#0f172a;
-    flex-direction:column;align-items:stretch;padding:6px 10px 12px;gap:0;box-shadow:0 8px 20px rgba(0,0,0,.35)}}
+#__nav{{position:sticky;top:0;z-index:9999;background:rgba(255,255,255,.92);
+backdrop-filter:blur(12px);border-bottom:1px solid #E7E9F3;
+font-family:'Pretendard','Malgun Gothic',sans-serif}}
+#__nav .__inner{{width:100%;display:flex;align-items:center;gap:8px;padding:0 24px;height:56px}}
+#__nav .__brand{{font-size:20px;line-height:28px;font-weight:800;color:#1B1B3A;
+text-decoration:none;letter-spacing:-.02em;margin-right:20px}}
+#__nav .__brand b{{color:#4D2EE9;font-weight:800}}
+#__nav .__menu{{display:flex;align-items:center;gap:4px;flex:1}}
+#__nav .__menu a{{color:#5A5A7A;text-decoration:none;padding:8px 12px;border-radius:8px;
+font-weight:600;font-size:15px;line-height:20px;white-space:nowrap;
+transition:background .15s,color .15s}}
+#__nav .__menu a:hover{{background:#F2F2F8;color:#1B1B3A}}
+#__nav .__menu a.on{{color:#4D2EE9;background:#EFECFE}}
+#__nav .__right{{margin-left:auto;display:flex;align-items:center;gap:4px}}
+#__nav .__notify{{display:inline-flex;align-items:center;gap:4px;color:#5A5A7A}}
+#__nav .__notify svg{{flex:none}}
+#__nav .__logout{{color:#8080A8;font-size:14px}}
+#__nav .__ham{{display:none;color:#5A5A7A;cursor:pointer;padding:4px 8px;user-select:none}}
+#__nav a:focus-visible,#__nav label:focus-visible{{outline:2px solid #4D2EE9;outline-offset:2px}}
+@media(max-width:900px){{
+  #__nav .__inner{{padding:0 16px;height:52px}}
+  #__nav .__ham{{display:flex;margin-left:auto}}
+  #__nav .__menu{{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;
+    flex-direction:column;align-items:stretch;padding:8px 12px 12px;gap:0;
+    border-bottom:1px solid #E7E9F3;box-shadow:0 8px 20px rgba(27,27,58,.08)}}
   #__navtog:checked ~ #__nav .__menu{{display:flex}}
-  #__nav .__menu a{{padding:12px 10px;border-bottom:1px solid #1e293b;font-size:15.5px}}
+  #__nav .__menu a{{padding:12px;border-radius:8px;font-size:15px}}
+  #__nav .__right{{margin-left:0;flex-direction:column;align-items:stretch;
+    border-top:1px solid #E7E9F3;margin-top:8px;padding-top:8px}}
 }}
 </style>"""

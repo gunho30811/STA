@@ -582,14 +582,16 @@ a{color:var(--accent);text-decoration:none}
 img,svg{max-width:100%}
 
 /* 헤더 */
+/* 로그인 헤더(#__nav)와 같은 규격 — 높이 56px·브랜드 20px·hairline 하단선 */
 .hd{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);
 border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;
-padding:14px 40px;flex-wrap:wrap;gap:10px}
-.brand{font-size:21px;font-weight:900;letter-spacing:-.02em;color:var(--accent)}
+height:56px;padding:0 24px;gap:8px}
+.brand{font-size:20px;line-height:28px;font-weight:800;letter-spacing:-.02em;color:var(--ink)}
+.brand b{color:var(--accent);font-weight:800}
 .hd-cta{display:flex;align-items:center;gap:16px}
 .hd-cta .login{font-size:14px;font-weight:600;color:var(--mut)}
 .hd-cta .signup{font-size:14px;font-weight:700;color:var(--accent);border:1px solid #D7DBE4;padding:8px 15px;border-radius:8px}
-@media(max-width:720px){.hd{padding:12px 18px}}
+@media(max-width:720px){.hd{padding:0 16px;height:52px}}
 
 /* 히어로 */
 .hero{background:linear-gradient(180deg,#F4F6FB 0%,#FBFCFE 70%,#fff 100%);border-bottom:1px solid #EEF0F4}
@@ -714,7 +716,7 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
 
 <!-- 헤더 : 무료 도구가 1순위, 회원가입은 2순위 -->
 <header class=hd>
-  <div class=brand>rendit</div>
+  <div class=brand>ren<b>dit</b></div>
   <div class=hd-cta>
     <a class=login href="/auth/login">로그인</a>
     <a class=signup href="/auth/signup">회원가입</a>
@@ -871,7 +873,7 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
 </section>
 
 <footer class=foot>
-  <div class=brand>rendit</div>
+  <div class=brand>ren<b>dit</b></div>
   <div>© 2026 rendit. All rights reserved.</div>
 </footer>
 
@@ -966,12 +968,13 @@ body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
 background:var(--bg);min-height:100vh;color:var(--text);padding:20px 16px 60px}
 .hd{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);
 border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;
-padding:16px 40px;margin:-20px -16px 20px}
-.hd .brand{font-size:22px;line-height:28px;font-weight:900;letter-spacing:-.02em;color:var(--brand);text-decoration:none}
+height:56px;padding:0 24px;margin:-20px -16px 20px}
+.hd .brand{font-size:20px;line-height:28px;font-weight:800;letter-spacing:-.02em;color:var(--text);text-decoration:none}
+.hd .brand b{color:var(--brand);font-weight:800}
 .hd-cta{display:flex;align-items:center;gap:16px}
 .hd-cta .login{font-size:14px;line-height:20px;font-weight:600;color:var(--text-sub);text-decoration:none}
 .hd-cta .signup{font-size:14px;line-height:20px;font-weight:700;color:var(--brand);border:1px solid var(--line);
-padding:8px 16px;border-radius:8px;text-decoration:none}
+padding:0 16px;height:36px;display:inline-flex;align-items:center;border-radius:8px;text-decoration:none}
 /* 로그인 시 auth._inject_nav가 body 시작 직후 삽입하는 공통 네비바(#__nav)도
    body의 padding에 밀리지 않게 동일하게 상쇄 — 다른 뷰어(body padding:0)와 간격 맞춤.
    주의: _inject_nav는 여는 태그 문자열을 앞에서부터 찾아 그 바로 뒤에 네비바를 끼워넣는다.
@@ -1245,7 +1248,7 @@ input[type=range]{height:28px}
 </style></head><body>
 {% if not user %}
 <header class=hd>
-  <a class=brand href="/">rendit</a>
+  <a class=brand href="/">ren<b>dit</b></a>
   <div class=hd-cta>
     <a class=login href="/auth/login">로그인</a>
     <a class=signup href="/auth/signup">회원가입</a>
