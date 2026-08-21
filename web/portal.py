@@ -947,14 +947,17 @@ color:var(--text);text-align:right;width:100%;font-family:inherit}
 /* 공실률 설정 카드 헤더 — 좌: 라벨+타이틀, 우: 큰 일수 숫자 */
 .vac-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:20px}
 .vac-eyebrow{font-size:12px;color:var(--text-sub);margin:0 0 2px}
+/* docs/design-system.md 결과 존 규칙: 공유 클래스 .vac-eyebrow의 margin(2px)은 시나리오/시장비교
+   쪽에도 쓰여서 여기서 직접 못 고침 — .vac-head 안에서만 4px로 스코프해서 덮어씀 */
+.vac-head .vac-eyebrow{margin:0 0 4px}
 .vac-head h2{font-size:14px;font-weight:700;margin:0}
 .vac-num{text-align:right}
-.vac-num b{display:block;font-size:28px;font-weight:700;color:var(--brand);line-height:1}
-.vac-num span{display:block;font-size:11px;color:var(--text-sub);margin-top:2px}
+.vac-num b{display:block;font-size:24px;font-weight:700;color:var(--brand);line-height:1}
+.vac-num span{display:block;font-size:12px;color:var(--text-sub);margin-top:4px}
 .vac-range{width:100%;accent-color:var(--brand)}
-.scale{display:flex;justify-content:space-between;font-size:11px;color:var(--text-sub);margin-top:6px}
-.vac-insight{display:flex;align-items:center;gap:8px;margin-top:16px;padding:10px 14px;
-border-radius:12px;font-size:12.5px;font-weight:600}
+.scale{display:flex;justify-content:space-between;font-size:12px;color:var(--text-sub);margin-top:8px}
+.vac-insight{display:flex;align-items:center;gap:8px;margin-top:16px;padding:12px 16px;
+border-radius:12px;font-size:14px;font-weight:600}
 .vac-insight.safe{background:var(--profit-bg);color:var(--profit)}
 .vac-insight.unsafe{background:var(--loss-bg);color:var(--loss)}
 .vac-insight svg{flex:none}
@@ -969,7 +972,7 @@ border-radius:12px;font-size:12.5px;font-weight:600}
 .vac tbody tr{cursor:pointer;transition:background .1s}
 .vac tbody tr:hover,.vac tbody tr.active{background:var(--field-bg)}
 .vac tbody tr.active td:first-child{color:var(--brand);font-weight:700}
-.hero-card{padding:24px 22px}
+.hero-card{padding:24px 24px}
 .hero-sub{font-size:12px;color:var(--text-sub);margin:0 0 8px}
 .hero-row{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
 /* line-height 명시 필수 — 유니코드 마이너스(−)가 Pretendard에 없어 폴백 폰트로
@@ -1003,15 +1006,15 @@ font-size:14px;font-weight:700;color:var(--text);font-family:inherit}
 .week-mini .hl b{font-size:17px}
 /* 손익분기 슬라이더 — App.tsx 그대로: 초록 반투명 fill=안전구간(0~손익분기일),
    손잡이=지금 선택한 공실일수 위치(안전이면 브랜드색, 아니면 손실색) */
-.gauge-caption{font-size:13px;font-weight:700;margin:2px 0 14px}
+.gauge-caption{font-size:14px;font-weight:700;margin:4px 0 16px}
 .gauge2-track{position:relative;height:10px;background:var(--field-bg);border-radius:999px}
 .gauge2-safe{position:absolute;inset:0 auto 0 0;top:0;bottom:0;left:0;background:var(--profit);
 opacity:.15;border-radius:999px;transition:width .15s}
 .gauge2-thumb{position:absolute;top:50%;transform:translateY(-50%);width:16px;height:16px;
 border-radius:999px;background:var(--brand);border:2px solid #fff;
-box-shadow:0 1px 4px rgba(27,27,58,.25);transition:left .15s,background .15s}
+transition:left .15s,background .15s}
 .gauge2-thumb.unsafe{background:var(--loss)}
-.gauge2-cap{display:flex;justify-content:space-between;font-size:11px;font-weight:700;margin-top:10px}
+.gauge2-cap{display:flex;justify-content:space-between;font-size:12px;font-weight:700;margin-top:12px}
 /* 공실률별 시나리오 막대그래프 — 클릭하면 공실일수 슬라이더 값이 그 날짜로 바뀐다 */
 .scenario-title{font-size:14px;font-weight:700;margin:2px 0 16px}
 .scenario-chart{display:flex;align-items:flex-end;gap:6px;height:96px;margin-bottom:16px}
@@ -1066,16 +1069,16 @@ padding-top:16px;border-top:1px solid var(--line)}
 .market-foot span.sep{margin:0 6px;color:var(--line)}
 .kpi3{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:0}
 @media(max-width:480px){.kpi3{grid-template-columns:1fr}}
-.kpi3-cell{background:var(--field-bg);border-radius:16px;padding:16px 18px}
+.kpi3-cell{background:var(--field-bg);border-radius:16px;padding:16px 16px}
 .kpi3-cell.warn{background:var(--gold-bg)}
 .kpi3-cell.neg{background:var(--loss-bg)}
 .kpi3-cell.posbg{background:var(--profit-bg)}
-.kpi3-cell .l{font-size:12.5px;color:var(--text-sub);margin-bottom:6px}
+.kpi3-cell .l{font-size:12px;color:var(--text-sub);margin-bottom:8px}
 .kpi3-cell.warn .l{color:var(--gold);font-weight:700}
 .kpi3-cell .v{font-size:20px;font-weight:700;white-space:nowrap}   /* '+145,385 / 원' 줄바꿈 방지 */
 .kpi3-cell .v.warn{color:var(--gold)}.kpi3-cell .v.neg{color:var(--loss)}.kpi3-cell .v.pos{color:var(--profit)}
 .kpi3-paren{font-size:13px;font-weight:600;color:var(--text-sub)}
-.kpi3-sub{font-size:11.5px;color:var(--text-sub);margin-top:4px}
+.kpi3-sub{font-size:12px;color:var(--text-sub);margin-top:4px}
 /* 박스는 아이콘(13x13) 크기 그대로 — vertical-align:middle로 라벨 글자와 정확히
    가운데 정렬. 히트 영역 확장은 박스 크기에 전혀 영향 없는 ::before 유령 레이어로
    처리(이전엔 padding/margin으로 박스 자체를 키우다가 정렬이 계속 어긋났음) */
