@@ -967,10 +967,10 @@ background:var(--bg);min-height:100vh;color:var(--text);padding:20px 14px 60px}
 .hd{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);
 border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;
 padding:14px 40px;margin:-20px -14px 20px}
-.hd .brand{font-size:21px;font-weight:900;letter-spacing:-.02em;color:var(--brand);text-decoration:none}
+.hd .brand{font-size:22px;line-height:28px;font-weight:900;letter-spacing:-.02em;color:var(--brand);text-decoration:none}
 .hd-cta{display:flex;align-items:center;gap:16px}
-.hd-cta .login{font-size:14px;font-weight:600;color:var(--text-sub);text-decoration:none}
-.hd-cta .signup{font-size:14px;font-weight:700;color:var(--brand);border:1px solid var(--line);
+.hd-cta .login{font-size:14px;line-height:20px;font-weight:600;color:var(--text-sub);text-decoration:none}
+.hd-cta .signup{font-size:14px;line-height:20px;font-weight:700;color:var(--brand);border:1px solid var(--line);
 padding:8px 15px;border-radius:8px;text-decoration:none}
 /* 로그인 시 auth._inject_nav가 body 시작 직후 삽입하는 공통 네비바(#__nav)도
    body의 padding에 밀리지 않게 동일하게 상쇄 — 다른 뷰어(body padding:0)와 간격 맞춤.
@@ -980,14 +980,14 @@ padding:8px 15px;border-radius:8px;text-decoration:none}
    이 주석에서도 그 문자열 형태를 그대로 쓰지 않는다. */
 #__nav{margin:-20px -14px 20px}
 .wrap{max-width:1120px;margin:0 auto}
-.back{display:inline-block;margin-bottom:14px;color:var(--text-sub);text-decoration:none;font-size:13px;font-weight:700}
+.back{display:inline-block;margin-bottom:14px;color:var(--text-sub);text-decoration:none;font-size:14px;line-height:20px;font-weight:700}
 .back:hover{color:var(--brand)}
 .ic{display:inline-flex;vertical-align:-0.15em;margin-right:6px}
 .ic svg{width:1em;height:1em;display:block}
 .ic-brand{color:var(--brand)}
-h1{font-size:28px;font-weight:900;margin:4px 0;letter-spacing:-.01em}
-.sub{color:var(--text-sub);font-size:13px;margin:0;line-height:1.6}
-.sec-label{font-size:17px;font-weight:700;color:var(--text-sub);margin:0 0 9px}
+h1{font-size:28px;line-height:34px;font-weight:900;margin:4px 0;letter-spacing:-.01em}
+.sub{color:var(--text-sub);font-size:14px;line-height:20px;margin:0;line-height:1.6}
+.sec-label{font-size:17px;line-height:24px;font-weight:700;color:var(--text-sub);margin:0 0 9px}
 /* 상단 — 왼쪽 제목/설명, 오른쪽 매물유형 탭 + 초기화 (좁은 화면에서 아래로 줄바꿈).
    원본은 header 밑에 별도 흰 스트립(풀블리드)이지만, 이 프로젝트는 body padding 기반이라
    카드 형태로 근사(리스크가 큰 풀블리드 마진 트릭은 .hd 하나로 충분). */
@@ -999,13 +999,13 @@ box-shadow:0 1px 2px rgba(27,27,58,.04),0 14px 28px -16px rgba(27,27,58,.15);
 padding:22px 24px;margin-bottom:32px}
 .top-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .type-tabs{display:flex;align-items:center;gap:6px}
-.type-label{font-size:12px;color:var(--text-sub);margin-right:4px}
-.tab{border:none;background:var(--field-bg);color:var(--text-sub);font-size:12px;
+.type-label{font-size:12px;line-height:16px;color:var(--text-sub);margin-right:4px}
+.tab{border:none;background:var(--field-bg);color:var(--text-sub);font-size:12px;line-height:16px;
 font-weight:600;padding:7px 14px;border-radius:999px;cursor:pointer;font-family:inherit;
 white-space:nowrap;transition:background .15s,color .15s}
 .tab:hover{color:var(--text)}
 .tab.active{background:var(--brand);color:#fff}
-.reset-btn{border:none;background:var(--field-bg);color:var(--text-sub);font-size:12px;
+.reset-btn{border:none;background:var(--field-bg);color:var(--text-sub);font-size:12px;line-height:16px;
 font-weight:600;padding:7px 14px;border-radius:999px;cursor:pointer;font-family:inherit;
 white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
 .reset-btn:hover{color:var(--text);background:#E2E2F0}
@@ -1022,81 +1022,81 @@ box-shadow:0 1px 2px rgba(27,27,58,.04),0 14px 28px -16px rgba(27,27,58,.15)}
 /* card-head를 box 패딩 밖으로 블리드시켜 하단 보더로 구분된 별도 스트립처럼 보이게 */
 .card-head{display:flex;align-items:baseline;justify-content:space-between;
 margin:-20px -20px 16px;padding:16px 20px;border-bottom:1px solid var(--line)}
-.card-head h2{font-size:14px;font-weight:700;margin:0;color:var(--text)}
-.card-head .unit-badge{font-size:11px;font-weight:700;color:var(--text-sub)}
-.hint{font-size:12px;color:var(--text-sub);margin:0 0 16px}
+.card-head h2{font-size:14px;line-height:20px;font-weight:700;margin:0;color:var(--text)}
+.card-head .unit-badge{font-size:12px;line-height:16px;font-weight:700;color:var(--text-sub)}
+.hint{font-size:12px;line-height:16px;color:var(--text-sub);margin:0 0 16px}
 .field-primary{margin:14px 0}
-.field-primary label{display:block;font-size:13px;color:var(--text-sub);margin-bottom:6px}
+.field-primary label{display:block;font-size:14px;line-height:20px;color:var(--text-sub);margin-bottom:6px}
 .field-box{display:flex;align-items:center;justify-content:flex-end;gap:6px;border:1px solid transparent;
 border-radius:12px;padding:10px 14px;background:var(--field-bg)}
 .field-box:focus-within{border-color:var(--brand);background:#fff;box-shadow:0 0 0 3px var(--brand-tint)}
-.field-box input{border:none;outline:none;background:transparent;font-size:15px;font-weight:600;
+.field-box input{border:none;outline:none;background:transparent;font-size:14px;line-height:20px;font-weight:600;
 color:var(--text);text-align:right;width:100%;font-family:inherit}
-.field-box .unit{font-size:12px;color:var(--text-sub);font-weight:500;white-space:nowrap}
+.field-box .unit{font-size:12px;line-height:16px;color:var(--text-sub);font-weight:500;white-space:nowrap}
 /* 접기(details) 없이 항상 펼친 상태 — 클릭해야 보이는 게 불친절하다는 피드백(장효령, 08-06) */
 .more{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
-.more-title{font-size:14px;font-weight:700;color:var(--text);line-height:1;margin:0 0 2px}
+.more-title{font-size:14px;line-height:20px;font-weight:700;color:var(--text);line-height:1;margin:0 0 2px}
 /* 공실률 설정 카드 헤더 — 왼쪽→오른쪽으로 읽는 순서에 맞춰 세로 스택(2026-08-21 이전엔
    예약일수 숫자가 우측에 따로 떨어져 있어 눈이 갈 곳이 헷갈린다는 피드백으로 변경) —
    안내문구 → 타이틀 → 숫자값 순서로, 전부 왼쪽 정렬 */
 .vac-head{margin-bottom:20px}
-.vac-eyebrow{font-size:12px;color:var(--text-sub);margin:0 0 2px}
+.vac-eyebrow{font-size:12px;line-height:16px;color:var(--text-sub);margin:0 0 2px}
 /* docs/design-system.md 결과 존 규칙: 공유 클래스 .vac-eyebrow의 margin(2px)은 시나리오/시장비교
    쪽에도 쓰여서 여기서 직접 못 고침 — .vac-head 안에서만 4px로 스코프해서 덮어씀 */
 .vac-head .vac-eyebrow{margin:0 0 4px}
-.vac-head h2{font-size:14px;font-weight:700;margin:0}
+.vac-head h2{font-size:14px;line-height:20px;font-weight:700;margin:0}
 .vac-num{display:flex;align-items:baseline;gap:8px;margin-top:12px}
-.vac-num b{font-size:24px;font-weight:700;color:var(--brand);line-height:1}
-.vac-num span{font-size:12px;color:var(--text-sub)}
+.vac-num b{font-size:28px;line-height:34px;font-weight:700;color:var(--brand);line-height:1}
+.vac-num span{font-size:12px;line-height:16px;color:var(--text-sub)}
 .vac-range{width:100%;accent-color:var(--brand)}
-.scale{display:flex;justify-content:space-between;font-size:12px;color:var(--text-sub);margin-top:8px}
+.scale{display:flex;justify-content:space-between;font-size:12px;line-height:16px;color:var(--text-sub);margin-top:8px}
 .vac-insight{display:flex;align-items:center;gap:12px;margin-top:16px;padding:12px 16px;
-background:#fff;border:1px solid #3d25b5;border-radius:12px;font-size:14px;font-weight:600;color:var(--text)}
+background:#fff;border:1px solid #3d25b5;border-radius:12px;font-size:14px;line-height:20px;font-weight:600;color:var(--text)}
 .vac-insight svg{flex:none}
 .pos{color:var(--profit)}.pos-brand{color:var(--brand)}.neg{color:var(--loss)}
 .vac{margin-top:0}
 .vac-scroll{overflow-x:auto}
-.vac table{width:100%;min-width:280px;border-collapse:collapse;font-size:12px}
+.vac table{width:100%;min-width:280px;border-collapse:collapse;font-size:12px;line-height:16px}
 .vac th,.vac td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--line)}
 .vac th{color:var(--text-sub);font-weight:700}.vac td:first-child,.vac th:first-child{text-align:left}
 .vac tbody tr{cursor:pointer;transition:background .1s}
 .vac tbody tr:hover,.vac tbody tr.active{background:var(--field-bg)}
 .vac tbody tr.active td:first-child{color:var(--brand);font-weight:700}
 .hero-card{padding:24px 24px}
-.hero-sub{font-size:14px;color:var(--text-sub);margin:0 0 8px}
+.hero-sub{font-size:14px;line-height:20px;color:var(--text-sub);margin:0 0 8px}
 .hero-row{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
 /* line-height 명시 필수 — 유니코드 마이너스(−)가 Pretendard에 없어 폴백 폰트로
    렌더되면서 그 줄만 줄높이가 커져 카드가 세로로 늘어나는 버그가 있었음.
    ASCII 하이픈으로 통일했지만 향후 재발 방지 차원에서도 고정해둔다. */
-.hero-num{font-size:36px;line-height:1.15;font-weight:700;letter-spacing:-.02em;white-space:nowrap}
-.hero-annual{font-size:12px;line-height:1.4;color:var(--text-sub);white-space:nowrap;font-variant-numeric:tabular-nums}
-@media(max-width:480px){.hero-num{font-size:27px}}
+.hero-num{font-size:36px;line-height:44px;line-height:1.15;font-weight:700;letter-spacing:-.02em;white-space:nowrap}
+.hero-annual{font-size:12px;line-height:16px;line-height:1.4;color:var(--text-sub);white-space:nowrap;font-variant-numeric:tabular-nums}
+@media(max-width:480px){.hero-num{font-size:28px;line-height:34px}}
 /* 매출에서 빠지는 선택 항목(플랫폼 수수료·부가세) — 체크 꺼짐이면 % 입력도 잠근다 */
 .opts{margin-top:20px;border-top:1px solid var(--line);padding-top:14px}
-.opts-title{font-size:13px;font-weight:700;color:var(--text);margin:0 0 10px}
+.opts-title{font-size:14px;line-height:20px;font-weight:700;color:var(--text);margin:0 0 10px}
 .opts-sub{font-weight:600;color:var(--text-sub)}
 .opt-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
-.opt{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer}
+.opt{display:flex;align-items:center;gap:8px;font-size:14px;line-height:20px;color:var(--text);cursor:pointer}
 .opt input[type=checkbox]{width:16px;height:16px;accent-color:var(--brand);cursor:pointer}
 .opt-val{display:flex;align-items:center;gap:5px;border:1.5px solid var(--line);border-radius:9px;
 padding:6px 10px;background:#fff}
 .opt-val input{border:none;outline:none;background:transparent;width:52px;text-align:right;
-font-size:14px;font-weight:700;color:var(--text);font-family:inherit}
+font-size:14px;line-height:20px;font-weight:700;color:var(--text);font-family:inherit}
 .opt-val:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-tint)}
 .opt-val.off{opacity:.45}
-.opt-val .unit{font-size:12px;color:var(--text-sub);font-weight:600}
-.opts-hint{font-size:11.5px;color:var(--text-sub);margin:8px 0 0;line-height:1.5}
+.opt-val .unit{font-size:12px;line-height:16px;color:var(--text-sub);font-weight:600}
+.opts-hint{font-size:12px;line-height:16px;color:var(--text-sub);margin:8px 0 0;line-height:1.5}
 /* '받는 돈' 카드 안 주 단위 요약 — 입력하는 자리에서 바로 결과가 보이게(카드 여백도 채움) */
 .week-mini{margin-top:20px;border-top:1px solid var(--line);padding-top:14px;display:grid;gap:9px}
-.week-mini>div{display:flex;justify-content:space-between;align-items:baseline;font-size:13px}
+.week-mini>div{display:flex;justify-content:space-between;align-items:baseline;font-size:14px;line-height:20px}
 .week-mini span{color:var(--text-sub)}
 .week-mini b{font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
 .week-mini .hl{margin-top:3px;padding-top:11px;border-top:1px dashed var(--line)}
 .week-mini .hl span{color:var(--text);font-weight:700}
-.week-mini .hl b{font-size:17px}
+.week-mini .hl b{font-size:17px;line-height:24px}
 /* 손익분기 슬라이더 — App.tsx 그대로: 초록 반투명 fill=안전구간(0~손익분기일),
    손잡이=지금 선택한 공실일수 위치(안전이면 브랜드색, 아니면 손실색) */
-.gauge-caption{font-size:20px;font-weight:700;margin:4px 0 16px}
+.gauge-caption{font-size:22px;line-height:28px;font-weight:700;margin:4px 0 16px}
 .gauge2-track{position:relative;height:10px;background:var(--field-bg);border-radius:999px}
 .gauge2-safe{position:absolute;inset:0 auto 0 0;top:0;bottom:0;left:0;background:var(--profit);
 opacity:.15;border-radius:999px;transition:width .15s}
@@ -1104,24 +1104,24 @@ opacity:.15;border-radius:999px;transition:width .15s}
 border-radius:999px;background:var(--brand);border:2px solid #fff;
 transition:left .15s,background .15s}
 .gauge2-thumb.unsafe{background:var(--loss)}
-.gauge2-cap{display:flex;justify-content:space-between;font-size:12px;font-weight:700;margin-top:12px}
+.gauge2-cap{display:flex;justify-content:space-between;font-size:12px;line-height:16px;font-weight:700;margin-top:12px}
 /* 공실률별 시나리오 막대그래프 — 클릭하면 공실일수 슬라이더 값이 그 날짜로 바뀐다 */
-.scenario-title{font-size:20px;font-weight:700;margin:2px 0 16px}
+.scenario-title{font-size:22px;line-height:28px;font-weight:700;margin:2px 0 16px}
 .scenario-chart{display:flex;align-items:flex-end;gap:6px;height:96px;margin-bottom:16px}
 .sbar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;cursor:pointer}
 .sbar-track{flex:1;display:flex;align-items:flex-end;width:100%}
 .sbar{width:100%;border-radius:4px 4px 0 0;transition:opacity .15s}
-.sbar-label{font-size:10px;color:var(--text-sub);margin-top:6px}
+.sbar-label{font-size:12px;line-height:16px;color:var(--text-sub);margin-top:6px}
 .sbar-col.active .sbar-label{color:var(--brand);font-weight:700}
 /* 비슷한 매물과 비교하면 — 지역 드롭다운 + 목업 분포 히스토그램(정적 데이터) */
 .market-card{margin-top:0}
 .market-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
 margin-bottom:20px;flex-wrap:wrap}
-.market-title{font-size:20px;font-weight:700;margin:0}
+.market-title{font-size:22px;line-height:28px;font-weight:700;margin:0}
 /* 네이티브 select는 펼친 옵션 목록을 OS가 직접 그려서 CSS로 스타일링이 안 되므로
    버튼+직접 그린 목록으로 만든 커스텀 드롭다운으로 교체 */
 .market-region-wrap{position:relative}
-.market-region{font-size:12px;border:none;background:var(--field-bg);color:var(--text);
+.market-region{font-size:12px;line-height:16px;border:none;background:var(--field-bg);color:var(--text);
 border-radius:10px;height:34px;padding:0 32px 0 12px;min-width:120px;cursor:pointer;font-family:inherit;
 display:inline-flex;align-items:center;position:relative}
 .market-region svg{position:absolute;right:10px;top:50%;transform:translateY(-50%);
@@ -1131,17 +1131,17 @@ color:var(--text-sub);transition:transform .15s}
 background:#fff;border-radius:12px;box-shadow:0 12px 32px -8px rgba(27,27,58,.25);
 padding:6px;z-index:30}
 .market-region-menu.show{display:block}
-.market-region-opt{display:block;width:100%;text-align:left;padding:8px 12px;font-size:12px;
+.market-region-opt{display:block;width:100%;text-align:left;padding:8px 12px;font-size:12px;line-height:16px;
 border-radius:8px;cursor:pointer;background:none;border:none;font-family:inherit;
 color:var(--text);white-space:nowrap}
 .market-region-opt:hover{background:var(--field-bg)}
 .market-region-opt.active{background:var(--brand);color:#fff;font-weight:700}
 .market-highlight{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;
 background:var(--field-bg);border-radius:12px;margin-bottom:20px}
-.market-mine{font-size:20px;font-weight:700;color:var(--brand);margin:0;font-variant-numeric:tabular-nums}
+.market-mine{font-size:22px;line-height:28px;font-weight:700;color:var(--brand);margin:0;font-variant-numeric:tabular-nums}
 /* 옅은 틴트 뱃지는 하이라이트 박스(연보라 배경) 위에서 거의 안 보였음 —
    토스류 상태칩처럼 색을 꽉 채운 solid fill + 흰 글자로 위계를 확실히 줌 */
-.market-badge{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;
+.market-badge{display:inline-flex;align-items:center;gap:4px;font-size:12px;line-height:16px;font-weight:800;
 background:var(--brand);color:#fff;padding:6px 12px;border-radius:999px}
 .market-badge.neg{background:var(--loss)}
 .market-badge svg{flex:none}
@@ -1152,12 +1152,12 @@ background:var(--brand);color:#fff;padding:6px 12px;border-radius:999px}
 .mbar{width:100%;min-height:4px;border-radius:3px 3px 0 0;background:var(--line);
 transition:background .15s}
 .mbar.user{background:var(--brand)}
-.mbar-label{font-size:9.5px;color:var(--text-sub);margin-top:6px;text-align:center;line-height:1.3}
+.mbar-label{font-size:12px;line-height:16px;color:var(--text-sub);margin-top:6px;text-align:center;line-height:1.3}
 .market-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px;
 padding-top:16px;border-top:1px solid var(--line)}
-.market-stat-v{font-size:16px;font-weight:700}
-.market-stat-v span{font-size:12px;color:var(--text-sub);font-weight:500;margin-left:2px}
-.market-foot{font-size:11px;color:var(--text-sub);margin:12px 0 0;line-height:1.6}
+.market-stat-v{font-size:17px;line-height:24px;font-weight:700}
+.market-stat-v span{font-size:12px;line-height:16px;color:var(--text-sub);font-weight:500;margin-left:2px}
+.market-foot{font-size:12px;line-height:16px;color:var(--text-sub);margin:12px 0 0;line-height:1.6}
 .market-foot span.sep{margin:0 6px;color:var(--line)}
 .kpi3{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:0}
 @media(max-width:480px){.kpi3{grid-template-columns:1fr}}
@@ -1165,11 +1165,11 @@ padding-top:16px;border-top:1px solid var(--line)}
 .kpi3-cell.warn{background:var(--gold-bg)}
 .kpi3-cell.neg{background:var(--loss-bg)}
 .kpi3-cell.posbg{background:var(--profit-bg)}
-.kpi3-cell .l{font-size:14px;color:var(--text-sub);margin-top:0;margin-bottom:8px}
-.kpi3-cell .v{font-size:20px;font-weight:700;white-space:nowrap}   /* '+145,385 / 원' 줄바꿈 방지 */
+.kpi3-cell .l{font-size:14px;line-height:20px;color:var(--text-sub);margin-top:0;margin-bottom:8px}
+.kpi3-cell .v{font-size:22px;line-height:28px;font-weight:700;white-space:nowrap}   /* '+145,385 / 원' 줄바꿈 방지 */
 .kpi3-cell .v.warn{color:var(--gold)}.kpi3-cell .v.neg{color:var(--loss)}.kpi3-cell .v.pos{color:var(--profit)}
-.kpi3-paren{font-size:13px;font-weight:600;color:var(--text-sub)}
-.kpi3-sub{font-size:12px;color:var(--text-sub);margin-top:4px}
+.kpi3-paren{font-size:14px;line-height:20px;font-weight:600;color:var(--text-sub)}
+.kpi3-sub{font-size:12px;line-height:16px;color:var(--text-sub);margin-top:4px}
 /* 박스는 아이콘(13x13) 크기 그대로 — vertical-align:middle로 라벨 글자와 정확히
    가운데 정렬. 히트 영역 확장은 박스 크기에 전혀 영향 없는 ::before 유령 레이어로
    처리(이전엔 padding/margin으로 박스 자체를 키우다가 정렬이 계속 어긋났음) */
@@ -1181,36 +1181,66 @@ cursor:help;border-radius:50%}
 /* culc_redesign(App.tsx Hint 컴포넌트) 그대로: 어두운 카드, 200px 폭에서 줄바꿈, 여유 있는 패딩 */
 .info-tip{display:none;position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);
 width:max-content;max-width:200px;background:rgba(27,27,58,.95);color:#F2F3FA;
-font-size:12px;font-weight:500;line-height:1.6;padding:10px 12px;border-radius:12px;
+font-size:12px;line-height:16px;font-weight:500;line-height:1.6;padding:10px 12px;border-radius:12px;
 white-space:normal;text-align:left;z-index:20;box-shadow:0 12px 32px rgba(0,0,0,.25)}
 /* 짧은 문구는 굳이 200px에서 꺾이지 않고 한 줄로 — 내용 길이에 맞춰 폭이 늘어난다 */
 .info-tip.nowrap{white-space:nowrap;max-width:none}
 .info-wrap:hover .info-tip,.info-wrap.show .info-tip{display:block}
-.be-row td{border-top:1px dashed var(--gold);border-bottom:none;color:var(--gold);font-size:11px;
+.be-row td{border-top:1px dashed var(--gold);border-bottom:none;color:var(--gold);font-size:12px;line-height:16px;
 font-weight:700;text-align:center;padding:6px 4px}
 .cta-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
 margin-top:32px;padding:24px;background:#3d25b5;border-radius:16px;
 box-shadow:0 14px 28px -14px rgba(77,46,233,.25)}
-.cta-h1{font-size:15px;font-weight:700;color:#fff;margin:0 0 4px;line-height:1.4}
-.cta-h2{font-size:13px;color:rgba(255,255,255,.7);margin:0;line-height:1.5}
+.cta-h1{font-size:14px;line-height:20px;font-weight:700;color:#fff;margin:0 0 4px;line-height:1.4}
+.cta-h2{font-size:14px;line-height:20px;color:rgba(255,255,255,.7);margin:0;line-height:1.5}
 .cta-btn{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
-background:#fff;color:var(--brand);font-weight:700;font-size:13.5px;
+background:#fff;color:var(--brand);font-weight:700;font-size:14px;line-height:20px;
 padding:11px 20px;border-radius:12px;text-decoration:none}
 .cta-btn:hover{opacity:.9}
 /* 카드 헤더 옆 요약 배지 — "합계 94만원" / "주 순수익 35만원" */
-.sum-badge{font-size:12px;color:var(--text-sub);display:flex;align-items:baseline;gap:6px}
-.sum-badge b{font-size:15px;font-weight:700;color:var(--text)}
+.sum-badge{font-size:12px;line-height:16px;color:var(--text-sub);display:flex;align-items:baseline;gap:6px}
+.sum-badge b{font-size:14px;line-height:20px;font-weight:700;color:var(--text)}
 /* 입력 카드 내부 2열 필드 그리드(핵심/세부 구분 없이 전부 같은 무게) */
 .field-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
 .field-grid2:first-of-type{margin-top:16px}
 @media(max-width:480px){.field-grid2{grid-template-columns:1fr}}
-.field label{display:block;font-size:12px;color:var(--text-sub);margin-bottom:6px}
+.field label{display:block;font-size:12px;line-height:16px;color:var(--text-sub);margin-bottom:6px}
 .field-full{margin-top:14px}
-.field-full label{display:block;font-size:12px;color:var(--text-sub);margin-bottom:6px}
+.field-full label{display:block;font-size:12px;line-height:16px;color:var(--text-sub);margin-bottom:6px}
 /* 수수료·부가세 — 체크박스+% 입력을 field-grid2 셀 하나에 맞춤 */
-.field-opt label.opt{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-sub);
+.field-opt label.opt{display:flex;align-items:center;gap:6px;font-size:12px;line-height:16px;color:var(--text-sub);
 margin-bottom:6px;cursor:pointer}
 .field-opt .opt input[type=checkbox]{width:14px;height:14px;accent-color:var(--brand);cursor:pointer}
+
+/* ── 마감 규칙 적용(2026-08-21, docs/reference-rules.md) ─────────────────────
+   ① 면 분리는 그림자가 아니라 hairline border/배경 대비로(규칙2)
+   ② 컬럼을 하나의 패널로 묶어 카드가 떠 보이지 않게 — 카드마다 그림자+20px 패딩이라
+      결과 존 5장에서만 세로 200px가 패딩으로 나갔고, 서로 동떨어져 보였다
+   ③ 숫자는 고정폭(값이 바뀔 때 폭이 출렁이지 않게)
+   ④ 누를 수 있는 건 반응·포커스가 보이게, 클릭 영역은 36px 이상 */
+.layout{gap:20px}
+.left-col,.right-col{gap:0;background:#fff;border:1px solid var(--line);border-radius:16px}
+.left-col>*,.right-col>*{margin:0;background:transparent;border:none;border-radius:0;
+box-shadow:none;padding:16px 20px;border-bottom:1px solid var(--line)}
+.left-col>*:first-child,.right-col>*:first-child{border-radius:16px 16px 0 0}
+.left-col>*:last-child,.right-col>*:last-child{border-bottom:none;border-radius:0 0 16px 16px}
+.card-head{margin-bottom:12px}
+.kpi3{gap:8px}
+.kpi3-cell{border-radius:12px;padding:12px 14px}
+.market-card{box-shadow:none;border:1px solid var(--line)}
+/* 숫자 고정폭 */
+.hero-num,.vac-num b,.kpi3-cell .v,.market-stat-v,.market-mine,.sum-badge b,.week-mini b,
+.vac table td,.gauge-caption b,#o_fixedsum,#o_wnetbadge{font-variant-numeric:tabular-nums}
+/* 상태 피드백 */
+.tab,.reset-btn,.market-region,.market-region-opt,.cta-btn,.hd-cta .signup{
+transition:background .15s,color .15s,border-color .15s,transform .06s}
+.tab:hover,.reset-btn:hover,.market-region:hover{background:#E2E2F0}
+.tab.active:hover{background:var(--brand)}
+.tab:active,.reset-btn:active,.market-region:active,.cta-btn:active{transform:scale(.97)}
+.tab,.reset-btn{min-height:36px;display:inline-flex;align-items:center}
+.market-region{min-height:40px}
+input[type=range]{height:28px}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 </style></head><body>
 {% if not user %}
 <header class=hd>
