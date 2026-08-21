@@ -1211,7 +1211,6 @@ padding:11px 20px;border-radius:12px;text-decoration:none}
 .field-opt label.opt{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-sub);
 margin-bottom:6px;cursor:pointer}
 .field-opt .opt input[type=checkbox]{width:14px;height:14px;accent-color:var(--brand);cursor:pointer}
-.host-fee-note{font-size:12px;color:var(--text-sub);line-height:1.6;margin:2px 4px 0}
 </style></head><body>
 {% if not user %}
 <header class=hd>
@@ -1290,7 +1289,6 @@ margin-bottom:6px;cursor:pointer}
       <div class=hl><span>주간 순수익</span><b id=o_wnet_m>-</b></div>
     </div>
   </div>
-  <p class=host-fee-note>삼삼엠투 호스트 수수료는 총 이용요금의 3.3%(VAT 포함)입니다. 처음 3개월은 공실률 25~35%로 보수적으로 계산해보길 권장해요.</p>
   </div>
   <div class=right-col>
   <div class=box>
