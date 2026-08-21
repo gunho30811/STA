@@ -1274,12 +1274,16 @@ margin-bottom:6px;cursor:pointer}
     <div class=field-grid2>
       <div class=field><label>주간 임대료<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><span class=info-tip>1주 기준 게스트에게 받는 임대료</span></span></label>
         <div class=field-box><input id=i_wrent type=number value=30><span class=unit>만원</span></div></div>
-      <div class=field><label>청소·관리비<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><span class="info-tip nowrap">퇴실 시 게스트에게 별도 청구하는 청소비</span></span></label>
-        <div class=field-box><input id=i_wmgmt type=number value=6><span class=unit>만원</span></div></div>
+      <div class=field><label>관리비<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><span class="info-tip nowrap">1주 기준 게스트에게 받는 관리비</span></span></label>
+        <div class=field-box><input id=i_wmgmt type=number value=5><span class=unit>만원</span></div></div>
     </div>
     <div class=field-grid2>
-      <div class=field><label>플랫폼 수수료<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><span class=info-tip>삼삼엠투 등 플랫폼 수수료율<br>(총 매출 기준)</span></span></label>
+      <div class=field><label>청소비<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><span class="info-tip nowrap">퇴실 시 게스트에게 별도 청구하는 청소비. 편의상 월 1회 정산으로 계산(수수료·부가세 미적용)</span></span></label>
+        <div class=field-box><input id=i_wclean type=number value=5><span class=unit>만원</span></div></div>
+      <div class=field><label>플랫폼 수수료<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><span class=info-tip>삼삼엠투 등 플랫폼 수수료율<br>(주간 임대료+관리비 기준. 청소비는 미포함)</span></span></label>
         <div class=field-box><input id=i_fee type=number value=3.3 step=0.1 min=0><span class=unit>%</span></div></div>
+    </div>
+    <div class=field-grid2>
       <div class=field><label>부가가치세<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><span class=info-tip>일반과세자 10%, 간이과세자 0%</span></span></label>
         <div class=field-box><input id=i_vat type=number value=0 step=0.1 min=0><span class=unit>%</span></div></div>
     </div>
@@ -1460,27 +1464,32 @@ function calc(){
   var v=function(id){return parseFloat(document.getElementById(id).value)||0}
   var monthlyRent=v('i_rent'), deposit=v('i_dep'), depositRate=v('i_deprate')
   var mainFee=v('i_mgmt'), telecom=v('i_net'), supplies=v('i_clean'), rentalGoods=v('i_supply')
-  var weeklyRent=v('i_wrent'), weeklyClean=v('i_wmgmt')
+  var weeklyRent=v('i_wrent'), weeklyMgmt=v('i_wmgmt'), cleaningFee=v('i_wclean')
   var commission=v('i_fee'), vat=v('i_vat')
   // 슬라이더는 "예약일수"를 직접 받는다(0=한달공실~31=풀예약) — 기존 계산식은
   // 전부 공실일수(vacancy) 기준이라 여기서 한 번만 뒤집어서 넘겨준다
   var bookedDays=v('i_vacancy'), vacancy=31-bookedDays
 
-  var weeklyGross=weeklyRent+weeklyClean
+  var weeklyGross=weeklyRent+weeklyMgmt
   var weeklyDeduct=weeklyGross*(commission+vat)/100
   var weeklyNet=weeklyGross-weeklyDeduct
+  // 청소비: 관리비와 달리 매주 반복이 아니라 편의상 월 1회 정산으로 계산. 플랫폼
+  // 수수료·부가세도 안 붙고(순수 청소비 그대로), 공실률과 무관하게 매달 고정으로 더한다.
+  var cleaningMo=cleaningFee
 
   var depositInterest=deposit*depositRate/100/12
   var supplyMo=(supplies+rentalGoods)/10000*WPM
   var totalCost=monthlyRent+depositInterest+mainFee/10000+telecom/10000+supplyMo
 
-  var monthlyNet100=weeklyNet*WPM   // 완전가동(공실 0일) 가정 월 순수익(비용 반영 전)
-  var beVacancyPct=monthlyNet100>0?Math.min(99,Math.max(0,(1-totalCost/monthlyNet100)*100)):0
+  var monthlyNet100=weeklyNet*WPM   // 완전가동(공실 0일) 가정 월 순수익(청소비·고정지출 반영 전)
+  // 청소비는 공실률과 무관한 고정 수익이라, 손익분기 계산에서는 고정지출에서 미리 뺀 것과 같다
+  var fixedNet=totalCost-cleaningMo
+  var beVacancyPct=monthlyNet100>0?Math.min(99,Math.max(0,(1-fixedNet/monthlyNet100)*100)):0
   var beVacancyDays=Math.floor(beVacancyPct/100*31)
-  var beOccupiedRaw=totalCost/(monthlyNet100/31)
+  var beOccupiedRaw=fixedNet/(monthlyNet100/31)
   var beOccupiedDays=isFinite(beOccupiedRaw)?Math.ceil(beOccupiedRaw):null   // 0/0 → NaN 가드
 
-  var effRevenue=monthlyNet100*(1-vacancy/31)
+  var effRevenue=monthlyNet100*(1-vacancy/31)+cleaningMo
   var monthlyProfit=effRevenue-totalCost
   var annualProfit=monthlyProfit*12
   var opMargin=effRevenue>0?(monthlyProfit/effRevenue)*100:(monthlyProfit>0?100:-100)
@@ -1527,7 +1536,7 @@ function calc(){
 
   // 공실률별 시나리오 — App.tsx SCENARIOS_DAYS 그대로, 막대/표 행 클릭 시 공실일수 슬라이더 이동
   var scenarios=SCENARIOS_DAYS.map(function(days){
-    return {days:days,profit:monthlyNet100*(1-days/31)-totalCost}
+    return {days:days,profit:monthlyNet100*(1-days/31)+cleaningMo-totalCost}
   })
   var maxAbs=Math.max.apply(null,scenarios.map(function(s){return Math.abs(s.profit)}))||1
   var chart=document.getElementById('o_schart'),ch=''
@@ -1570,9 +1579,9 @@ document.addEventListener('click',function(){
 })
 // 매물유형 프리셋 — design/culc_redesign/src/app/App.tsx의 PRESETS/selectPropType 그대로 이식
 var PRESETS={
-  '원룸':{rent:60,dep:500,mgmt:150000,wrent:30,wmgmt:6},
-  '빌라·주택':{rent:70,dep:1000,mgmt:150000,wrent:38,wmgmt:7},
-  '오피스텔':{rent:80,dep:3000,mgmt:200000,wrent:45,wmgmt:7}
+  '원룸':{rent:60,dep:500,mgmt:150000,wrent:30,wmgmt:5,wclean:5},
+  '빌라·주택':{rent:70,dep:1000,mgmt:150000,wrent:38,wmgmt:9,wclean:8},
+  '오피스텔':{rent:80,dep:3000,mgmt:200000,wrent:45,wmgmt:6,wclean:5}
 }
 function setv(id,val){document.getElementById(id).value=val}
 function selectPropType(btn){
@@ -1586,7 +1595,7 @@ function selectPropType(btn){
   btn.classList.add('active')
   var p=PRESETS[type]
   setv('i_rent',p.rent); setv('i_dep',p.dep); setv('i_mgmt',p.mgmt)
-  setv('i_wrent',p.wrent); setv('i_wmgmt',p.wmgmt)
+  setv('i_wrent',p.wrent); setv('i_wmgmt',p.wmgmt); setv('i_wclean',p.wclean)
   // 유형과 무관하게 항상 이 고정값으로 리셋(App.tsx selectPropType과 동일)
   setv('i_deprate',3.5); setv('i_net',20000); setv('i_clean',15000); setv('i_supply',20000)
   setv('i_fee',3.3); setv('i_vat',0); setv('i_vacancy',28)
@@ -1594,7 +1603,7 @@ function selectPropType(btn){
 }
 function resetAll(){
   ['i_rent','i_dep','i_deprate','i_mgmt','i_net','i_clean','i_supply',
-   'i_wrent','i_wmgmt','i_fee','i_vat','i_vacancy'].forEach(function(id){setv(id,0)})
+   'i_wrent','i_wmgmt','i_wclean','i_fee','i_vat','i_vacancy'].forEach(function(id){setv(id,0)})
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active')})
   calc()
 }
