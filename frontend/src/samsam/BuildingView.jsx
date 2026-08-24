@@ -166,7 +166,7 @@ function BuildingRow({ r, onClick }) {
       <td className="mut">{r.n_matched || 0}</td>
       <td className="l" onClick={stop}>
         {r.sam_url ? <a className="lnk" href={r.sam_url} target="_blank" rel="noreferrer">렌트 예시</a> : null}
-        {r.naver_url ? <> <a className="lnk" style={{ background: '#123A6D' }} href={r.naver_url} target="_blank" rel="noreferrer">부동산</a></> : null}
+        {r.naver_url ? <> <a className="lnk" style={{ background: '#1B72E8' }} href={r.naver_url} target="_blank" rel="noreferrer">부동산</a></> : null}
         {!r.sam_url && !r.naver_url ? <span className="mut">-</span> : null}
       </td>
     </tr>
@@ -205,7 +205,7 @@ function BuildingModal({ r, onClose }) {
         </div>
         <div className="modal-foot">
           {r.sam_url ? <a className="lnk" href={r.sam_url} target="_blank" rel="noreferrer">렌트 예시</a> : null}
-          {r.naver_url ? <a className="lnk" style={{ background: '#123A6D' }} href={r.naver_url} target="_blank" rel="noreferrer">부동산 매물</a> : null}
+          {r.naver_url ? <a className="lnk" style={{ background: '#1B72E8' }} href={r.naver_url} target="_blank" rel="noreferrer">부동산 매물</a> : null}
         </div>
       </div>
     </div>

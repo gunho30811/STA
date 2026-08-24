@@ -81,7 +81,7 @@ export default function MapView({ filters }) {
       if (sh.rent) {
         for (const r of d.rent || []) {
           L.circleMarker([r.lat, r.lng], {
-            radius: 6, color: '#123A6D', weight: 1.5, fillColor: '#123A6D', fillOpacity: 0.85,
+            radius: 6, color: '#1B72E8', weight: 1.5, fillColor: '#1B72E8', fillOpacity: 0.85,
           }).bindPopup(
             `<b>${r.name || '(이름없음)'}</b><br>${r.btype} · ${r.pyeong ?? '-'}평 · 주당 ${r.week ?? '-'}만<br>` +
             `예약률 <b style="color:${occColor(r.occ)}">${r.occ}%</b>` +
@@ -132,7 +132,7 @@ export default function MapView({ filters }) {
         줌 {MARKER_ZOOM}+ 에서 개별 매물 표시 · 위 필터의 <b>건물유형</b> 적용(렌트·원). 마커 클릭=상세.</p>
       <div className="map-bar">
         <Toggle k="circles" label="동별 예약률 원" color="#059669" />
-        <Toggle k="rent" label="렌트 매물" color="#123A6D" />
+        <Toggle k="rent" label="렌트 매물" color="#1B72E8" />
         <Toggle k="naver" label="부동산 매물" color="#0d9488" />
         <span className="mut" style={{ fontSize: 12 }}>{stat}</span>
       </div>

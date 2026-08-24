@@ -141,7 +141,7 @@ export default function ProfitList({ facets, month, demo = false, onSignup }) {
       {/* 첫 진입 안내: 무엇을·어떤 순서로 + 용어는 눌러서(모바일 터치 대응) */}
       <div style={{ background: '#eff6ff', border: '1px solid #dbeafe', borderRadius: 9, padding: '9px 13px', margin: '0 0 10px', fontSize: 13, color: '#1e3a5f', lineHeight: 1.55 }}>
         💡 <b>단기임대로 돌리면 한 달에 얼마 남나(기대월순수익)</b> 높은 순이에요.{' '}
-        <b role="button" style={{ color: '#123A6D', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => setShowTerms(true)}>용어 설명 보기</b>
+        <b role="button" style={{ color: '#1B72E8', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => setShowTerms(true)}>용어 설명 보기</b>
         {demo ? '' : ' · 매물을 누르면 상세'}.
       </div>
 
@@ -176,7 +176,7 @@ export default function ProfitList({ facets, month, demo = false, onSignup }) {
                   <th key={c.k} className={`col-${c.k}${c.l ? ' l' : ''}`} onClick={() => onSort(c.k)}>
                     {c.t}
                     {c.tip && (
-                      <span role="button" title="설명 보기" style={{ color: '#123A6D', fontWeight: 700, cursor: 'help' }}
+                      <span role="button" title="설명 보기" style={{ color: '#1B72E8', fontWeight: 700, cursor: 'help' }}
                         onClick={(e) => { e.stopPropagation(); setTerm({ t: c.t, tip: c.tip }) }}> ⓘ</span>
                     )}
                     {c.k === sort.col ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
