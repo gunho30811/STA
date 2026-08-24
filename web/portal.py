@@ -600,8 +600,6 @@ box-shadow:0 1px 1px hsl(213deg 82% 38% / .04),0 2px 2px hsl(213deg 82% 38% / .0
 .brand b{color:var(--accent);font-weight:800}
 .brand{display:inline-flex;align-items:center}
 /* 로고 마크 — 같은 색 계열 명암(밝은 면/어두운 면)으로 평평해 보이지 않게 */
-.brand-mark{width:22px;height:22px;margin-right:8px;flex:none}
-.brand-mark svg{width:100%;height:100%;display:block}
 .hd-cta{display:flex;align-items:center;gap:16px}
 .hd-cta .login{font-size:14px;font-weight:600;color:var(--mut)}
 .hd-cta .signup{font-size:14px;line-height:20px;font-weight:700;color:#fff;background:var(--accent);
@@ -734,7 +732,7 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
 
 <!-- 헤더 : 무료 도구가 1순위, 회원가입은 2순위 -->
 <header class=hd>
-  <div class=brand><span class=brand-mark><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="mark-svg" aria-hidden="true"><defs><linearGradient id="rmA" x1="18" y1="5" x2="5" y2="25" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#8ACBFF"/><stop offset=".4" stop-color="#3B8EF7"/><stop offset="1" stop-color="#1157C9"/></linearGradient><linearGradient id="rmB" x1="18" y1="5" x2="5" y2="25" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#6BB6FF"/><stop offset=".42" stop-color="#1B72E8"/><stop offset="1" stop-color="#0B4CB0"/></linearGradient><radialGradient id="rmG" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset=".6" stop-color="#fff" stop-opacity=".08"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient><clipPath id="rmC"><path d="M17.1 2.8C9.4 5.6 3.2 11.6 3.2 18.8c0 6.1 4.4 10.6 10 10.6C15.1 27.2 16.4 15.6 17.1 2.8Z"/></clipPath></defs><g transform="rotate(-10 16 16)"><g><path d="M17.1 2.8C9.4 5.6 3.2 11.6 3.2 18.8c0 6.1 4.4 10.6 10 10.6C15.1 27.2 16.4 15.6 17.1 2.8Z" fill="url(#rmA)"/><g clip-path="url(#rmC)"><ellipse cx="10" cy="12" rx="9" ry="7" fill="url(#rmG)" transform="rotate(-30 10 12)"/></g></g><g transform="rotate(180 16 16)"><path d="M17.1 2.8C9.4 5.6 3.2 11.6 3.2 18.8c0 6.1 4.4 10.6 10 10.6C15.1 27.2 16.4 15.6 17.1 2.8Z" fill="url(#rmB)"/><g clip-path="url(#rmC)"><ellipse cx="10" cy="12" rx="9" ry="7" fill="url(#rmG)" transform="rotate(-30 10 12)"/></g></g></g></svg></span>ren<b>dit</b></div>
+  <div class=brand>ren<b>dit</b></div>
   <div class=hd-cta>
     <a class=login href="/auth/login">로그인</a>
     <a class=signup href="/auth/signup">회원가입</a>
@@ -891,7 +889,7 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
 </section>
 
 <footer class=foot>
-  <div class=brand><span class=brand-mark><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="mark-svg" aria-hidden="true"><defs><linearGradient id="rmA" x1="18" y1="5" x2="5" y2="25" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#8ACBFF"/><stop offset=".4" stop-color="#3B8EF7"/><stop offset="1" stop-color="#1157C9"/></linearGradient><linearGradient id="rmB" x1="18" y1="5" x2="5" y2="25" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#6BB6FF"/><stop offset=".42" stop-color="#1B72E8"/><stop offset="1" stop-color="#0B4CB0"/></linearGradient><radialGradient id="rmG" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset=".6" stop-color="#fff" stop-opacity=".08"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient><clipPath id="rmC"><path d="M17.1 2.8C9.4 5.6 3.2 11.6 3.2 18.8c0 6.1 4.4 10.6 10 10.6C15.1 27.2 16.4 15.6 17.1 2.8Z"/></clipPath></defs><g transform="rotate(-10 16 16)"><g><path d="M17.1 2.8C9.4 5.6 3.2 11.6 3.2 18.8c0 6.1 4.4 10.6 10 10.6C15.1 27.2 16.4 15.6 17.1 2.8Z" fill="url(#rmA)"/><g clip-path="url(#rmC)"><ellipse cx="10" cy="12" rx="9" ry="7" fill="url(#rmG)" transform="rotate(-30 10 12)"/></g></g><g transform="rotate(180 16 16)"><path d="M17.1 2.8C9.4 5.6 3.2 11.6 3.2 18.8c0 6.1 4.4 10.6 10 10.6C15.1 27.2 16.4 15.6 17.1 2.8Z" fill="url(#rmB)"/><g clip-path="url(#rmC)"><ellipse cx="10" cy="12" rx="9" ry="7" fill="url(#rmG)" transform="rotate(-30 10 12)"/></g></g></g></svg></span>ren<b>dit</b></div>
+  <div class=brand>ren<b>dit</b></div>
   <div>© 2026 rendit. All rights reserved.</div>
 </footer>
 
@@ -997,9 +995,7 @@ box-shadow:0 1px 1px hsl(213deg 82% 38% / .04),0 2px 2px hsl(213deg 82% 38% / .0
 0 4px 4px hsl(213deg 82% 38% / .04),0 8px 8px hsl(213deg 82% 38% / .04)}
 .hd .brand{display:inline-flex;align-items:center;font-size:20px;line-height:28px;font-weight:800;letter-spacing:-.025em;color:#101B2D;text-decoration:none}
 .hd .brand b{color:var(--brand);font-weight:800}
-.hd .brand-mark{width:22px;height:22px;margin-right:8px;flex:none}
-.brand-mark svg{width:100%;height:100%;display:block}
-.hd-cta{display:flex;align-items:center;gap:16px}
+.hd .hd-cta{display:flex;align-items:center;gap:16px}
 .hd-cta .login{font-size:14px;line-height:20px;font-weight:600;color:var(--text-sub);text-decoration:none}
 .hd-cta .signup{font-size:14px;line-height:20px;font-weight:700;color:#fff;background:var(--brand);
 border:none;padding:0 16px;height:36px;display:inline-flex;align-items:center;border-radius:8px;
@@ -1279,7 +1275,7 @@ input[type=range]{height:28px}
 </style></head><body>
 {% if not user %}
 <header class=hd>
-  <a class=brand href="/"><span class=brand-mark><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="mark-svg" aria-hidden="true"><defs><linearGradient id="rmA" x1="18" y1="5" x2="5" y2="25" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#8ACBFF"/><stop offset=".4" stop-color="#3B8EF7"/><stop offset="1" stop-color="#1157C9"/></linearGradient><linearGradient id="rmB" x1="18" y1="5" x2="5" y2="25" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#6BB6FF"/><stop offset=".42" stop-color="#1B72E8"/><stop offset="1" stop-color="#0B4CB0"/></linearGradient><radialGradient id="rmG" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset=".6" stop-color="#fff" stop-opacity=".08"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient><clipPath id="rmC"><path d="M17.1 2.8C9.4 5.6 3.2 11.6 3.2 18.8c0 6.1 4.4 10.6 10 10.6C15.1 27.2 16.4 15.6 17.1 2.8Z"/></clipPath></defs><g transform="rotate(-10 16 16)"><g><path d="M17.1 2.8C9.4 5.6 3.2 11.6 3.2 18.8c0 6.1 4.4 10.6 10 10.6C15.1 27.2 16.4 15.6 17.1 2.8Z" fill="url(#rmA)"/><g clip-path="url(#rmC)"><ellipse cx="10" cy="12" rx="9" ry="7" fill="url(#rmG)" transform="rotate(-30 10 12)"/></g></g><g transform="rotate(180 16 16)"><path d="M17.1 2.8C9.4 5.6 3.2 11.6 3.2 18.8c0 6.1 4.4 10.6 10 10.6C15.1 27.2 16.4 15.6 17.1 2.8Z" fill="url(#rmB)"/><g clip-path="url(#rmC)"><ellipse cx="10" cy="12" rx="9" ry="7" fill="url(#rmG)" transform="rotate(-30 10 12)"/></g></g></g></svg></span>ren<b>dit</b></a>
+  <a class=brand href="/">ren<b>dit</b></a>
   <div class=hd-cta>
     <a class=login href="/auth/login">로그인</a>
     <a class=signup href="/auth/signup">회원가입</a>
