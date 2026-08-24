@@ -965,7 +965,7 @@ def _nav_html():
     return f"""<input type=checkbox id=__navtog hidden>
 <nav id=__nav>
   <div class=__inner>
-    <a class=__brand href="/"><span class=__mark><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="mark-svg" aria-hidden="true"><defs><linearGradient id="rmA" x1="18" y1="5" x2="5" y2="25" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#8ACBFF"/><stop offset=".4" stop-color="#3B8EF7"/><stop offset="1" stop-color="#1157C9"/></linearGradient><linearGradient id="rmB" x1="18" y1="5" x2="5" y2="25" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#6BB6FF"/><stop offset=".42" stop-color="#1B72E8"/><stop offset="1" stop-color="#0B4CB0"/></linearGradient><radialGradient id="rmG" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset=".6" stop-color="#fff" stop-opacity=".08"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient><clipPath id="rmC"><path d="M17.1 2.8C9.4 5.6 3.2 11.6 3.2 18.8c0 6.1 4.4 10.6 10 10.6C15.1 27.2 16.4 15.6 17.1 2.8Z"/></clipPath></defs><g transform="rotate(-10 16 16)"><g><path d="M17.1 2.8C9.4 5.6 3.2 11.6 3.2 18.8c0 6.1 4.4 10.6 10 10.6C15.1 27.2 16.4 15.6 17.1 2.8Z" fill="url(#rmA)"/><g clip-path="url(#rmC)"><ellipse cx="10" cy="12" rx="9" ry="7" fill="url(#rmG)" transform="rotate(-30 10 12)"/></g></g><g transform="rotate(180 16 16)"><path d="M17.1 2.8C9.4 5.6 3.2 11.6 3.2 18.8c0 6.1 4.4 10.6 10 10.6C15.1 27.2 16.4 15.6 17.1 2.8Z" fill="url(#rmB)"/><g clip-path="url(#rmC)"><ellipse cx="10" cy="12" rx="9" ry="7" fill="url(#rmG)" transform="rotate(-30 10 12)"/></g></g></g></svg></span>ren<b>dit</b></a>
+    <a class=__brand href="/">ren<b>dit</b></a>
     <label for=__navtog class=__ham aria-label="메뉴">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
         stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
@@ -1008,8 +1008,6 @@ box-shadow:0 1px 1px hsl(213deg 82% 38% / .04),
 font-weight:800;color:#101B2D;text-decoration:none;letter-spacing:-.025em;margin-right:20px}}
 #__nav .__brand b{{color:#1B72E8;font-weight:800}}
 /* 로고 마크 — 같은 색 계열의 명암(밝은 면/어두운 면)을 줘서 평평해 보이지 않게 */
-#__nav .__mark{{width:22px;height:22px;margin-right:8px;flex:none}}
-#__nav .__mark svg{{width:100%;height:100%;display:block}}
 #__nav .__menu{{display:flex;align-items:center;gap:4px;flex:1}}
 #__nav .__menu a{{color:#45456B;text-decoration:none;padding:8px 12px;border-radius:8px;
 font-weight:600;font-size:15px;line-height:20px;white-space:nowrap;
