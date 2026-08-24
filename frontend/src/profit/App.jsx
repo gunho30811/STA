@@ -39,7 +39,7 @@ export default function App() {
       {demo && (
         <div style={{ background: '#1e293b', color: '#e2e8f0', padding: '10px 22px', fontSize: 13.5, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
           <span>🔒 <b>데모</b> — 지금은 기대 월순수익 상위 일부만 보여요. 회원가입하면 <b>전체 매물 · 필터 · 순위 · 신규진입 추천</b>까지 전부.</span>
-          <a href="/auth/signup" style={{ background: '#4321F3', color: '#fff', textDecoration: 'none', fontWeight: 800, padding: '7px 16px', borderRadius: 8 }}>무료 회원가입 →</a>
+          <a href="/auth/signup" style={{ background: '#123A6D', color: '#fff', textDecoration: 'none', fontWeight: 800, padding: '7px 16px', borderRadius: 8 }}>무료 회원가입 →</a>
         </div>
       )}
 

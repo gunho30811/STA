@@ -242,10 +242,10 @@ display:flex;min-height:100vh;align-items:center;justify-content:center;padding:
 h1{font-size:20px;margin:0 0 4px;font-weight:800}.sub{font-size:12.5px;color:#94a3b8;margin:0 0 20px}
 label{font-size:12px;font-weight:700;color:#4b5563;display:block;margin:12px 0 4px}
 input{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-family:inherit}
-input:focus{outline:none;border-color:#4321F3;box-shadow:0 0 0 3px rgba(67,33,243,.1)}
+input:focus{outline:none;border-color:#123A6D;box-shadow:0 0 0 3px rgba(18,58,109,.1)}
 .btn{display:block;width:100%;margin-top:16px;padding:11px;border:none;border-radius:8px;
-background:#4321F3;color:#fff;font-size:14px;font-weight:700;cursor:pointer;text-align:center;font-family:inherit}
-.btn:hover{background:#3517c4}
+background:#123A6D;color:#fff;font-size:14px;font-weight:700;cursor:pointer;text-align:center;font-family:inherit}
+.btn:hover{background:#0D2B52}
 .kakao-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:0;
 padding:12px;border-radius:8px;background:#FEE500;color:#191919;font-size:14px;font-weight:700;
 text-decoration:none;font-family:inherit}
@@ -255,10 +255,10 @@ text-decoration:none;font-family:inherit}
 .or-sep hr{flex:1;border:none;border-top:1px solid #e5e7eb}
 .msg{margin:12px 0;padding:10px 12px;border-radius:8px;font-size:13px}
 .err{background:#fef2f2;color:#b91c1c}.ok{background:#ecfdf5;color:#047857}.info{background:#eff6ff;color:#1e40af}
-.lnk{text-align:center;margin-top:20px;font-size:13px;color:#6b7280}.lnk a{color:#4321F3;text-decoration:none;font-weight:700}
+.lnk{text-align:center;margin-top:20px;font-size:13px;color:#6b7280}.lnk a{color:#123A6D;text-decoration:none;font-weight:700}
 table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 10px;border-bottom:1px solid #eef0f2;text-align:left}
 th{background:#f9fafb;font-weight:700}.danger{color:#dc2626;cursor:pointer;border:none;background:none;font-weight:700}
-.code{font-size:24px;font-weight:800;letter-spacing:4px;color:#4321F3;text-align:center;background:#eff6ff;padding:12px;border-radius:8px;margin:8px 0}
+.code{font-size:24px;font-weight:800;letter-spacing:4px;color:#123A6D;text-align:center;background:#eff6ff;padding:12px;border-radius:8px;margin:8px 0}
 .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .homelink{position:fixed;top:16px;left:18px;color:#94a3b8;text-decoration:none;font-weight:800;font-size:14px}
 .homelink b{color:#fff}.homelink:hover{color:#cbd5e1}
@@ -304,7 +304,7 @@ def login():
     _ico = ('<svg width="18" height="18" viewBox="0 0 18 18"><path fill="#191919" d="M9 1.5C4.86'
             ' 1.5 1.5 4.19 1.5 7.5c0 2.1 1.27 3.94 3.19 5.06l-.81 3.01 3.48-2.29C7.72 13.42'
             ' 8.35 13.5 9 13.5c4.14 0 7.5-2.69 7.5-6S13.14 1.5 9 1.5z"/></svg>')
-    body = (f'<h1 style="letter-spacing:-.02em;color:#171A23">ren<b style="color:#4321F3">dit</b></h1>'
+    body = (f'<h1 style="letter-spacing:-.02em;color:#171A23">ren<b style="color:#123A6D">dit</b></h1>'
             f'<p class="sub">부동산 단기임대 수익성 분석 · 회원 전용</p>{msg}'
             f'<a href="{url_for("auth.kakao_login")}" class="kakao-btn">{_ico}카카오로 시작하기</a>'
             f'<div class="or-sep"><hr><span>또는</span><hr></div>'
@@ -495,7 +495,7 @@ def members():
             act = _form("auth.member_approve", r["id"], "승인취소", "approve", "0", "#64748b")
         else:
             ap = '<span style="color:#dc2626;font-weight:700">대기</span>'
-            act = _form("auth.member_approve", r["id"], "✔ 승인", "approve", "1", "#4321F3")
+            act = _form("auth.member_approve", r["id"], "✔ 승인", "approve", "1", "#123A6D")
         delbtn = _form("auth.member_delete", r["id"], "삭제", confirm=True) if r["role"] != "admin" else ""
         trs += (f"<tr><td>{r['id']}</td><td>{r.get('email') or '-'}</td><td>{r.get('name') or ''}</td>"
                 f"<td>{r.get('birthdate') or ''}</td><td>{vr}</td><td>{ap}</td>"
@@ -995,44 +995,44 @@ def _nav_html():
    낮은 알파로 여러 겹 쌓는다(단일 회색 그림자가 '싸구려'로 보이는 이유가 이것).
    평소엔 그림자 없이 hairline만, 스크롤해서 본문이 헤더 밑으로 들어갈 때만 살짝 띄운다. */
 #__nav{{position:sticky;top:0;z-index:9999;background:rgba(255,255,255,.86);
-backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid #E7E9F3;
+backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid #EEF1F6;
 font-family:'Pretendard','Malgun Gothic',sans-serif;
 transition:box-shadow .18s ease,border-color .18s ease,background .18s ease}}
 #__nav.__scrolled{{border-bottom-color:transparent;background:rgba(255,255,255,.94);
-box-shadow:0 1px 1px hsl(248deg 45% 35% / .04),
-           0 2px 2px hsl(248deg 45% 35% / .04),
-           0 4px 4px hsl(248deg 45% 35% / .04),
-           0 8px 8px hsl(248deg 45% 35% / .04)}}
+box-shadow:0 1px 1px hsl(214deg 72% 25% / .04),
+           0 2px 2px hsl(214deg 72% 25% / .04),
+           0 4px 4px hsl(214deg 72% 25% / .04),
+           0 8px 8px hsl(214deg 72% 25% / .04)}}
 #__nav .__inner{{width:100%;display:flex;align-items:center;gap:8px;padding:0 24px;height:56px}}
 #__nav .__brand{{display:inline-flex;align-items:center;font-size:20px;line-height:28px;
-font-weight:800;color:#0F0F23;text-decoration:none;letter-spacing:-.025em;margin-right:20px}}
-#__nav .__brand b{{color:#4D2EE9;font-weight:800}}
+font-weight:800;color:#101B2D;text-decoration:none;letter-spacing:-.025em;margin-right:20px}}
+#__nav .__brand b{{color:#123A6D;font-weight:800}}
 /* 로고 마크 — 같은 색 계열의 명암(밝은 면/어두운 면)을 줘서 평평해 보이지 않게 */
 #__nav .__mark{{width:10px;height:10px;margin-right:9px;border-radius:2.5px;
-background:linear-gradient(145deg,#6B52F5,#3A1FC9);transform:rotate(45deg);
-box-shadow:0 1px 2px hsl(248deg 45% 35% / .38),inset 0 1px 0 hsl(248deg 90% 82% / .55)}}
+background:linear-gradient(145deg,#2C5A9E,#0D2B52);transform:rotate(45deg);
+box-shadow:0 1px 2px hsl(214deg 72% 25% / .38),inset 0 1px 0 hsl(214deg 80% 82% / .55)}}
 #__nav .__menu{{display:flex;align-items:center;gap:4px;flex:1}}
 #__nav .__menu a{{color:#45456B;text-decoration:none;padding:8px 12px;border-radius:8px;
 font-weight:600;font-size:15px;line-height:20px;white-space:nowrap;
 transition:background .15s,color .15s}}
-#__nav .__menu a:hover{{background:#F2F2F8;color:#1B1B3A}}
-#__nav .__menu a.on{{color:#4D2EE9;background:#EDE9FE;box-shadow:inset 0 1px 0 #fff,0 1px 2px hsl(248deg 45% 35% / .10)}}
+#__nav .__menu a:hover{{background:#F2F2F8;color:#16233A}}
+#__nav .__menu a.on{{color:#123A6D;background:#E4EBF6;box-shadow:inset 0 1px 0 #fff,0 1px 2px hsl(214deg 72% 25% / .10)}}
 #__nav .__right{{margin-left:auto;display:flex;align-items:center;gap:4px}}
 #__nav .__notify{{display:inline-flex;align-items:center;gap:4px;color:#45456B}}
 #__nav .__notify svg{{flex:none}}
-#__nav .__logout{{color:#8080A8;font-size:14px}}
+#__nav .__logout{{color:#6B7A90;font-size:14px}}
 #__nav .__ham{{display:none;color:#45456B;cursor:pointer;padding:4px 8px;user-select:none}}
-#__nav a:focus-visible,#__nav label:focus-visible{{outline:2px solid #4D2EE9;outline-offset:2px}}
+#__nav a:focus-visible,#__nav label:focus-visible{{outline:2px solid #123A6D;outline-offset:2px}}
 @media(max-width:900px){{
   #__nav .__inner{{padding:0 16px;height:52px}}
   #__nav .__ham{{display:flex;margin-left:auto}}
   #__nav .__menu{{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;
     flex-direction:column;align-items:stretch;padding:8px 12px 12px;gap:0;
-    border-bottom:1px solid #E7E9F3;box-shadow:0 8px 20px rgba(27,27,58,.08)}}
+    border-bottom:1px solid #EEF1F6;box-shadow:0 8px 20px rgba(27,27,58,.08)}}
   #__navtog:checked ~ #__nav .__menu{{display:flex}}
   #__nav .__menu a{{padding:12px;border-radius:8px;font-size:15px}}
   #__nav .__right{{margin-left:0;flex-direction:column;align-items:stretch;
-    border-top:1px solid #E7E9F3;margin-top:8px;padding-top:8px}}
+    border-top:1px solid #EEF1F6;margin-top:8px;padding-top:8px}}
 }}
 </style>
 <script>

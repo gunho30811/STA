@@ -18,8 +18,8 @@ export const medal = (r) => (r === 1 ? '🥇' : r === 2 ? '🥈' : r === 3 ? '�
 export const sgn = (v) => (v == null ? '-' : (v > 0 ? '+' : '') + v)
 
 export const VERDICT = {
-  measurable: { t: '측정가능', c: '#4321F3' },
-  essential: { t: '사실상 필수', c: '#7c3aed' },
+  measurable: { t: '측정가능', c: '#123A6D' },
+  essential: { t: '사실상 필수', c: '#123A6D' },
   lowsample: { t: '표본부족', c: '#9ca3af' },
 }
 

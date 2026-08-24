@@ -27,13 +27,13 @@ font-size:12px;font-weight:700;color:#94a3b8;background:rgba(255,255,255,.95);cu
 box-shadow:0 1px 4px rgba(0,0,0,.2);white-space:nowrap}
 .tog.on{color:#111827}
 .chip{color:#475569}
-.chip.on{background:#4321F3;border-color:#4321F3;color:#fff}
+.chip.on{background:#123A6D;border-color:#123A6D;color:#fff}
 .dot{width:9px;height:9px;border-radius:50%;opacity:.35}.tog.on .dot{opacity:1}
 .stat{font-size:11.5px;color:#e2e8f0;background:rgba(15,23,42,.75);padding:6px 11px;border-radius:8px}
 .sbox{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.95);border:1.5px solid #cbd5e1;border-radius:999px;
 padding:3px 6px 3px 12px;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .sbox input{border:none;outline:none;background:none;font-size:13px;width:150px;font-weight:600}
-.sbox button{border:none;background:#4321F3;color:#fff;border-radius:999px;padding:5px 11px;font-size:12px;font-weight:700;cursor:pointer}
+.sbox button{border:none;background:#123A6D;color:#fff;border-radius:999px;padding:5px 11px;font-size:12px;font-weight:700;cursor:pointer}
 .num{display:flex;align-items:center;gap:3px;background:rgba(255,255,255,.95);border:1.5px solid #cbd5e1;border-radius:999px;
 padding:4px 10px;font-size:11.5px;font-weight:700;color:#475569;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .num input{border:none;outline:none;background:none;width:44px;font-size:13px;font-weight:800;text-align:right;color:#111827}
@@ -41,7 +41,7 @@ padding:4px 10px;font-size:11.5px;font-weight:700;color:#475569;box-shadow:0 1px
 .poi{display:flex;align-items:center;gap:3px;background:rgba(255,255,255,.95);border:1.5px solid #f59e0b;border-radius:999px;
 padding:2px 8px 2px 4px;font-size:11px;font-weight:800;color:#92400e;white-space:nowrap;box-shadow:0 1px 5px rgba(0,0,0,.3);
 transform:translate(-50%,-50%)}
-.poi.h{border-color:#dc2626;color:#991b1b}.poi.u{border-color:#2563eb;color:#1e40af}.poi.i{border-color:#7c3aed;color:#5b21b6}
+.poi.h{border-color:#dc2626;color:#991b1b}.poi.u{border-color:#2563eb;color:#1e40af}.poi.i{border-color:#123A6D;color:#5b21b6}
 .poi.a{border-color:#059669;color:#065f46}.poi.t{border-color:#0891b2;color:#155e75}
 .poi.g{border-color:#db2777;color:#9d174d}
 .poi.tsp{border-color:#f9a8d4;color:#be185d;font-size:10px;padding:1px 6px 1px 3px;opacity:.9}
@@ -68,11 +68,11 @@ color:#475569;background:#fff;cursor:pointer;white-space:nowrap}
 .pin.nv{width:13px;height:13px;background:#14b8a6}
 .clus{display:flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;font-weight:800;
 border:3px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.35);line-height:1.1;text-align:center;cursor:pointer}
-.clus.rent{background:#4321F3}
+.clus.rent{background:#123A6D}
 .clus small{font-weight:600;font-size:9px;display:block}
 /* 네이버지도 스타일 지역(동/시군구) 건수 뱃지 — 예약률 표시와 안 겹치게 지점 위로 띄움 */
 .dongb{transform:translate(-50%,-112%);display:flex;flex-direction:column;align-items:center;
-background:rgba(67,33,243,.93);color:#fff;border:2.5px solid rgba(255,255,255,.9);border-radius:13px;
+background:rgba(18,58,109,.93);color:#fff;border:2.5px solid rgba(255,255,255,.9);border-radius:13px;
 padding:4px 10px;line-height:1.15;white-space:nowrap;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.35);
 font-weight:800;text-align:center}
 .dongb b{font-size:14px}.dongb small{font-size:9px;font-weight:600;opacity:.85;margin-left:1px}
@@ -98,17 +98,17 @@ text-shadow:0 1px 3px #fff,0 -1px 3px #fff,1px 0 3px #fff,-1px 0 3px #fff,1px 1p
 .it-name{font-weight:700;font-size:13.5px}
 .it-sub{font-size:11.5px;color:#64748b;margin-top:2px}
 .it-occ{font-size:15px;font-weight:800;white-space:nowrap}
-.it-go{font-size:11px;color:#4321F3;font-weight:700;white-space:nowrap}
+.it-go{font-size:11px;color:#123A6D;font-weight:700;white-space:nowrap}
 .good{color:#059669}.midc{color:#d97706}.bad{color:#dc2626}.mut{color:#94a3b8}
 /* ⭐ 추천 설정 모달 */
 .rl{display:block;font-size:11.5px;font-weight:700;color:#64748b;margin:12px 0 4px}
 .ri{width:100%;padding:9px 11px;border:1.5px solid #cbd5e1;border-radius:9px;font-size:14px;font-weight:700;font-family:inherit}
-.ri:focus{outline:none;border-color:#4321F3}
+.ri:focus{outline:none;border-color:#123A6D}
 .rrow{display:flex;gap:8px}.rrow>div{flex:1}
 .riw{position:relative}
 .riw .ri{padding-right:52px}
 .rsuf{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;color:#94a3b8;pointer-events:none}
-.rbtn{width:100%;margin-top:16px;padding:12px;border:none;border-radius:10px;background:#4321F3;color:#fff;
+.rbtn{width:100%;margin-top:16px;padding:12px;border:none;border-radius:10px;background:#123A6D;color:#fff;
 font-size:14px;font-weight:800;cursor:pointer;font-family:inherit}
 .rbtn2{width:100%;margin-top:8px;padding:10px;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;
 color:#64748b;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
@@ -117,7 +117,7 @@ color:#64748b;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
 align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
 background:rgba(15,23,42,.92);color:#fff;padding:11px 16px;font-size:13px;font-weight:600}
 #demobar b{color:#c7bcff}
-#demobar a{background:#4321F3;color:#fff;font-weight:800;padding:8px 18px;border-radius:8px;
+#demobar a{background:#123A6D;color:#fff;font-weight:800;padding:8px 18px;border-radius:8px;
 text-decoration:none;font-size:13px;white-space:nowrap}
 </style></head><body>
 <div id=wrap>
@@ -142,7 +142,7 @@ text-decoration:none;font-size:13px;white-space:nowrap}
   </div>
   <div class=row>
     <label class="tog on" id=t_circles><span class=dot style="background:#059669"></span>동별 예약률</label>
-    <label class="tog" id=t_rent><span class=dot style="background:#4321F3"></span>렌트</label>
+    <label class="tog" id=t_rent><span class=dot style="background:#123A6D"></span>렌트</label>
     <label class="tog" id=t_naver><span class=dot style="background:#14b8a6"></span>부동산</label>
     <label class="tog" id=t_reco><span class=dot style="background:#eab308"></span>⭐ 추천 스팟만</label>
   </div>
@@ -195,7 +195,7 @@ text-decoration:none;font-size:13px;white-space:nowrap}
         <div><label class=rl>추천 점수 (100점 만점)</label><div class=riw><input id=r_mins type=number class=ri placeholder=0><span class=rsuf>점 이상</span></div></div>
         <div style="display:flex;align-items:flex-end;padding-bottom:9px">
           <label style="font-size:12.5px;font-weight:700;color:#475569;display:flex;align-items:center;gap:6px;cursor:pointer">
-            <input type=checkbox id=r_only checked style="width:16px;height:16px;accent-color:#4321F3"> 조건 맞는 매물 있는 동만</label>
+            <input type=checkbox id=r_only checked style="width:16px;height:16px;accent-color:#123A6D"> 조건 맞는 매물 있는 동만</label>
         </div>
       </div>
       <button class=rbtn onclick="applyReco()">적용하고 추천 보기</button>
@@ -217,7 +217,7 @@ function signupNudge(what){
     '<div style="font-size:14px;color:#334155;line-height:1.6;margin-bottom:16px">'+
     '지금 보시는 건 <b>강남권 미리보기</b>예요.<br>무료 가입하면 <b>전 지역</b> + '+
     '부동산 매물 매칭 + ⭐추천 스팟까지 전부 열립니다.</div>'+
-    '<a href="/auth/signup" style="display:inline-block;background:#4321F3;color:#fff;font-weight:800;'+
+    '<a href="/auth/signup" style="display:inline-block;background:#123A6D;color:#fff;font-weight:800;'+
     'font-size:14px;padding:12px 28px;border-radius:10px;text-decoration:none">무료로 가입하고 전체 보기</a>'+
     '<div style="margin-top:10px"><a href="/auth/login" style="color:#64748b;font-size:12.5px">이미 회원이세요? 로그인</a></div></div>'
   document.getElementById('modal').style.display='flex'
@@ -462,9 +462,9 @@ function geoStyle(i){
   var s=GEO_STAT[i]
   if(!s||s.on<3) return {c:'#c3c8d4',w:.5,fc:'#94a3b8',fo:.02}   // 표본<3: 사실상 안 칠함
   var occ=s.bk/s.on*100                                          // 예약된 매물 비율(%)
-  if(occ>=70) return {c:'#4321F3',w:1,fc:'#4321F3',fo:.32}
+  if(occ>=70) return {c:'#123A6D',w:1,fc:'#123A6D',fo:.32}
   if(occ>=55) return {c:'#6d5ef2',w:.8,fc:'#6d5ef2',fo:.20}
-  if(occ>=40) return {c:'#8b7dff',w:.6,fc:'#8b7dff',fo:.11}
+  if(occ>=40) return {c:'#7FA6DC',w:.6,fc:'#7FA6DC',fo:.11}
   return {c:'#c3c8d4',w:.5,fc:'#94a3b8',fo:.03}                  // 예약률 낮음: 색 없음
 }
 function restyleGeo(){

@@ -73,8 +73,8 @@ export default function OptionView({ filters, runSeq }) {
       <div className="panel">
         <h2 className="sec">옵션별 예약률 영향 — 옵션을 클릭하면 그 옵션 <span className="badge2">없는 집</span> 목록이 아래에 떠요</h2>
         <p className="hint">
-          <b>판정</b>: <span style={{ color: '#7c3aed', fontWeight: 700 }}>사실상 필수</span>=보유율 95%+ → 효과 측정 불가 ·
-          <span style={{ color: '#4321F3', fontWeight: 700 }}> 측정가능</span>=보정차이 신뢰(크면 중요, 작거나 음수면 없어도 잘 나감) ·
+          <b>판정</b>: <span style={{ color: '#123A6D', fontWeight: 700 }}>사실상 필수</span>=보유율 95%+ → 효과 측정 불가 ·
+          <span style={{ color: '#123A6D', fontWeight: 700 }}> 측정가능</span>=보정차이 신뢰(크면 중요, 작거나 음수면 없어도 잘 나감) ·
           <span style={{ color: '#9ca3af', fontWeight: 700 }}> 표본부족</span>=비교 대상 적음. <b>단순차이</b>는 참고값.
         </p>
         <div className="scroll">
