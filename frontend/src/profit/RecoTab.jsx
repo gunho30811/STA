@@ -62,7 +62,7 @@ export default function RecoTab({ month }) {
                   <td style={{ color: r.matches != null && r.matches <= 2 ? '#dc2626' : '#94a3b8', fontWeight: r.matches != null && r.matches <= 2 ? 700 : 400 }} title={r.matches != null && r.matches <= 2 ? '표본 부족 — 신뢰도 낮음' : ''}>{n(r.matches)}</td>
                   <td className="occ">{n(r.occ)}%</td>
                   <td className="pos" style={{ fontWeight: 800 }}>{n(r.expNet)}</td>
-                  <td style={{ fontWeight: 800, color: '#7c3aed' }}>{n(r.score)}</td>
+                  <td style={{ fontWeight: 800, color: '#123A6D' }}>{n(r.score)}</td>
                   <td className="l">
                     {r.naverUrl && <a className="lnk n" style={{ padding: '3px 8px' }} href={r.naverUrl} target="_blank" rel="noreferrer">부동산</a>}
                     {r.samUrl && <a className="lnk s" style={{ padding: '3px 8px' }} href={r.samUrl} target="_blank" rel="noreferrer">렌트</a>}
@@ -83,7 +83,7 @@ export default function RecoTab({ month }) {
                     {r.matches != null && r.matches <= 2 && <span style={{ marginLeft: 5, fontSize: 10, fontWeight: 700, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 5px' }}>표본부족</span>}
                   </div>
                   <div className="mc-area">{[r.dong, r.station].filter(Boolean).join(' · ')}{r.pyeong ? ` · ${n(r.pyeong)}평` : ''} · 경쟁 {fmtComp(r.comp)}</div>
-                  <div className="mc-area">기회점수 <b style={{ color: '#7c3aed' }}>{n(r.score)}</b>
+                  <div className="mc-area">기회점수 <b style={{ color: '#123A6D' }}>{n(r.score)}</b>
                     {r.naverUrl && <a className="lnk n" style={{ padding: '2px 7px', marginLeft: 6 }} href={r.naverUrl} target="_blank" rel="noreferrer">부동산</a>}
                     {r.samUrl && <a className="lnk s" style={{ padding: '2px 7px', marginLeft: 4 }} href={r.samUrl} target="_blank" rel="noreferrer">렌트</a>}
                   </div>
@@ -121,7 +121,7 @@ function RecoArea({ title, rows }) {
                 <td style={r.n != null && r.n <= 2 ? { color: '#dc2626', fontWeight: 700 } : { color: '#94a3b8' }}>{n(r.n)}</td>
                 <td className="occ">{n(r.occ)}%</td>
                 <td className="pos" style={{ fontWeight: 800 }}>{n(r.expNet)}</td>
-                <td style={{ fontWeight: 800, color: '#7c3aed' }}>{n(r.score)}</td>
+                <td style={{ fontWeight: 800, color: '#123A6D' }}>{n(r.score)}</td>
               </tr>
             ))}
           </tbody>
@@ -137,7 +137,7 @@ function RecoArea({ title, rows }) {
                 <div className="mc-name"><span style={{ marginRight: 5 }}>{medal(i + 1)}</span>{r.name}
                   {r.n != null && r.n <= 2 && <span style={{ marginLeft: 5, fontSize: 10, fontWeight: 700, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 5px' }}>표본부족</span>}
                 </div>
-                <div className="mc-area">경쟁 {fmtComp(r.comp)} · 매칭 {n(r.n)} · 기회점수 <b style={{ color: '#7c3aed' }}>{n(r.score)}</b></div>
+                <div className="mc-area">경쟁 {fmtComp(r.comp)} · 매칭 {n(r.n)} · 기회점수 <b style={{ color: '#123A6D' }}>{n(r.score)}</b></div>
               </div>
               <div className="mc-nums">
                 <div className="mc-net pos">{n(r.expNet)}<small>만</small></div>

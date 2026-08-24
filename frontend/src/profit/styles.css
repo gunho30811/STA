@@ -20,7 +20,7 @@ header p { margin: 4px 0 0; font-size: 12px; color: #94a3b8; }
 .fg select, .fg input { padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: #fff; }
 .fg input[type=number] { width: 80px; }
 .btn { cursor: pointer; border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 700; }
-.btn-go { background: #4321F3; color: #fff; }
+.btn-go { background: #123A6D; color: #fff; }
 .btn-reset { background: #e5e7eb; color: #374151; }
 .legend { font-size: 11.5px; color: #6b7280; margin-top: 9px; line-height: 1.6; }
 .md { display: flex; gap: 12px; align-items: flex-start; }
@@ -36,11 +36,11 @@ tbody tr.on { background: #dbeafe; }
 .name { font-weight: 700; }
 .sub { color: #9ca3af; font-size: 11px; }
 .pos { color: #dc2626; font-weight: 800; }
-.neg { color: #4321F3; font-weight: 700; }
+.neg { color: #123A6D; font-weight: 700; }
 .occ { font-weight: 700; color: #0369a1; }
 .pager { display: flex; justify-content: center; gap: 6px; padding: 12px 0; flex-wrap: wrap; }
 .pager button { background: #fff; border: 1px solid #d1d5db; border-radius: 6px; min-width: 32px; padding: 6px; cursor: pointer; }
-.pager button.on { background: #4321F3; color: #fff; border-color: #4321F3; }
+.pager button.on { background: #123A6D; color: #fff; border-color: #123A6D; }
 .pager button:disabled { opacity: .4; cursor: default; }
 .pager .ell { padding: 0 4px; color: #9ca3af; }
 .d-empty { color: #9ca3af; text-align: center; padding: 40px 0; font-size: 13px; }
@@ -49,7 +49,7 @@ tbody tr.on { background: #dbeafe; }
 .d-net { font-size: 13px; color: #6b7280; margin-bottom: 12px; }
 .d-net b { font-size: 24px; color: #dc2626; }
 .d-sec { margin-bottom: 12px; }
-.d-sec h4 { font-size: 11.5px; color: #4321F3; margin: 0 0 6px; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; }
+.d-sec h4 { font-size: 11.5px; color: #123A6D; margin: 0 0 6px; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; }
 .d-kv { display: flex; justify-content: space-between; font-size: 12.5px; padding: 4px 0; border-bottom: 1px dashed #eef0f2; }
 .d-kv .k { color: #94a3b8; }
 .d-kv .v { font-weight: 700; }
@@ -84,7 +84,7 @@ tbody tr.on { background: #dbeafe; }
 .mc-net { font-size: 18px; font-weight: 800; }
 .mc-net small { font-size: 11px; font-weight: 600; margin-left: 1px; }
 .mc-net.pos { color: #dc2626; }
-.mc-net.neg { color: #4321F3; }
+.mc-net.neg { color: #123A6D; }
 .mc-occ { font-size: 12px; font-weight: 700; color: #0369a1; margin-top: 3px; }
 .mc-occ.zero { color: #dc2626; }
 @media (max-width: 720px) {

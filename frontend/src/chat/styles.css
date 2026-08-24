@@ -48,14 +48,14 @@ header p {
 }
 
 .btn-go {
-  background: #4321F3;
+  background: #123A6D;
   color: #fff;
 }
 
 .btn-ghost {
   background: #fff;
-  color: #4321F3;
-  border: 1px solid #4321F3;
+  color: #123A6D;
+  border: 1px solid #123A6D;
 }
 
 .wrap {
@@ -357,7 +357,7 @@ h2.sec {
 
 .bubble.me {
   align-self: flex-end;
-  background: #4321F3;
+  background: #123A6D;
   color: #fff;
   border-bottom-right-radius: 3px;
 }
