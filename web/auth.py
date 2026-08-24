@@ -965,7 +965,7 @@ def _nav_html():
     return f"""<input type=checkbox id=__navtog hidden>
 <nav id=__nav>
   <div class=__inner>
-    <a class=__brand href="/">ren<b>dit</b></a>
+    <a class=__brand href="/"><i class=__mark aria-hidden=true></i>ren<b>dit</b></a>
     <label for=__navtog class=__ham aria-label="메뉴">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
         stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
@@ -991,24 +991,37 @@ def _nav_html():
   </div>
 </nav>
 <style>
-#__nav{{position:sticky;top:0;z-index:9999;background:rgba(255,255,255,.92);
-backdrop-filter:blur(12px);border-bottom:1px solid #E7E9F3;
-font-family:'Pretendard','Malgun Gothic',sans-serif}}
+/* 명암 규칙: 광원은 위쪽 한 곳, 그림자는 검정이 아니라 브랜드 계열 색(hsl 248deg)을
+   낮은 알파로 여러 겹 쌓는다(단일 회색 그림자가 '싸구려'로 보이는 이유가 이것).
+   평소엔 그림자 없이 hairline만, 스크롤해서 본문이 헤더 밑으로 들어갈 때만 살짝 띄운다. */
+#__nav{{position:sticky;top:0;z-index:9999;background:rgba(255,255,255,.86);
+backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid #E7E9F3;
+font-family:'Pretendard','Malgun Gothic',sans-serif;
+transition:box-shadow .18s ease,border-color .18s ease,background .18s ease}}
+#__nav.__scrolled{{border-bottom-color:transparent;background:rgba(255,255,255,.94);
+box-shadow:0 1px 1px hsl(248deg 45% 35% / .04),
+           0 2px 2px hsl(248deg 45% 35% / .04),
+           0 4px 4px hsl(248deg 45% 35% / .04),
+           0 8px 8px hsl(248deg 45% 35% / .04)}}
 #__nav .__inner{{width:100%;display:flex;align-items:center;gap:8px;padding:0 24px;height:56px}}
-#__nav .__brand{{font-size:20px;line-height:28px;font-weight:800;color:#1B1B3A;
-text-decoration:none;letter-spacing:-.02em;margin-right:20px}}
+#__nav .__brand{{display:inline-flex;align-items:center;font-size:20px;line-height:28px;
+font-weight:800;color:#0F0F23;text-decoration:none;letter-spacing:-.025em;margin-right:20px}}
 #__nav .__brand b{{color:#4D2EE9;font-weight:800}}
+/* 로고 마크 — 같은 색 계열의 명암(밝은 면/어두운 면)을 줘서 평평해 보이지 않게 */
+#__nav .__mark{{width:10px;height:10px;margin-right:9px;border-radius:2.5px;
+background:linear-gradient(145deg,#6B52F5,#3A1FC9);transform:rotate(45deg);
+box-shadow:0 1px 2px hsl(248deg 45% 35% / .38),inset 0 1px 0 hsl(248deg 90% 82% / .55)}}
 #__nav .__menu{{display:flex;align-items:center;gap:4px;flex:1}}
-#__nav .__menu a{{color:#5A5A7A;text-decoration:none;padding:8px 12px;border-radius:8px;
+#__nav .__menu a{{color:#45456B;text-decoration:none;padding:8px 12px;border-radius:8px;
 font-weight:600;font-size:15px;line-height:20px;white-space:nowrap;
 transition:background .15s,color .15s}}
 #__nav .__menu a:hover{{background:#F2F2F8;color:#1B1B3A}}
-#__nav .__menu a.on{{color:#4D2EE9;background:#EFECFE}}
+#__nav .__menu a.on{{color:#4D2EE9;background:#EDE9FE;box-shadow:inset 0 1px 0 #fff,0 1px 2px hsl(248deg 45% 35% / .10)}}
 #__nav .__right{{margin-left:auto;display:flex;align-items:center;gap:4px}}
-#__nav .__notify{{display:inline-flex;align-items:center;gap:4px;color:#5A5A7A}}
+#__nav .__notify{{display:inline-flex;align-items:center;gap:4px;color:#45456B}}
 #__nav .__notify svg{{flex:none}}
 #__nav .__logout{{color:#8080A8;font-size:14px}}
-#__nav .__ham{{display:none;color:#5A5A7A;cursor:pointer;padding:4px 8px;user-select:none}}
+#__nav .__ham{{display:none;color:#45456B;cursor:pointer;padding:4px 8px;user-select:none}}
 #__nav a:focus-visible,#__nav label:focus-visible{{outline:2px solid #4D2EE9;outline-offset:2px}}
 @media(max-width:900px){{
   #__nav .__inner{{padding:0 16px;height:52px}}
@@ -1021,4 +1034,16 @@ transition:background .15s,color .15s}}
   #__nav .__right{{margin-left:0;flex-direction:column;align-items:stretch;
     border-top:1px solid #E7E9F3;margin-top:8px;padding-top:8px}}
 }}
-</style>"""
+</style>
+<script>
+// 본문이 헤더 밑으로 들어갔을 때만 그림자를 켠다(평소엔 평평하게).
+(function(){{
+  var n=document.getElementById('__nav'); if(!n) return;
+  var on=false;
+  function upd(){{
+    var s=window.scrollY>4;
+    if(s!==on){{ on=s; n.classList.toggle('__scrolled',s); }}
+  }}
+  addEventListener('scroll',upd,{{passive:true}}); upd();
+}})();
+</script>"""

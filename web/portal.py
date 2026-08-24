@@ -558,6 +558,11 @@ padding:14px;text-align:center}
   },15000);
 })();
 </script>
+<script>
+(function(){var h=document.querySelector('.hd');if(!h)return;var on=false;
+function u(){var s=scrollY>4;if(s!==on){on=s;h.classList.toggle('scrolled',s)}}
+addEventListener('scroll',u,{passive:true});u()})();
+</script>
 </body></html>"""
 
 
@@ -583,14 +588,28 @@ img,svg{max-width:100%}
 
 /* 헤더 */
 /* 로그인 헤더(#__nav)와 같은 규격 — 높이 56px·브랜드 20px·hairline 하단선 */
-.hd{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);
+/* 광원 한 곳(위) · 그림자는 브랜드 계열색을 여러 겹. 스크롤 전엔 평평하게 둔다. */
+.hd{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.86);
+backdrop-filter:saturate(180%) blur(14px);
 border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;
-height:56px;padding:0 24px;gap:8px}
-.brand{font-size:20px;line-height:28px;font-weight:800;letter-spacing:-.02em;color:var(--ink)}
+height:56px;padding:0 24px;gap:8px;transition:box-shadow .18s ease,border-color .18s ease}
+.hd.scrolled{border-bottom-color:transparent;background:rgba(255,255,255,.94);
+box-shadow:0 1px 1px hsl(248deg 45% 35% / .04),0 2px 2px hsl(248deg 45% 35% / .04),
+0 4px 4px hsl(248deg 45% 35% / .04),0 8px 8px hsl(248deg 45% 35% / .04)}
+.brand{font-size:20px;line-height:28px;font-weight:800;letter-spacing:-.025em;color:#0F0F23}
 .brand b{color:var(--accent);font-weight:800}
+.brand{display:inline-flex;align-items:center}
+/* 로고 마크 — 같은 색 계열 명암(밝은 면/어두운 면)으로 평평해 보이지 않게 */
+.brand-mark{width:10px;height:10px;margin-right:9px;border-radius:2.5px;
+background:linear-gradient(145deg,#6B52F5,#3A1FC9);transform:rotate(45deg);
+box-shadow:0 1px 2px hsl(248deg 45% 35% / .38),inset 0 1px 0 hsl(248deg 90% 82% / .55)}
 .hd-cta{display:flex;align-items:center;gap:16px}
 .hd-cta .login{font-size:14px;font-weight:600;color:var(--mut)}
-.hd-cta .signup{font-size:14px;font-weight:700;color:var(--accent);border:1px solid #D7DBE4;padding:8px 15px;border-radius:8px}
+.hd-cta .signup{font-size:14px;line-height:20px;font-weight:700;color:#fff;background:var(--accent);
+border:none;padding:0 16px;height:36px;display:inline-flex;align-items:center;border-radius:8px;
+box-shadow:0 1px 2px hsl(248deg 45% 35% / .28),inset 0 1px 0 hsl(248deg 90% 85% / .35);
+transition:background .15s,transform .06s}
+.hd-cta .signup:hover{background:#3A1FC9}.hd-cta .signup:active{transform:scale(.97)}
 @media(max-width:720px){.hd{padding:0 16px;height:52px}}
 
 /* 히어로 */
@@ -716,7 +735,7 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
 
 <!-- 헤더 : 무료 도구가 1순위, 회원가입은 2순위 -->
 <header class=hd>
-  <div class=brand>ren<b>dit</b></div>
+  <div class=brand><i class=brand-mark></i>ren<b>dit</b></div>
   <div class=hd-cta>
     <a class=login href="/auth/login">로그인</a>
     <a class=signup href="/auth/signup">회원가입</a>
@@ -873,7 +892,7 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
 </section>
 
 <footer class=foot>
-  <div class=brand>ren<b>dit</b></div>
+  <div class=brand><i class=brand-mark></i>ren<b>dit</b></div>
   <div>© 2026 rendit. All rights reserved.</div>
 </footer>
 
@@ -898,6 +917,11 @@ gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
   [rent, weekly, occEl].forEach(function(el){ el.addEventListener('input', calc); });
   calc();
 })();
+</script>
+<script>
+(function(){var h=document.querySelector('.hd');if(!h)return;var on=false;
+function u(){var s=scrollY>4;if(s!==on){on=s;h.classList.toggle('scrolled',s)}}
+addEventListener('scroll',u,{passive:true});u()})();
 </script>
 </body></html>"""
 
@@ -968,13 +992,20 @@ body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
 background:var(--bg);min-height:100vh;color:var(--text);padding:20px 16px 60px}
 .hd{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);
 border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;
-height:56px;padding:0 24px;margin:-20px -16px 20px}
-.hd .brand{font-size:20px;line-height:28px;font-weight:800;letter-spacing:-.02em;color:var(--text);text-decoration:none}
+height:56px;padding:0 24px;margin:-20px -16px 20px;transition:box-shadow .18s ease,border-color .18s ease}
+.hd.scrolled{border-bottom-color:transparent;
+box-shadow:0 1px 1px hsl(248deg 45% 35% / .04),0 2px 2px hsl(248deg 45% 35% / .04),
+0 4px 4px hsl(248deg 45% 35% / .04),0 8px 8px hsl(248deg 45% 35% / .04)}
+.hd .brand{display:inline-flex;align-items:center;font-size:20px;line-height:28px;font-weight:800;letter-spacing:-.025em;color:#0F0F23;text-decoration:none}
 .hd .brand b{color:var(--brand);font-weight:800}
+.hd .brand-mark{width:10px;height:10px;margin-right:9px;border-radius:2.5px;background:linear-gradient(145deg,#6B52F5,#3A1FC9);transform:rotate(45deg);box-shadow:0 1px 2px hsl(248deg 45% 35% / .38),inset 0 1px 0 hsl(248deg 90% 82% / .55)}
 .hd-cta{display:flex;align-items:center;gap:16px}
 .hd-cta .login{font-size:14px;line-height:20px;font-weight:600;color:var(--text-sub);text-decoration:none}
-.hd-cta .signup{font-size:14px;line-height:20px;font-weight:700;color:var(--brand);border:1px solid var(--line);
-padding:0 16px;height:36px;display:inline-flex;align-items:center;border-radius:8px;text-decoration:none}
+.hd-cta .signup{font-size:14px;line-height:20px;font-weight:700;color:#fff;background:var(--brand);
+border:none;padding:0 16px;height:36px;display:inline-flex;align-items:center;border-radius:8px;
+text-decoration:none;box-shadow:0 1px 2px hsl(248deg 45% 35% / .28),inset 0 1px 0 hsl(248deg 90% 85% / .35);
+transition:background .15s,transform .06s}
+.hd-cta .signup:hover{background:#3A1FC9}.hd-cta .signup:active{transform:scale(.97)}
 /* 로그인 시 auth._inject_nav가 body 시작 직후 삽입하는 공통 네비바(#__nav)도
    body의 padding에 밀리지 않게 동일하게 상쇄 — 다른 뷰어(body padding:0)와 간격 맞춤.
    주의: _inject_nav는 여는 태그 문자열을 앞에서부터 찾아 그 바로 뒤에 네비바를 끼워넣는다.
@@ -1248,7 +1279,7 @@ input[type=range]{height:28px}
 </style></head><body>
 {% if not user %}
 <header class=hd>
-  <a class=brand href="/">ren<b>dit</b></a>
+  <a class=brand href="/"><i class=brand-mark></i>ren<b>dit</b></a>
   <div class=hd-cta>
     <a class=login href="/auth/login">로그인</a>
     <a class=signup href="/auth/signup">회원가입</a>
@@ -1664,7 +1695,12 @@ document.querySelectorAll('.info-ic').forEach(function(el){el.addEventListener('
 document.addEventListener('click',function(){document.querySelectorAll('.info-wrap.show').forEach(function(w){w.classList.remove('show')})})
 calc()
 </script>
-</div></body></html>"""
+</div><script>
+(function(){var h=document.querySelector('.hd');if(!h)return;var on=false;
+function u(){var s=scrollY>4;if(s!==on){on=s;h.classList.toggle('scrolled',s)}}
+addEventListener('scroll',u,{passive:true});u()})();
+</script>
+</body></html>"""
 
 
 @portal.route("/calc")
