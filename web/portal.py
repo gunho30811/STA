@@ -580,7 +580,7 @@ PUBLIC_LANDING = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxMDAgMTAwJz48Y2lyY2xlIGN4PSc1MCcgY3k9JzUwJyByPSc1MCcgZmlsbD0nIzQzMjFGMycvPjxnIGZpbGw9J25vbmUnIHN0cm9rZT0nI2ZmZicgc3Ryb2tlLXdpZHRoPScxMycgc3Ryb2tlLWxpbmVjYXA9J3JvdW5kJyBzdHJva2UtbGluZWpvaW49J3JvdW5kJz48cGF0aCBkPSdNNDAgMzRWNjcnLz48cGF0aCBkPSdNNDAgNDdDNDMgMzkgNTIgMzYgNjEgNDAnLz48L2c+PC9zdmc+">
 <link rel=stylesheet href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard-dynamic-subset.css">
 <style>
-:root{--accent:#123A6D;--ink:#141824;--sub:#565C6E;--mut:#6B7080;--line:#ECEEF2;--line2:#E5E8EF;--bg-soft:#F7F8FB}
+:root{--accent:#1B72E8;--ink:#141824;--sub:#565C6E;--mut:#6B7080;--line:#ECEEF2;--line2:#E5E8EF;--bg-soft:#F7F8FB}
 *{box-sizing:border-box}
 body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;background:#fff;color:var(--ink);line-height:1.55}
 a{color:var(--accent);text-decoration:none}
@@ -594,22 +594,22 @@ backdrop-filter:saturate(180%) blur(14px);
 border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;
 height:56px;padding:0 24px;gap:8px;transition:box-shadow .18s ease,border-color .18s ease}
 .hd.scrolled{border-bottom-color:transparent;background:rgba(255,255,255,.94);
-box-shadow:0 1px 1px hsl(214deg 72% 25% / .04),0 2px 2px hsl(214deg 72% 25% / .04),
-0 4px 4px hsl(214deg 72% 25% / .04),0 8px 8px hsl(214deg 72% 25% / .04)}
+box-shadow:0 1px 1px hsl(213deg 82% 38% / .04),0 2px 2px hsl(213deg 82% 38% / .04),
+0 4px 4px hsl(213deg 82% 38% / .04),0 8px 8px hsl(213deg 82% 38% / .04)}
 .brand{font-size:20px;line-height:28px;font-weight:800;letter-spacing:-.025em;color:#101B2D}
 .brand b{color:var(--accent);font-weight:800}
 .brand{display:inline-flex;align-items:center}
 /* 로고 마크 — 같은 색 계열 명암(밝은 면/어두운 면)으로 평평해 보이지 않게 */
 .brand-mark{width:10px;height:10px;margin-right:9px;border-radius:2.5px;
-background:linear-gradient(145deg,#2C5A9E,#0D2B52);transform:rotate(45deg);
-box-shadow:0 1px 2px hsl(214deg 72% 25% / .38),inset 0 1px 0 hsl(214deg 80% 82% / .55)}
+background:linear-gradient(145deg,#3B8EF7,#1560C4);transform:rotate(45deg);
+box-shadow:0 1px 2px hsl(213deg 82% 38% / .38),inset 0 1px 0 hsl(214deg 80% 82% / .55)}
 .hd-cta{display:flex;align-items:center;gap:16px}
 .hd-cta .login{font-size:14px;font-weight:600;color:var(--mut)}
 .hd-cta .signup{font-size:14px;line-height:20px;font-weight:700;color:#fff;background:var(--accent);
 border:none;padding:0 16px;height:36px;display:inline-flex;align-items:center;border-radius:8px;
-box-shadow:0 1px 2px hsl(214deg 72% 25% / .28),inset 0 1px 0 hsl(214deg 80% 85% / .35);
+box-shadow:0 1px 2px hsl(213deg 82% 38% / .28),inset 0 1px 0 hsl(214deg 80% 85% / .35);
 transition:background .15s,transform .06s}
-.hd-cta .signup:hover{background:#0D2B52}.hd-cta .signup:active{transform:scale(.97)}
+.hd-cta .signup:hover{background:#1560C4}.hd-cta .signup:active{transform:scale(.97)}
 @media(max-width:720px){.hd{padding:0 16px;height:52px}}
 
 /* 히어로 */
@@ -927,9 +927,9 @@ addEventListener('scroll',u,{passive:true});u()})();
 
 
 # rendit 아이콘 타일(라운드 사각 + 흰 글리프, 로고의 둥근 기하학 톤). 다크/라이트 배경 공통.
-# fill 기본값은 로그인 후 대시보드(LANDING)의 기존 브랜드색 유지 — 신규 브랜드색(#123A6D)은
+# fill 기본값은 로그인 후 대시보드(LANDING)의 기존 브랜드색 유지 — 신규 브랜드색(#1B72E8)은
 # 공개 랜딩(PUBLIC_LANDING) 전용 아이콘에만 명시적으로 넘긴다.
-def _tile(glyph, fill='#123A6D'):
+def _tile(glyph, fill='#1B72E8'):
     return (
         '<svg width="46" height="46" viewBox="0 0 46 46" fill="none" '
         'style="display:block">'
@@ -945,7 +945,7 @@ ICON_RENT = _tile('<rect x="14" y="16" width="18" height="16" rx="3"/>'
 # 부동산 매물: 건물/집 + 문
 ICON_ESTATE = _tile('<path d="M16 32V20l7-6 7 6v12"/><path d="M20 32v-6h6v6"/>')
 
-_BRAND = '#123A6D'
+_BRAND = '#1B72E8'
 # 계산기: 화면 + 버튼 그리드
 ICON_CALC = _tile('<rect x="15" y="11" width="16" height="24" rx="3"/>'
                   '<path d="M18 16h10M18 22h2M22 22h2M26 22h2M18 27h2M22 27h2M26 27h2"/>', _BRAND)
@@ -985,7 +985,7 @@ CALC_PAGE = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
 *{box-sizing:border-box}
 /* 포인트 색상(브랜드/수익/손실/골드)은 Figma 값 대신 사용자가 기존에 정의해둔 디자인
    토큰으로 — 배경·텍스트·보더 등 구조색은 Figma Make export 값 유지 */
-:root{--brand:#123A6D;--brand-hover:#0D2B52;--brand-tint:#E9EEF7;--profit:#148A5E;--loss:#D24545;
+:root{--brand:#1B72E8;--brand-hover:#1560C4;--brand-tint:#E8F1FD;--profit:#148A5E;--loss:#D24545;
 --profit-bg:#EAF6F0;--loss-bg:#FBEAEA;--gold-bg:#FDF8ED;
 --bg:#EEF1F6;--text:#16233A;--text-sub:#6B7A90;--line:#E3E8EF;--gold:#D89700;--field-bg:#EEF2F7}
 body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
@@ -994,18 +994,18 @@ background:var(--bg);min-height:100vh;color:var(--text);padding:20px 16px 60px}
 border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;
 height:56px;padding:0 24px;margin:-20px -16px 20px;transition:box-shadow .18s ease,border-color .18s ease}
 .hd.scrolled{border-bottom-color:transparent;
-box-shadow:0 1px 1px hsl(214deg 72% 25% / .04),0 2px 2px hsl(214deg 72% 25% / .04),
-0 4px 4px hsl(214deg 72% 25% / .04),0 8px 8px hsl(214deg 72% 25% / .04)}
+box-shadow:0 1px 1px hsl(213deg 82% 38% / .04),0 2px 2px hsl(213deg 82% 38% / .04),
+0 4px 4px hsl(213deg 82% 38% / .04),0 8px 8px hsl(213deg 82% 38% / .04)}
 .hd .brand{display:inline-flex;align-items:center;font-size:20px;line-height:28px;font-weight:800;letter-spacing:-.025em;color:#101B2D;text-decoration:none}
 .hd .brand b{color:var(--brand);font-weight:800}
-.hd .brand-mark{width:10px;height:10px;margin-right:9px;border-radius:2.5px;background:linear-gradient(145deg,#2C5A9E,#0D2B52);transform:rotate(45deg);box-shadow:0 1px 2px hsl(214deg 72% 25% / .38),inset 0 1px 0 hsl(214deg 80% 82% / .55)}
+.hd .brand-mark{width:10px;height:10px;margin-right:9px;border-radius:2.5px;background:linear-gradient(145deg,#3B8EF7,#1560C4);transform:rotate(45deg);box-shadow:0 1px 2px hsl(213deg 82% 38% / .38),inset 0 1px 0 hsl(214deg 80% 82% / .55)}
 .hd-cta{display:flex;align-items:center;gap:16px}
 .hd-cta .login{font-size:14px;line-height:20px;font-weight:600;color:var(--text-sub);text-decoration:none}
 .hd-cta .signup{font-size:14px;line-height:20px;font-weight:700;color:#fff;background:var(--brand);
 border:none;padding:0 16px;height:36px;display:inline-flex;align-items:center;border-radius:8px;
-text-decoration:none;box-shadow:0 1px 2px hsl(214deg 72% 25% / .28),inset 0 1px 0 hsl(214deg 80% 85% / .35);
+text-decoration:none;box-shadow:0 1px 2px hsl(213deg 82% 38% / .28),inset 0 1px 0 hsl(214deg 80% 85% / .35);
 transition:background .15s,transform .06s}
-.hd-cta .signup:hover{background:#0D2B52}.hd-cta .signup:active{transform:scale(.97)}
+.hd-cta .signup:hover{background:#1560C4}.hd-cta .signup:active{transform:scale(.97)}
 /* 로그인 시 auth._inject_nav가 body 시작 직후 삽입하는 공통 네비바(#__nav)도
    body의 padding에 밀리지 않게 동일하게 상쇄 — 다른 뷰어(body padding:0)와 간격 맞춤.
    주의: _inject_nav는 여는 태그 문자열을 앞에서부터 찾아 그 바로 뒤에 네비바를 끼워넣는다.
@@ -1085,7 +1085,7 @@ color:var(--text);text-align:right;width:100%;font-family:inherit}
 .vac-range{width:100%;accent-color:var(--brand)}
 .scale{display:flex;justify-content:space-between;font-size:12px;line-height:16px;color:var(--text-sub);margin-top:8px}
 .vac-insight{display:flex;align-items:center;gap:12px;margin-top:16px;padding:12px 16px;
-background:#fff;border:1px solid #0D2B52;border-radius:12px;font-size:14px;line-height:20px;font-weight:600;color:var(--text)}
+background:#fff;border:1px solid #1560C4;border-radius:12px;font-size:14px;line-height:20px;font-weight:600;color:var(--text)}
 .vac-insight svg{flex:none}
 .pos{color:var(--profit)}.pos-brand{color:var(--brand)}.neg{color:var(--loss)}
 .vac{margin-top:0}
@@ -1223,8 +1223,8 @@ white-space:normal;text-align:left;z-index:20;box-shadow:0 12px 32px rgba(0,0,0,
 .be-row td{border-top:1px dashed var(--gold);border-bottom:none;color:var(--gold);font-size:12px;line-height:16px;
 font-weight:700;text-align:center;padding:8px 4px}
 .cta-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
-margin-top:32px;padding:24px;background:#0D2B52;border-radius:16px;
-box-shadow:0 14px 28px -14px rgba(18,58,109,.25)}
+margin-top:32px;padding:24px;background:#1560C4;border-radius:16px;
+box-shadow:0 14px 28px -14px rgba(27,114,232,.25)}
 .cta-h1{font-size:14px;line-height:20px;font-weight:700;color:#fff;margin:0 0 4px;line-height:1.4}
 .cta-h2{font-size:14px;line-height:20px;color:rgba(255,255,255,.7);margin:0;line-height:1.5}
 .cta-btn{flex:0 0 auto;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;
@@ -1396,7 +1396,7 @@ input[type=range]{height:28px}
   </div>
 </div>
 <div class="box vac">
-  <p class=vac-eyebrow>공실률별로 보면<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#123A6D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+  <p class=vac-eyebrow>공실률별로 보면<span class=info-wrap><span class=info-ic tabindex=0><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1B72E8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
 <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
 </svg></span><span class="info-tip nowrap">월 완전가동 순수익 x (1−공실일수/31) − 월 고정지출</span></span></p>
   <h2 class=scenario-title>순수익 시나리오</h2>

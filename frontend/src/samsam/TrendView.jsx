@@ -58,7 +58,7 @@ export default function TrendView({ filters, runSeq }) {
             ) : rows.map((x, i) => {
               const dcell = x.delta == null ? <span className="mut">-</span>
                 : x.delta > 0 ? <span className="bad">▲{x.delta}</span>
-                : x.delta < 0 ? <span style={{ color: '#123A6D', fontWeight: 700 }}>▼{Math.abs(x.delta)}</span> : '0'
+                : x.delta < 0 ? <span style={{ color: '#1B72E8', fontWeight: 700 }}>▼{Math.abs(x.delta)}</span> : '0'
               const to = x.top_office
               return (
                 <tr key={i}>
