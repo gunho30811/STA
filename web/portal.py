@@ -727,7 +727,8 @@ transition:.15s}
 /* 푸터 */
 .foot{padding:32px 40px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;
 gap:12px;color:#8990A0;font-size:13px;border-top:1px solid var(--line)}
-.foot .brand{font-size:21px}
+/* 로고는 어디서나 같은 규격 — 크기만 상황에 맞게, 색·굵기·자간은 고정 */
+.foot .brand{font-size:20px}
 </style></head><body>
 
 <!-- 헤더 : 무료 도구가 1순위, 회원가입은 2순위 -->
@@ -984,7 +985,7 @@ CALC_PAGE = """<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8>
    토큰으로 — 배경·텍스트·보더 등 구조색은 Figma Make export 값 유지 */
 :root{--brand:#1B72E8;--brand-hover:#1560C4;--brand-tint:#E8F1FD;--profit:#148A5E;--loss:#D24545;
 --profit-bg:#EAF6F0;--loss-bg:#FBEAEA;--gold-bg:#FDF8ED;
---bg:#EEF1F6;--text:#16233A;--text-sub:#6B7A90;--line:#E3E8EF;--gold:#D89700;--field-bg:#EEF2F7}
+--bg:#FFFFFF;--text:#16233A;--text-sub:#6B7A90;--line:#E3E8EF;--gold:#D89700;--field-bg:#EEF2F7}
 body{margin:0;font-family:"Pretendard","Malgun Gothic",sans-serif;
 background:var(--bg);min-height:100vh;color:var(--text);padding:20px 16px 60px}
 .hd{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);

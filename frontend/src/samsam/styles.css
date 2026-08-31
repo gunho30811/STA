@@ -1,6 +1,6 @@
 /* 기존 templates/samsam.html 스타일 이식(디자인 유지). */
 * { box-sizing: border-box; }
-body { margin: 0; font-family: "Pretendard", "Malgun Gothic", "맑은 고딕", sans-serif; background: #f3f5f7; color: #1f2937; }
+body { margin: 0; font-family: "Pretendard", "Malgun Gothic", "맑은 고딕", sans-serif; background: #ffffff; color: #1f2937; }
 header { background: linear-gradient(120deg, #0f172a, #1e293b); color: #fff; padding: 16px 24px; }
 header h1 { margin: 0; font-size: 19px; font-weight: 800; }
 header p { margin: 5px 0 0; font-size: 12.5px; color: #94a3b8; }
