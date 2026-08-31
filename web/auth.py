@@ -260,7 +260,11 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 10px;
 th{background:#f9fafb;font-weight:700}.danger{color:#dc2626;cursor:pointer;border:none;background:none;font-weight:700}
 .code{font-size:24px;font-weight:800;letter-spacing:4px;color:#1B72E8;text-align:center;background:#eff6ff;padding:12px;border-radius:8px;margin:8px 0}
 .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.homelink{position:fixed;top:16px;left:18px;color:#94a3b8;text-decoration:none;font-weight:800;font-size:14px}
+.homelink{position:fixed;top:16px;left:18px;color:#6B7A90;text-decoration:none;font-weight:800;font-size:14px;letter-spacing:-.025em}
+.homelink b{color:#1B72E8}
+/* 로그인·가입 화면 로고 — 헤더 워드마크와 같은 규격(색·굵기·자간) */
+.brandmark{font-size:28px;line-height:34px;font-weight:800;letter-spacing:-.025em;color:#101B2D;margin:0 0 6px}
+.brandmark b{color:#1B72E8;font-weight:800}
 .homelink b{color:#fff}.homelink:hover{color:#cbd5e1}
 @media(max-width:640px){body{padding:12px}.box{padding:22px 16px}
 table{font-size:12px}th,td{padding:7px 8px}input{font-size:16px}}
@@ -304,7 +308,7 @@ def login():
     _ico = ('<svg width="18" height="18" viewBox="0 0 18 18"><path fill="#191919" d="M9 1.5C4.86'
             ' 1.5 1.5 4.19 1.5 7.5c0 2.1 1.27 3.94 3.19 5.06l-.81 3.01 3.48-2.29C7.72 13.42'
             ' 8.35 13.5 9 13.5c4.14 0 7.5-2.69 7.5-6S13.14 1.5 9 1.5z"/></svg>')
-    body = (f'<h1 style="letter-spacing:-.02em;color:#171A23">ren<b style="color:#1B72E8">dit</b></h1>'
+    body = (f'<h1 class=brandmark>ren<b>dit</b></h1>'
             f'<p class="sub">부동산 단기임대 수익성 분석 · 회원 전용</p>{msg}'
             f'<a href="{url_for("auth.kakao_login")}" class="kakao-btn">{_ico}카카오로 시작하기</a>'
             f'<div class="or-sep"><hr><span>또는</span><hr></div>'
@@ -994,6 +998,9 @@ def _nav_html():
 /* 명암 규칙: 광원은 위쪽 한 곳, 그림자는 검정이 아니라 브랜드 계열 색(hsl 248deg)을
    낮은 알파로 여러 겹 쌓는다(단일 회색 그림자가 '싸구려'로 보이는 이유가 이것).
    평소엔 그림자 없이 hairline만, 스크롤해서 본문이 헤더 밑으로 들어갈 때만 살짝 띄운다. */
+/* React 뷰어는 앱 CSS가 늦게 붙어 그 전까지 body 기본 margin(8px)이 남는다.
+   그 8px 때문에 네비가 아래로 밀렸다가 CSS 로드 후 위로 튀어서, 여기서 먼저 지운다. */
+body{{margin:0}}
 #__nav{{position:sticky;top:0;z-index:9999;background:rgba(255,255,255,.86);
 backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid #EEF1F6;
 font-family:'Pretendard','Malgun Gothic',sans-serif;
