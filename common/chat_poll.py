@@ -369,6 +369,21 @@ def poll_liveanywhere_account(conn, acct):
         prev_notif = (st['last_notified_time'] if st else None) or 0
         room_id = _upsert_room(conn, acct_id, ch['channel_url'], room, ch['counterpart_nickname'])
         lmt = ch['last_message_time'] or 0
+        # 대화 내용 적재 — 리브애니웨어는 이력 조회 API가 없어서(게이트웨이 404/500) 폴링 때
+        # 보이는 '마지막 메시지'만 모은다. 그래서 연결 이후 오간 대화가 쌓이는 구조다.
+        # 보낸 사람 정보가 payload에 없어, 안읽음이 있으면 상대방 발신으로 본다(그 외는 미상).
+        if ch.get('last_message') and ch.get('last_message_id'):
+            sender = ch['counterpart_member'] if (ch.get('unread') or 0) > 0 else ''
+            try:
+                conn.execute(
+                    "INSERT INTO samsam_chat_messages"
+                    " (room_id, msg_key, sender, receiver, message, message_type, message_time)"
+                    " VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (room_id, msg_key) DO NOTHING",
+                    (room_id, f"la:{ch['last_message_id']}", sender, '',
+                     ch['last_message'], 'text', lmt))
+                conn.commit()
+            except Exception as e:
+                log(f"    [LA]메시지 적재 실패(room {room_id}): {repr(e)[:80]}")
         # 신규 수신 = 최초폴 아님 + 안읽음 있음 + 마지막메시지 시각이 직전 알림보다 최신. (fail-safe)
         if (not first_poll) and ch.get('unread', 0) > 0 and lmt > prev_notif:
             label = acct.get('label') or acct.get('samsam_email') or '리브애니웨어'

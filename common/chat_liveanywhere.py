@@ -116,7 +116,7 @@ def list_channels(cookies):
     """GET /v1/sendbird/my-channels → 정규화된 채널(방) 리스트.
 
     각 원소: {channel_url, room_name, counterpart_nickname, counterpart_member,
-              unread, last_message, last_message_time(epoch ms)}
+              unread, last_message, last_message_time(epoch ms), last_message_id}
     인증 만료 시 requests.HTTPError(폴러가 잡아 재로그인).
     """
     s = _session(cookies)
@@ -139,5 +139,8 @@ def list_channels(cookies):
             "unread": sb.get("unreadMessageCount") or 0,
             "last_message": last.get("message"),
             "last_message_time": last.get("createdAt"),
+            # 메시지 적재 dedupe 키. 게이트웨이엔 대화 이력 조회 API가 없어(404/500) 폴링 때
+            # 보이는 lastMessage만 모을 수 있다 → messageId로 중복을 거른다.
+            "last_message_id": str(last.get("messageId") or ""),
         })
     return out
