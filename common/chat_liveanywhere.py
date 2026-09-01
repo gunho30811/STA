@@ -131,6 +131,7 @@ def list_channels(cookies):
         members = sb.get("members") or []
         # 상대(게스트) = 내가 아닌 멤버 중 첫 번째. (host=isMe=true)
         guest = next((m for m in members if not m.get("isMe")), None) or {}
+        me = next((m for m in members if m.get("isMe")), None) or {}
         out.append({
             "channel_url": sb.get("channelUrl"),
             "room_name": acc.get("name") or sb.get("name"),
@@ -142,5 +143,6 @@ def list_channels(cookies):
             # 메시지 적재 dedupe 키. 게이트웨이엔 대화 이력 조회 API가 없어(404/500) 폴링 때
             # 보이는 lastMessage만 모을 수 있다 → messageId로 중복을 거른다.
             "last_message_id": str(last.get("messageId") or ""),
+            "my_member": str(me.get("userId") or ""),
         })
     return out
