@@ -111,6 +111,14 @@ export default function Inbox({ rooms, onReloadRooms }) {
           <div className="thread" ref={threadRef}>
             {!thread && <div className="empty">왼쪽에서 채팅방을 선택하세요</div>}
 
+            {thread && thread.messages.length === 0 && (
+              <div className="empty">
+                {canReply(curInfo && curInfo.provider)
+                  ? '아직 주고받은 메시지가 없어요.'
+                  : '리브애니웨어는 지난 대화를 불러오는 기능이 없어서, 계정을 연결한 뒤부터 오가는 메시지가 여기에 쌓여요. 지난 내용은 리브애니웨어 앱에서 확인해 주세요.'}
+              </div>
+            )}
+
             {thread && thread.messages.map((m, i) => {
               const mine = String(m.sender) === String(thread.owner_id)
               const kind = m.message_type === 'system' ? 'system' : mine ? 'me' : 'other'
