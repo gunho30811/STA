@@ -371,11 +371,15 @@ def poll_liveanywhere_account(conn, acct):
         lmt = ch['last_message_time'] or 0
         # 대화 내용 적재 — 리브애니웨어는 이력 조회 API가 없어서(게이트웨이 404/500) 폴링 때
         # 보이는 '마지막 메시지'만 모은다. 그래서 연결 이후 오간 대화가 쌓이는 구조다.
-        # 발신자: payload에 없다. 안읽음이 있으면 상대방이 보낸 게 확실하고, 그 외는 확정할 수
-        # 없다(내가 보냈을 수도, 상대 메시지를 앱에서 이미 읽었을 수도) → 빈값 = '미상'으로 두고
-        # 화면에서도 미상으로 표시한다. 추측해서 내 말풍선으로 붙이면 대화가 거꾸로 보인다.
+        # 발신자: payload에 없어서 안읽음 수로 추론한다.
+        #   안읽음 > 0  → 상대방이 보낸 것(확실). 내가 보낸 메시지는 내 안읽음을 만들지 않는다.
+        #   안읽음 == 0 → 내가 보낸 것으로 본다. 상대 메시지였다면 안읽음이 남아 있어야 하고,
+        #                 0이라는 건 이 방의 마지막 발화가 내 쪽이라는 뜻이다.
+        # 오판 케이스: 폴링 주기 안에 상대 메시지가 오고 내가 앱에서 그걸 읽기까지 한 경우.
+        # 그때만 상대 메시지가 내 것으로 보인다(주기가 짧을수록 드물다).
         if ch.get('last_message') and ch.get('last_message_id'):
-            sender = ch['counterpart_member'] if (ch.get('unread') or 0) > 0 else ''
+            sender = (ch['counterpart_member'] if (ch.get('unread') or 0) > 0
+                      else (ch.get('my_member') or ''))
             try:
                 conn.execute(
                     "INSERT INTO samsam_chat_messages"
