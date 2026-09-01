@@ -457,3 +457,12 @@ h2.sec {
     font-size: 16px;
   }
 }
+
+/* 발신자를 알 수 없는 메시지(리브애니웨어) — 좌우 어느 쪽도 아닌 중립 표시 */
+.bubble.unknown {
+  align-self: center; background: #F2F4F7; color: #45456B; border: 1px dashed #D7DCE5;
+  max-width: 80%; text-align: left;
+}
+.bubble.unknown .who {
+  display: block; font-size: 11px; font-weight: 700; color: #8A93A6; margin-bottom: 4px;
+}

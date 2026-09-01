@@ -120,10 +120,15 @@ export default function Inbox({ rooms, onReloadRooms }) {
             )}
 
             {thread && thread.messages.map((m, i) => {
-              const mine = String(m.sender) === String(thread.owner_id)
-              const kind = m.message_type === 'system' ? 'system' : mine ? 'me' : 'other'
+              const mine = m.sender && String(m.sender) === String(thread.owner_id)
+              // 리브애니웨어는 발신자를 알려주지 않는 경우가 있다(빈값). 한쪽으로 몰아 붙이면
+              // 대화가 거꾸로 읽히므로 '미상'으로 가운데 표시한다.
+              const unknown = !m.sender && m.message_type !== 'system'
+              const kind = m.message_type === 'system' ? 'system'
+                : unknown ? 'unknown' : mine ? 'me' : 'other'
               return (
                 <div className={`bubble ${kind}`} key={m.msg_key || i}>
+                  {unknown && <span className="who">보낸 사람 미상</span>}
                   {m.message}
                   <span className="t">{fmtTime(m.message_time)}</span>
                 </div>
