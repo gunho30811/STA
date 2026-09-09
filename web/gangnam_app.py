@@ -47,6 +47,13 @@ try:
 except Exception as _e:   # 알림이 안 떠도 뷰어 자체는 떠야 한다
     print(f"[alerts] 스케줄러 시작 실패: {repr(_e)[:120]}", flush=True)
 
+# 하루 1회 배치(매매 실거래 갱신 + 좌표→주소 캐시). 서버에 크론이 없어 여기서 돌린다.
+try:
+    import daily_jobs  # noqa: E402
+    daily_jobs.start()
+except Exception as _e:
+    print(f"[daily] 시작 실패: {repr(_e)[:120]}", flush=True)
+
 TYPE_NAMES = {
     "APT": "아파트", "OPST": "오피스텔", "VL": "빌라",
     "OR": "원룸", "DDDGG": "단독/다가구", "SG": "상가", "JWJT": "전원주택",
@@ -122,13 +129,15 @@ def _sam_idx():
 # '그 동 아파트가 평당 얼마에 거래되는지'를 붙인다. 월세 매물만 봐서는 그 동네의
 # 소비력(구매력)을 알 수 없어서, 매매 실거래를 옆에 두고 보게 하는 것.
 _APT_IDX = None
+_APT_IDX_AT = 0.0
+_APT_TTL = 1800         # 하루 1회 배치가 갱신하므로 30분 캐시(프로세스 재시작 없이 반영)
 _APT_MIN_N = 5          # 동 표본이 이보다 적으면 시군구 집계로 폴백
 
 
 def _apt_idx():
     """(시군구, 동) → 시세 dict. 시군구 전체는 (시군구, '') 키."""
-    global _APT_IDX
-    if _APT_IDX is not None:
+    global _APT_IDX, _APT_IDX_AT
+    if _APT_IDX is not None and (_time.time() - _APT_IDX_AT) < _APT_TTL:
         return _APT_IDX
     idx = {}
     try:
@@ -143,7 +152,7 @@ def _apt_idx():
         rows = []
     for r in rows:
         idx[(r["sigungu"] or "", r["dong"] or "")] = dict(r)
-    _APT_IDX = idx
+    _APT_IDX, _APT_IDX_AT = idx, _time.time()
     return idx
 
 
