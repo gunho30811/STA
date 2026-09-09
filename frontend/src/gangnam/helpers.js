@@ -17,6 +17,22 @@ export function won(v) {
   return v == null ? '-' : Number(v).toLocaleString()
 }
 
+// 등록상태 뱃지 — 네이버 '확인일자'(confirmed_at) 기준.
+//   1일 이내면 🌱 새로 올라온 매물, 7일이 넘으면 이미 거래돼 사라졌을 확률이 높다
+//   (중개사가 확인을 갱신하지 않은 매물). 서버 필터(age=new|week|stale)와 같은 기준.
+export function ageBadge(confirmedAt) {
+  if (!confirmedAt) return null
+  const t = Date.parse(confirmedAt + 'T00:00:00')
+  if (Number.isNaN(t)) return null
+  const days = Math.floor((Date.now() - t) / 86400000)
+  if (days <= 1) return { kind: 'new', label: '🌱 신규', title: `확인일 ${confirmedAt}` }
+  if (days >= 7) {
+    return { kind: 'stale', label: `⏳ ${days}일 전`,
+      title: `확인일 ${confirmedAt} — 이미 거래돼 사라졌을 수 있어요` }
+  }
+  return null
+}
+
 // jsonl엔 list가 문자열("[...]")로 저장된 경우가 있음
 export function jarr(v) {
   if (Array.isArray(v)) return v
