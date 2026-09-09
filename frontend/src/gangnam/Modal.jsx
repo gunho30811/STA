@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
-import { TYPES, GROUPS, won, fmtVal } from './helpers.js'
+import { TYPES, GROUPS, won, fmtVal, addrOf, roadOf, titleOf } from './helpers.js'
 import SamArea from './SamArea.jsx'
+import AptPrice from './AptPrice.jsx'
 
 // 상세 모달. 기존 renderM 이식. item은 리스트값+DB 상세 병합본.
 export default function Modal({ item, onClose }) {
@@ -13,7 +14,9 @@ export default function Modal({ item, onClose }) {
   if (!item) return null
   const x = item
   const tc = x.building_type_code || ''
-  const title = x.building_name || TYPES[tc] || '매물'
+  const title = titleOf(x, TYPES[tc])
+  const addr = addrOf(x)
+  const road = roadOf(x)
 
   return (
     <div className="overlay on" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
@@ -21,7 +24,7 @@ export default function Modal({ item, onClose }) {
         <div className="mhead">
           <div>
             <h2>{title} <span className="chip">{TYPES[tc] || tc}</span></h2>
-            <div className="ma">{x.jibun_address || ''} {x.road_address ? '· ' + x.road_address : ''}</div>
+            <div className="ma">{addr}{road ? ' · ' + road : ''}</div>
           </div>
           <button className="x" onClick={onClose}>&times;</button>
         </div>
@@ -49,6 +52,7 @@ export default function Modal({ item, onClose }) {
               </div>
             )
           })}
+          <AptPrice ap={x.apt_price} trades={x.apt_trades || []} />
           <SamArea sa={x.sam_area} />
           {x.url && <a className="mlink" href={x.url} target="_blank" rel="noreferrer">부동산에서 보기 →</a>}
         </div>

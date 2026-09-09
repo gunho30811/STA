@@ -19,6 +19,7 @@ DIST = os.path.join(ROOT, "frontend", "dist", "gangnam")   # React(Vite) 빌드 
 sys.path.insert(0, ROOT)   # db 모듈 import용(상세 모달이 DB에서 전체 컬럼을 가져옴)
 sys.path.insert(0, os.path.join(ROOT, "common"))   # 공용 유틸(subway 등, sta-common 예정)
 import subway  # noqa: E402  # 역 반경 검색: 매물 lat/lng ↔ 역 좌표 거리 계산
+import geocode  # noqa: E402  # 좌표 → 도로명/지번 주소(카카오, 캐시)
 import db  # noqa: E402  # naver_listings 를 DB에서 직접 쿼리(70MB 파일 통짜 로드 대신)
 import target_regions  # noqa: E402  # 크롤·노출 대상 지역(수도권 + 부산·천안)
 # 역명(N역) → (lat, lng). data/subway_stations.csv(수도권 589역 + 부산) 에
@@ -114,6 +115,49 @@ def _sam_idx():
             idx.setdefault(key, []).append(o)
     _SAMOFF = idx
     return idx
+
+
+# ── 동네 아파트 매매 시세(소비력 가늠용) ────────────────────────────────────
+# 국토부 실거래(apt_trades)를 동별로 집계한 apt_price_dong 을 읽어, 매물마다
+# '그 동 아파트가 평당 얼마에 거래되는지'를 붙인다. 월세 매물만 봐서는 그 동네의
+# 소비력(구매력)을 알 수 없어서, 매매 실거래를 옆에 두고 보게 하는 것.
+_APT_IDX = None
+_APT_MIN_N = 5          # 동 표본이 이보다 적으면 시군구 집계로 폴백
+
+
+def _apt_idx():
+    """(시군구, 동) → 시세 dict. 시군구 전체는 (시군구, '') 키."""
+    global _APT_IDX
+    if _APT_IDX is not None:
+        return _APT_IDX
+    idx = {}
+    try:
+        conn = db.connect()
+        rows = conn.execute(
+            "SELECT sido, sigungu, dong, n, months, median_amount, median_per_pyeong,"
+            " p25_per_pyeong, p75_per_pyeong, top_apt, top_apt_per_pyeong, avg_build_year"
+            " FROM apt_price_dong").fetchall()
+        conn.close()
+    except Exception as e:
+        print(f"[gangnam_app] 아파트 시세 조회 실패({type(e).__name__}) → 빈 색인", flush=True)
+        rows = []
+    for r in rows:
+        idx[(r["sigungu"] or "", r["dong"] or "")] = dict(r)
+    _APT_IDX = idx
+    return idx
+
+
+def _apt_price_of(x):
+    """이 매물이 속한 동의 아파트 매매 시세. 표본이 얇으면 시군구 시세로 폴백."""
+    idx = _apt_idx()
+    sgg, dong = x.get("sigungu") or "", x.get("dong") or ""
+    d = idx.get((sgg, dong))
+    if d and (d.get("n") or 0) >= _APT_MIN_N:
+        return {**d, "scope": "동"}
+    d2 = idx.get((sgg, ""))
+    if d2:
+        return {**d2, "scope": "시군구"}
+    return {**d, "scope": "동"} if d else None
 
 
 def _area_of(x):
@@ -551,6 +595,19 @@ def api_listings():
     for it in items:   # 페이지 항목에 근처(같은 동) 삼삼 수요·순수익 부착(이미 있으면 재사용)
         if "sam_area" not in it:
             it["sam_area"] = _area_of(it)
+        it["apt_price"] = _apt_price_of(it)   # 그 동 아파트 매매 시세(소비력 가늠)
+
+    # 주소 채우기: 목록 크롤엔 주소가 없어 카드가 '1동 / 빌라'만 보여주던 문제.
+    # 좌표→주소(카카오) 캐시에서 붙이고, 캐시에 없는 것만 이 페이지 분량만큼 즉석 변환.
+    need = [it for it in items if not (it.get("jibun_address") or it.get("road_address"))]
+    if need:
+        conn = db.connect()
+        try:
+            geocode.attach(conn, need)
+        except Exception as e:
+            print(f"[gangnam_app] 주소 변환 실패: {repr(e)[:120]}", flush=True)
+        finally:
+            conn.close()
     return jsonify({
         "total": total, "page": page, "size": size,
         "pages": (total + size - 1) // size,
@@ -569,10 +626,26 @@ def api_detail(no):
         r = conn.execute("SELECT * FROM naver_listings WHERE article_no=%s", (no,)).fetchone()
         if not r:
             r = conn.execute(f"SELECT * FROM {SRC} WHERE article_no=%s", (no,)).fetchone()
-        conn.close()
         if not r:
+            conn.close()
             return jsonify({})
         d = dict(r)
+        # 동네 아파트 매매 시세 + 최근 실거래 몇 건(소비력 가늠용 근거)
+        d["apt_price"] = _apt_price_of(d)
+        if not (d.get("jibun_address") or d.get("road_address")):
+            try:
+                geocode.attach(conn, [d])
+            except Exception:
+                pass
+        try:
+            d["apt_trades"] = [dict(t) for t in conn.execute(
+                "SELECT apt_name, area_m2, floor, amount, deal_date, build_year"
+                " FROM apt_trades WHERE sigungu=%s AND dong=%s AND canceled IS NOT TRUE"
+                " ORDER BY deal_date DESC LIMIT 6",
+                (d.get("sigungu") or "", d.get("dong") or "")).fetchall()]
+        except Exception:
+            d["apt_trades"] = []
+        conn.close()
         area = d.get("area_exclusive_m2")
         d["pyeong"] = round(area / M2_PER_PYEONG, 1) if isinstance(area, (int, float)) else None
         d["url"] = f"https://new.land.naver.com/offices?articleNo={no}"
