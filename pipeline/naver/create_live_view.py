@@ -40,6 +40,8 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS ix_listings_sido_dong ON listings(sido,dong)",
     "CREATE INDEX IF NOT EXISTS ix_listings_dong ON listings(dong)",
     "CREATE INDEX IF NOT EXISTS ix_listings_confirmymd ON listings(confirmymd)",
+    # 알림(새 매물 감지)이 first_seen 범위로 훑는다 — 없으면 165만행 풀스캔.
+    "CREATE INDEX IF NOT EXISTS ix_listings_first_seen ON listings(first_seen)",
     # 집계 커버링(index-only 스캔): 무필터 count/by_type/dong distinct를 넓은 heap 대신 인덱스로.
     "CREATE INDEX IF NOT EXISTS ix_listings_agg ON listings (sido, crawled_at, realestatetype, dong)",
 ]
@@ -61,7 +63,7 @@ SELECT
   n.jibun_address, n.road_address,
   COALESCE(n.confirmed_at, CASE WHEN l.confirmymd ~ '^[0-9]{{8}}$'
      THEN to_char(to_date(l.confirmymd,'YYYYMMDD'),'YYYY-MM-DD') END) AS confirmed_at,
-  l.crawled_at,
+  l.crawled_at, l.first_seen,
   NULLIF(l.confirmymd,'') AS confirmed_sort
 FROM listings l
 LEFT JOIN naver_listings n ON n.article_no = l.articleno::bigint
@@ -87,7 +89,7 @@ SELECT
   NULL::text AS jibun_address, NULL::text AS road_address,
   CASE WHEN l.confirmymd ~ '^[0-9]{{8}}$'
        THEN to_char(to_date(l.confirmymd,'YYYYMMDD'),'YYYY-MM-DD') END AS confirmed_at,
-  l.crawled_at,
+  l.crawled_at, l.first_seen,
   NULLIF(l.confirmymd,'') AS confirmed_sort
 FROM listings l
 WHERE {_REGION}

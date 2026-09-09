@@ -3,22 +3,39 @@ import { getJSON } from '../shared/api.js'
 import './styles.css'
 import Card from './Card.jsx'
 import Modal from './Modal.jsx'
+import AlertPanel from './AlertPanel.jsx'
 
 const uniq = (arr) => [...new Set(arr)].filter(Boolean).sort()
+const RADII = [['500', '반경 500m'], ['1000', '반경 1km'], ['2000', '반경 2km'], ['3000', '반경 3km']]
+
+// 주소창 쿼리로 검색조건 복원 — 카톡 알림 링크(/gangnam/?types=OPST&...)로 들어오면
+// 알림을 만든 그 조건 그대로 화면이 열린다.
+const URLQ = new URLSearchParams(window.location.search)
+const q1 = (k, d = '') => URLQ.get(k) ?? d
+const qAll = (k) => URLQ.getAll(k)
 
 export default function App() {
   const [facets, setFacets] = useState(null)
   const [stats, setStats] = useState(null)
 
   // 필터 상태
-  const [selTypes, setSelTypes] = useState([])
-  const [selRooms, setSelRooms] = useState([])
-  const [casc, setCasc] = useState({ sido: '', sigun: '', gu: '', dong: '' })
-  const [selRegions, setSelRegions] = useState([])   // [{enc,label}]
+  const [selTypes, setSelTypes] = useState(() => (q1('types') ? q1('types').split(',') : []))
+  const [selRooms, setSelRooms] = useState(() => qAll('rooms'))
+  const [casc, setCasc] = useState(
+    () => ({ sido: q1('sido'), sigun: q1('sigun'), gu: q1('gu'), dong: q1('dong') }))
+  const [selRegions, setSelRegions] = useState(
+    () => qAll('region').map((enc) => ({ enc, label: enc.split('|').filter(Boolean).join(' ') })))
   const [stationInput, setStationInput] = useState('')
-  const [selStations, setSelStations] = useState([])
-  const [radius, setRadius] = useState('1000')
-  const [f, setF] = useState({ kw: '', depmin: '', depmax: '', rentmin: '', rentmax: '', pmin: '', pmax: '', netmin: '', sort: 'recent', office: false })
+  const [selStations, setSelStations] = useState(() => qAll('station'))
+  const [selLines, setSelLines] = useState(() => qAll('line'))
+  const [radius, setRadius] = useState(() => q1('radius', '1000'))
+  const [alertsOpen, setAlertsOpen] = useState(false)
+  const [f, setF] = useState(() => ({
+    kw: q1('keyword'), depmin: q1('deposit_min'), depmax: q1('deposit_max'),
+    rentmin: q1('rent_min'), rentmax: q1('rent_max'), pmin: q1('pyeong_min'),
+    pmax: q1('pyeong_max'), netmin: q1('net_min'), sort: q1('sort', 'recent'),
+    office: q1('office') === '1', age: q1('age'),
+  }))
 
   const [res, setRes] = useState({ items: [], total: 0, page: 1, pages: 1 })
   const [modal, setModal] = useState(null)
@@ -50,7 +67,8 @@ export default function App() {
   const gus = uniq(subtree.filter((r) => !casc.sigun || r[0] === casc.sigun).map((r) => r[1]))
   const dongs = uniq(subtree.filter((r) => (!casc.sigun || r[0] === casc.sigun) && (!casc.gu || r[1] === casc.gu)).map((r) => r[2]))
 
-  const doSearch = useCallback(async (page) => {
+  // 현재 화면의 필터 → 쿼리스트링. 검색·알림저장이 같은 문자열을 쓴다(결과가 어긋나지 않게).
+  const buildQuery = useCallback((page) => {
     const p = new URLSearchParams()
     if (selTypes.length) p.set('types', selTypes.join(','))
     selRooms.forEach((r) => p.append('rooms', r))
@@ -60,15 +78,18 @@ export default function App() {
     if (cascEnc !== '|||' && !selRegions.some((r) => r.enc === cascEnc)) p.append('region', cascEnc)
     selRegions.forEach((r) => p.append('region', r.enc))
 
-    // 역 반경: 입력창 잔여 역명 자동 반영 + 선택 역들
+    // 역 반경: 입력창 잔여 역명 자동 반영 + 선택 역들 + 선택 호선(그 노선 전 역)
     let stns = selStations
     const leftover = stationInput.trim()
     if (leftover) {
       const s = stationSet.has(leftover) ? leftover : [...stationSet].find((n) => n === leftover + '역' || n.includes(leftover))
       if (s && !stns.includes(s)) { stns = [...stns, s]; setSelStations(stns); setStationInput('') }
     }
-    if (stns.length) { stns.forEach((s) => p.append('station', s)); p.set('radius', radius) }
+    stns.forEach((s) => p.append('station', s))
+    selLines.forEach((l) => p.append('line', l))
+    if (stns.length || selLines.length) p.set('radius', radius)
 
+    if (f.age) p.set('age', f.age)
     if (f.kw) p.set('keyword', f.kw)
     if (f.depmin) p.set('deposit_min', f.depmin)
     if (f.depmax) p.set('deposit_max', f.depmax)
@@ -79,11 +100,14 @@ export default function App() {
     if (f.netmin) p.set('net_min', f.netmin)
     if (f.office) p.set('office', '1')
     p.set('sort', f.sort); p.set('page', page); p.set('size', 24)
+    return p
+  }, [selTypes, selRooms, casc, selRegions, selStations, selLines, stationInput, stationSet, radius, f])
 
-    const r = await getJSON('api/listings?' + p.toString())
+  const doSearch = useCallback(async (page) => {
+    const r = await getJSON('api/listings?' + buildQuery(page).toString())
     setRes(r)
     window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [selTypes, selRooms, casc, selRegions, selStations, stationInput, stationSet, radius, f])
+  }, [buildQuery])
 
   // 최초 로드(facets 준비 후 1회)
   useEffect(() => { if (facets) doSearch(1) /* eslint-disable-next-line */ }, [facets])
@@ -111,8 +135,8 @@ export default function App() {
   }
   const reset = () => {
     setSelTypes([]); setSelRooms([]); setSelRegions([]); setSelStations([]); setStationInput('')
-    setCasc({ sido: '', sigun: '', gu: '', dong: '' }); setRadius('1000')
-    setF({ kw: '', depmin: '', depmax: '', rentmin: '', rentmax: '', pmin: '', pmax: '', netmin: '', sort: 'recent', office: false })
+    setSelLines([]); setCasc({ sido: '', sigun: '', gu: '', dong: '' }); setRadius('1000')
+    setF({ kw: '', depmin: '', depmax: '', rentmin: '', rentmax: '', pmin: '', pmax: '', netmin: '', sort: 'recent', office: false, age: '' })
     getJSON('api/listings?sort=recent&page=1&size=24').then(setRes)
   }
 
@@ -129,8 +153,8 @@ export default function App() {
     return (
       <>
         <header>
-          <h1>🏙️ 수도권 부동산 매물 뷰어</h1>
-          <p>서울·경기·인천 부동산 · 아파트/오피스텔/빌라/원룸/단독·다가구 · 카드 클릭 시 상세 전체 보기 · 단위 만원</p>
+          <h1>🏙️ 부동산 매물 뷰어</h1>
+          <p>수도권·부산·천안 · 아파트/오피스텔/빌라/원룸/단독·다가구 · 카드 클릭 시 상세 전체 보기 · 단위 만원</p>
         </header>
         <div className="wrap"><div className="panel" style={{ color: '#94a3b8' }}>데이터 불러오는 중…</div></div>
       </>
@@ -140,8 +164,8 @@ export default function App() {
   return (
     <>
       <header>
-        <h1>🏙️ 수도권 부동산 매물 뷰어</h1>
-        <p>서울·경기·인천 부동산 · 아파트/오피스텔/빌라/원룸/단독·다가구 · 카드 클릭 시 상세 전체 보기 · 단위 만원</p>
+        <h1>🏙️ 부동산 매물 뷰어</h1>
+        <p>수도권·부산·천안 · 아파트/오피스텔/빌라/원룸/단독·다가구 · 카드 클릭 시 상세 전체 보기 · 단위 만원</p>
       </header>
 
       <div className="wrap">
@@ -210,8 +234,9 @@ export default function App() {
               <button type="button" className="btn" style={{ background: '#dbeafe', color: '#075985' }} onClick={addStation}>➕ 역 추가</button>
               <select value={radius} onChange={(e) => setRadius(e.target.value)}
                 style={{ padding: '7px 9px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13 }}>
-                <option value="500">반경 500m</option><option value="1000">반경 1km</option>
-                <option value="2000">반경 2km</option><option value="3000">반경 3km</option>
+                {uniq([...RADII.map((r) => r[0]), radius]).sort((a, b) => a - b).map((v) => (
+                  <option key={v} value={v}>{(RADII.find((r) => r[0] === v) || [v, `반경 ${v}m`])[1]}</option>
+                ))}
               </select>
             </div>
             <div className="selchips">
@@ -219,6 +244,16 @@ export default function App() {
                 <span className="selchip stn" key={s}>🚇 {s}
                   <span className="rm" onClick={() => setSelStations(selStations.filter((_, j) => j !== i))}>×</span>
                 </span>
+              ))}
+            </div>
+          </div>
+          <div className="fg" style={{ marginBottom: 13 }}>
+            <label>🚈 노선 전체 (예: 2호선 전체 · 선택 반경은 위 반경 설정과 같음)</label>
+            <div className="typebtns linebtns">
+              {(facets.lines || []).map((l) => (
+                <button key={l.name} className={selLines.includes(l.name) ? 'on' : ''}
+                  title={`${l.name} ${l.n}개역`}
+                  onClick={() => toggle(selLines, setSelLines, l.name)}>{l.name}</button>
               ))}
             </div>
           </div>
@@ -235,6 +270,13 @@ export default function App() {
             <div className="fg"><label>평수</label><div style={{ display: 'flex', gap: 4 }}>
               <input type="number" value={f.pmin} placeholder="최소" onChange={(e) => setF({ ...f, pmin: e.target.value })} />
               <input type="number" value={f.pmax} placeholder="최대" onChange={(e) => setF({ ...f, pmax: e.target.value })} /></div></div>
+            <div className="fg"><label>🕒 등록상태(확인일)</label>
+              <select value={f.age} onChange={(e) => setF({ ...f, age: e.target.value })}>
+                <option value="">전체</option>
+                <option value="new">🌱 신규(1일 이내)</option>
+                <option value="week">최근 7일 이내</option>
+                <option value="stale">⏳ 7일 넘음</option>
+              </select></div>
             <div className="fg"><label>💰 월순수익(만) 이상</label>
               <input type="number" value={f.netmin} placeholder="예: 0" style={{ width: 110 }} onChange={(e) => setF({ ...f, netmin: e.target.value })} /></div>
             <div className="fg"><label>정렬</label>
@@ -258,7 +300,12 @@ export default function App() {
           </div>
         </div>
 
-        <div className="toolbar"><div className="cnt">검색결과 <b>{res.total.toLocaleString()}</b> 건</div></div>
+        <div className="toolbar">
+          <div className="cnt">검색결과 <b>{res.total.toLocaleString()}</b> 건</div>
+          <button className="btn btn-alert" onClick={() => setAlertsOpen(true)}>
+            🔔 이 조건으로 알림받기
+          </button>
+        </div>
         <div className="grid">
           {res.items.length === 0
             ? <div className="empty" style={{ gridColumn: '1/-1' }}>조건에 맞는 매물이 없습니다.</div>
@@ -267,6 +314,9 @@ export default function App() {
         <GangnamPager page={res.page} pages={res.pages} onGo={doSearch} />
       </div>
 
+      {alertsOpen && (
+        <AlertPanel currentQuery={buildQuery(1).toString()} onClose={() => setAlertsOpen(false)} />
+      )}
       <Modal item={modal} onClose={() => setModal(null)} />
     </>
   )

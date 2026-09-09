@@ -1348,6 +1348,13 @@ def chat_api_cron_poll():
             n = chat_poll.poll_all(conn)
             s = chat_poll.process_outbox(conn)
             print(f"[chat] cron-poll 완료: {n}계정 폴링, 답장 {s}건", flush=True)
+            # 부동산 조건 알림도 이 크론에 얹어 돌린다(자체 15분 간격 스로틀).
+            # 알림용 크론을 따로 등록할 필요 없이 같은 1분 호출을 재사용.
+            try:
+                import listing_alerts
+                listing_alerts.run_due(conn)
+            except Exception as e:
+                print(f"[alerts] 스캔 오류: {repr(e)[:150]}", flush=True)
         except Exception as e:
             print(f"[chat] cron-poll 오류: {repr(e)[:150]}", flush=True)
         finally:

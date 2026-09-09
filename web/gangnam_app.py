@@ -21,8 +21,17 @@ sys.path.insert(0, os.path.join(ROOT, "common"))   # 공용 유틸(subway 등, s
 import subway  # noqa: E402  # 역 반경 검색: 매물 lat/lng ↔ 역 좌표 거리 계산
 import db  # noqa: E402  # naver_listings 를 DB에서 직접 쿼리(70MB 파일 통짜 로드 대신)
 import target_regions  # noqa: E402  # 크롤·노출 대상 지역(수도권 + 부산·천안)
-# 역명(N역) → (lat, lng). data/subway_stations.csv(수도권 589역). '역 반경 검색' 자동완성·거리계산에 씀.
+# 역명(N역) → (lat, lng). data/subway_stations.csv(수도권 589역 + 부산) 에
+# data/subway_lines.csv(카카오 SW8 — 서해선·김포골드라인 등 신설 노선 포함)를 덧씌운다.
+# '역 반경 검색' 자동완성·거리계산, '○호선 전체' 노선 검색에 쓴다.
 STATION_COORDS = {f"{n}역": (y, x) for n, y, x in subway._load()}
+STATION_COORDS.update(subway.line_station_coords())
+# 호선 표시 순서: 수도권 숫자호선 → 광역/경전철 → 인천 → 부산. (없는 노선은 파일 순서로 뒤에)
+_LINE_ORDER = ["1호선", "2호선", "3호선", "4호선", "5호선", "6호선", "7호선", "8호선", "9호선",
+               "신분당선", "수인분당선", "경의중앙선", "경춘선", "경강선", "공항철도", "서해선",
+               "GTX-A", "김포골드라인", "우이신설경전철", "신림선", "의정부경전철", "용인에버라인",
+               "인천1호선", "인천2호선",
+               "부산1호선", "부산2호선", "부산3호선", "부산4호선", "동해선", "부산김해경전철"]
 M2_PER_PYEONG = 3.305785
 
 app = Flask(__name__)
@@ -146,6 +155,11 @@ LIST_COLS = (
     "summary", "lat", "lng", "jibun_address", "road_address", "confirmed_at",
 )
 
+# 역·노선 반경 검색처럼 '전 후보를 파이썬으로 걸러야' 할 때 먼저 읽는 최소 컬럼.
+# (거리 판정 + 정렬 + 페이지 산정에 필요한 것만 — 노선 전체는 후보가 수십만 건이라
+#  21컬럼을 다 읽으면 전송·파싱만으로 십수 초가 걸린다.)
+LITE_COLS = "article_no, lat, lng, deposit, rent_monthly, area_exclusive_m2, confirmed_at"
+
 # 시군구 문자열 → (시/군, 구) 를 SQL에서 계산.
 #   "수원시 영통구" → ("수원시","영통구") · "강남구" → ("","강남구") · "화성시" → ("화성시","")
 # LIKE '%구' 의 %가 파라미터 바인딩과 충돌하므로 right(..,1) 로 대체.
@@ -210,7 +224,11 @@ def api_facets():
     sidos = _cached("facets_sido", 600, _load)
     types = [{"code": c, "name": TYPE_NAMES[c]}
              for c in ["APT", "OPST", "VL", "OR", "DDDGG", "SG", "JWJT"]]
-    return jsonify({"sido": sidos, "types": types,
+    lm = subway.line_map()
+    order = {name: i for i, name in enumerate(_LINE_ORDER)}
+    lines = [{"name": k, "n": len(lm[k])}
+             for k in sorted(lm, key=lambda k: (order.get(k, 999), k))]
+    return jsonify({"sido": sidos, "types": types, "lines": lines,
                     "stations": sorted(STATION_COORDS.keys())})
 
 
@@ -280,6 +298,16 @@ def api_stats():
     return jsonify(_cached("stats", 300, _load))
 
 
+# 등록상태 필터/뱃지 기준일수. NEW_DAYS 이내면 '신규', STALE_DAYS 넘으면 '오래됨'.
+NEW_DAYS, STALE_DAYS = 1, 7
+_AGE_SQL = {
+    "new": f"confirmed_at >= to_char(now() - interval '{NEW_DAYS} day','YYYY-MM-DD')",
+    "week": f"confirmed_at >= to_char(now() - interval '{STALE_DAYS} day','YYYY-MM-DD')",
+    "stale": ("(confirmed_at IS NULL OR confirmed_at < "
+              f"to_char(now() - interval '{STALE_DAYS} day','YYYY-MM-DD'))"),
+}
+
+
 def _build_where(a):
     """요청 필터 → (SQL where 절 리스트, 파라미터). 역반경·월순수익은 여기서 안 다룸(파이썬 후처리)."""
     clauses, params = [], []
@@ -336,10 +364,15 @@ def _build_where(a):
 
     # 범위(보증금·월세·평수). 평수는 area_exclusive_m2 로 환산해 필터.
     def rng(field, lo, hi, scale=1.0):
+        # 정수 컬럼(보증금·월세)에 300.0 같은 실수를 그대로 넘기면 드라이버에 따라
+        # 타입 오류가 난다(pg8000) → 정수로 떨어지면 int 로 준다.
+        def val(x):
+            v = float(x) * scale
+            return int(v) if float(v).is_integer() else v
         if a.get(lo):
-            clauses.append(f"{field} >= %s"); params.append(float(a[lo]) * scale)
+            clauses.append(f"{field} >= %s"); params.append(val(a[lo]))
         if a.get(hi):
-            clauses.append(f"{field} <= %s"); params.append(float(a[hi]) * scale)
+            clauses.append(f"{field} <= %s"); params.append(val(a[hi]))
     rng("deposit", "deposit_min", "deposit_max")
     rng("rent_monthly", "rent_min", "rent_max")
     rng("area_exclusive_m2", "pyeong_min", "pyeong_max", scale=M2_PER_PYEONG)
@@ -351,6 +384,12 @@ def _build_where(a):
                   "subway_station", "summary_tags")
         clauses.append("(" + " OR ".join(f"{f} ILIKE %s" for f in fields) + ")")
         params.extend([f"%{kw}%"] * len(fields))
+
+    # 등록상태(네이버 '확인일자' 기준) — 카드의 🌱신규/⏳오래됨 뱃지와 같은 기준.
+    #   확인일이 오래된 매물은 이미 거래돼 사라졌을 확률이 높다(중개사가 갱신을 안 함).
+    age = a.get("age", "")
+    if age in _AGE_SQL:
+        clauses.append(_AGE_SQL[age])
 
     # 업무용 오피스텔: 상세 summary에 '업무용'·'전입 불가' 명시한 OPST
     if a.get("office") == "1":
@@ -383,13 +422,49 @@ def _sort_python(items, sort):
     return sorted(items, key=lambda x: x.get("confirmed_at") or "", reverse=True)
 
 
+def _stations_arg(a):
+    """요청의 station=역명 + line=호선 을 합친 역 목록(중복 제거, 좌표 있는 것만).
+
+    '2호선 전체' 처럼 노선을 고르면 그 노선의 전 역이 반경 검색 대상이 된다."""
+    stns = [s for s in a.getlist("station") if s in STATION_COORDS]
+    for ln in a.getlist("line"):
+        stns += [s for s in subway.stations_of(ln) if s in STATION_COORDS]
+    return list(dict.fromkeys(stns))
+
+
+def _within_radius(items, coords, radius):
+    """선택 역들의 반경 안에 있는 매물만. 역이 수십 개(노선 전체)여도 빠르게.
+
+    매물마다 전 역과 거리를 재면 (매물 수 × 역 수)라 노선 검색에서 터진다 →
+    역을 0.01°(≈1.1km) 격자에 담아두고 매물 주변 격자만 본다."""
+    cell = 0.01
+    grid = {}
+    for la, ln in coords:
+        grid.setdefault((round(la / cell), round(ln / cell)), []).append((la, ln))
+    # 격자 한 칸은 위도로 1.11km, 경도로는 위도 37°에서 0.89km — 좁은 쪽(경도)에
+    # 맞춰 넉넉히 잡아야 경계의 매물을 놓치지 않는다.
+    span = int(radius / 800) + 1
+    out = []
+    for x in items:
+        la, ln = x.get("lat"), x.get("lng")
+        if la is None or ln is None:
+            continue
+        ci, cj = round(la / cell), round(ln / cell)
+        near = [c for i in range(ci - span, ci + span + 1)
+                for j in range(cj - span, cj + span + 1)
+                for c in grid.get((i, j), ())]
+        if any(subway.haversine_m(la, ln, sy, sx) <= radius for sy, sx in near):
+            out.append(x)
+    return out
+
+
 @app.route("/api/listings")
 def api_listings():
     a = request.args
     clauses, params = _build_where(a)
 
     # 역 반경: bbox 로 SQL 선필터 → 파이썬에서 haversine 정밀 판정.
-    stns = [s for s in a.getlist("station") if s in STATION_COORDS]
+    stns = _stations_arg(a)
     radius = 1000.0
     if stns:
         try:
@@ -438,15 +513,16 @@ def api_listings():
                 params + [size, (page - 1) * size]).fetchall()
             items = [_enrich_row(dict(r)) for r in rows]
         else:
+            # 노선 전체 검색은 후보가 수십만 건 → 걸러낼 때는 가벼운 컬럼만 읽고(LITE_COLS),
+            # 실제로 보여줄 한 페이지만 전체 컬럼으로 다시 읽는다. (월순수익 필터는
+            # 유형·동·평수까지 봐야 해서 처음부터 전체 컬럼)
+            need_net = net_min is not None or sort == "net_desc"
             items_all = [_enrich_row(dict(r)) for r in conn.execute(
-                f"SELECT {cols} FROM {SRC}{where_sql}", params).fetchall()]
+                f"SELECT {cols if need_net else LITE_COLS} FROM {SRC}{where_sql}",
+                params).fetchall()]
             if stns:   # bbox 로 좁힌 뒤 haversine 정밀 판정
-                coords = [STATION_COORDS[s] for s in stns]
-                items_all = [x for x in items_all
-                             if x.get("lat") is not None and x.get("lng") is not None
-                             and any(subway.haversine_m(x["lat"], x["lng"], sy, sx) <= radius
-                                     for sy, sx in coords)]
-            if net_min is not None or sort == "net_desc":
+                items_all = _within_radius(items_all, [STATION_COORDS[s] for s in stns], radius)
+            if need_net:
                 for x in items_all:
                     x["sam_area"] = _area_of(x)
                 if net_min is not None:
@@ -456,6 +532,11 @@ def api_listings():
             items_all = _sort_python(items_all, sort)
             total = len(items_all)
             items = items_all[(page - 1) * size: (page - 1) * size + size]
+            if not need_net and items:
+                ids = [x["article_no"] for x in items]
+                full = {r["article_no"]: _enrich_row(dict(r)) for r in conn.execute(
+                    f"SELECT {cols} FROM {SRC} WHERE article_no = ANY(%s)", [ids]).fetchall()}
+                items = [full.get(i, x) for i, x in zip(ids, items)]
     finally:
         conn.close()
 
@@ -490,6 +571,122 @@ def api_detail(no):
         return jsonify(d)
     except Exception as e:
         return jsonify({"error": str(e)[:100]})
+
+
+# ── 조건 알림(카톡) ────────────────────────────────────────────────────────
+# 지금 보고 있는 검색조건을 저장해두면, 그 조건에 맞는 새 매물이 들어올 때
+# 카카오톡('나에게 보내기')으로 알려준다. 스캔 실행은 web/listing_alerts.py.
+_ALERT_MAX = 10          # 회원당 알림 개수 상한
+_ALERT_DROP = {"page", "size"}   # 저장할 필요 없는 파라미터
+
+
+@app.route("/api/alerts")
+def api_alerts():
+    from auth import current_user
+    import listing_alerts
+    u = current_user()
+    if not u:
+        return jsonify({"error": "login_required"}), 401
+    conn = db.connect()
+    try:
+        rows = listing_alerts.list_for(conn, u["id"])
+        kakao = conn.execute("SELECT kakao_notify FROM members WHERE id=%s",
+                             (u["id"],)).fetchone()
+    finally:
+        conn.close()
+    for r in rows:
+        r["link"] = listing_alerts.link_of(r)
+    return jsonify({"items": rows, "kakao_ready": bool(kakao and kakao[0]),
+                    "max": _ALERT_MAX})
+
+
+@app.route("/api/alerts", methods=["POST"])
+def api_alerts_create():
+    from auth import current_user
+    import listing_alerts
+    u = current_user()
+    if not u:
+        return jsonify({"error": "login_required"}), 401
+    from urllib.parse import urlencode
+    body = request.get_json(silent=True) or {}
+    query = urlencode([(k, v) for k, v in _qs_pairs(body.get("query") or "")
+                       if k not in _ALERT_DROP])
+    name = (body.get("name") or "").strip()[:40] or "내 매물 알림"
+    conn = db.connect()
+    try:
+        n = conn.execute("SELECT COUNT(*) FROM listing_alerts WHERE member_id=%s",
+                         (u["id"],)).fetchone()[0]
+        if n >= _ALERT_MAX:
+            return jsonify({"error": f"알림은 최대 {_ALERT_MAX}개까지 만들 수 있어요."}), 400
+        listing_alerts.create(conn, u["id"], name, query)
+        items = listing_alerts.list_for(conn, u["id"])
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "items": items})
+
+
+@app.route("/api/alerts/<int:aid>", methods=["PATCH", "DELETE"])
+def api_alerts_edit(aid):
+    from auth import current_user
+    import listing_alerts
+    u = current_user()
+    if not u:
+        return jsonify({"error": "login_required"}), 401
+    conn = db.connect()
+    try:
+        if request.method == "DELETE":
+            listing_alerts.delete(conn, u["id"], aid)
+        else:
+            body = request.get_json(silent=True) or {}
+            listing_alerts.set_enabled(conn, u["id"], aid, bool(body.get("enabled")))
+        items = listing_alerts.list_for(conn, u["id"])
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "items": items})
+
+
+@app.route("/api/alerts/<int:aid>/test", methods=["POST"])
+def api_alerts_test(aid):
+    """지금 바로 한 번 보내보기 — 카톡 연결이 됐는지 회원이 눈으로 확인하는 용도.
+    최근 24시간 안에 들어온 매물을 기준으로 본다(신규가 없으면 발송 안 함)."""
+    from auth import current_user
+    import listing_alerts
+    u = current_user()
+    if not u:
+        return jsonify({"error": "login_required"}), 401
+    conn = db.connect()
+    try:
+        r = conn.execute("SELECT id, member_id, name, query FROM listing_alerts "
+                         "WHERE id=%s AND member_id=%s", (aid, u["id"])).fetchone()
+        if not r:
+            return jsonify({"error": "not_found"}), 404
+        al = dict(r)
+        al["last_run_at"] = _time.strftime("%Y-%m-%d %H:%M:%S",
+                                           _time.localtime(_time.time() - 86400))
+        n, sent = listing_alerts.run_one(conn, al)
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "new": n, "sent": sent})
+
+
+@app.route("/api/cron-alerts", methods=["GET", "POST"])
+def api_cron_alerts():
+    """외부 크론이 직접 부를 수 있는 스캔 엔드포인트(평소엔 채팅 크론에 얹혀 돌아간다)."""
+    import hmac
+    import listing_alerts
+    secret = os.environ.get("CRON_SECRET")
+    if not secret or not hmac.compare_digest(request.args.get("key", ""), secret):
+        return jsonify({"error": "unauthorized"}), 403
+    conn = db.connect()
+    try:
+        return jsonify(listing_alerts.run_due(conn, force=request.args.get("force") == "1"))
+    finally:
+        conn.close()
+
+
+def _qs_pairs(qs):
+    from urllib.parse import parse_qsl
+    return parse_qsl(qs, keep_blank_values=False)
 
 
 def _n(v):

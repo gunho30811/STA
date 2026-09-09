@@ -1,4 +1,4 @@
-import { TYPES, won, fmtVal } from './helpers.js'
+import { TYPES, won, fmtVal, ageBadge } from './helpers.js'
 import SamArea from './SamArea.jsx'
 
 // 매물 카드 하나. 기존 renderGrid 이식.
@@ -15,10 +15,12 @@ export default function Card({ x, onClick }) {
   if (x.direction) specs.push(x.direction.replace(' (거실 기준)', ''))
   const sub = x.subway_station ? `${x.subway_station} ${x.subway_distance_m ? x.subway_distance_m + 'm' : ''}` : ''
   const smry = fmtVal(x.summary) || ''
+  const age = ageBadge(x.confirmed_at)
 
   return (
-    <div className="lst" onClick={onClick}>
+    <div className={`lst${age?.kind === 'stale' ? ' stale' : ''}`} onClick={onClick}>
       <span className={`badge b-${tc}`}>{TYPES[tc] || tc}</span>
+      {age && <span className={`agebadge a-${age.kind}`} title={age.title}>{age.label}</span>}
       <div className="nm">{title}</div>
       <div className="addr">{addr}</div>
       <div className="price">

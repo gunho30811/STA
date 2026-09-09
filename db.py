@@ -263,6 +263,26 @@ _COLUMN_MIGRATIONS = [
     "ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS last_read_at BIGINT",
     "ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS counterpart_nickname TEXT",
     "ALTER TABLE samsam_chat_rooms ADD COLUMN IF NOT EXISTS last_notified_time BIGINT",
+    # listings.first_seen — '우리가 이 매물을 처음 본 시각'. 신규 매물 알림의 기준.
+    #   1) 컬럼만 먼저 추가(기본값 없이 → 기존 165만행은 NULL, 테이블 재작성 없음)
+    #   2) 그 다음 기본값 지정 → 앞으로 들어오는 신규 행만 시각이 찍힌다.
+    #      (반대로 하면 ADD COLUMN DEFAULT now() 가 전 행을 '방금 등록'으로 채워버린다.)
+    #   크롤러의 INSERT 컬럼 목록에 first_seen 이 없으므로 UPSERT 시에도 최초값이 보존된다.
+    "ALTER TABLE listings ADD COLUMN IF NOT EXISTS first_seen TEXT",
+    "ALTER TABLE listings ALTER COLUMN first_seen SET DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')",
+    # 조건 알림(부동산 매물) — 회원이 저장한 검색조건, 새 매물이 뜨면 카톡으로 보낸다.
+    """CREATE TABLE IF NOT EXISTS listing_alerts (
+        id          SERIAL PRIMARY KEY,
+        member_id   INTEGER NOT NULL,
+        name        TEXT,
+        query       TEXT NOT NULL,
+        enabled     BOOLEAN DEFAULT TRUE,
+        last_run_at TEXT,
+        last_sent_at TEXT,
+        sent_count  INTEGER DEFAULT 0,
+        created_at  TEXT
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_listing_alerts_member ON listing_alerts(member_id)",
 ]
 
 
