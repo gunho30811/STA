@@ -17,6 +17,35 @@ export function won(v) {
   return v == null ? '-' : Number(v).toLocaleString()
 }
 
+// 네이버가 매물명으로 주는 '일반상가/빌라/1동' 같은 뜻 없는 이름들.
+// 이런 이름은 제목으로 쓰지 않고 건물명·주소로 대체한다.
+const GENERIC_NAME = /^(일반상가|복합상가|단지내상가|일반원룸|다가구|단독|빌라|상가|원룸|사무실|오피스텔|아파트|주택|근린상가|상가주택|지식산업센터|\d+동|[A-Za-z]?\d+동)$/
+
+// 카드/모달에 쓸 주소 — 상세 크롤(지번/도로명)이 있으면 그걸, 없으면 좌표로 변환한
+// 주소(geo), 그것도 없으면 최소한 '시군구 동'.
+export function addrOf(x) {
+  const g = x.geo || {}
+  return x.jibun_address || x.road_address || g.jibun || g.road
+    || [x.sigungu, x.dong].filter(Boolean).join(' ') || ''
+}
+
+// 도로명 주소(있을 때만) — 검색해보기 좋은 값이라 카드에 따로 한 줄 더 보여준다.
+export function roadOf(x) {
+  const road = x.road_address || (x.geo || {}).road || ''
+  return road && road !== addrOf(x) ? road : ''
+}
+
+// 카드 제목: 실제 건물명 우선 → 좌표로 찾은 건물명 → 주소 → '동 + 유형'
+export function titleOf(x, typeName) {
+  const g = x.geo || {}
+  const bn = (x.building_name || '').trim()
+  if (bn && !GENERIC_NAME.test(bn)) return bn
+  if (g.building) return g.building
+  const addr = addrOf(x)
+  if (addr) return addr.replace(/^(서울|경기도?|인천|부산|충청남도)\S*\s/, '')
+  return [x.dong, typeName].filter(Boolean).join(' ') || '매물'
+}
+
 // 등록상태 뱃지 — 네이버 '확인일자'(confirmed_at) 기준.
 //   1일 이내면 🌱 새로 올라온 매물, 7일이 넘으면 이미 거래돼 사라졌을 확률이 높다
 //   (중개사가 확인을 갱신하지 않은 매물). 서버 필터(age=new|week|stale)와 같은 기준.

@@ -283,6 +283,53 @@ _COLUMN_MIGRATIONS = [
         created_at  TEXT
     )""",
     "CREATE INDEX IF NOT EXISTS ix_listing_alerts_member ON listing_alerts(member_id)",
+    # 좌표 → 주소 캐시(카카오 coord2address). 목록 크롤엔 주소가 없어 카드에 보여줄
+    # 도로명·지번·건물명을 좌표로 만들어 쓴다. common/geocode.py 참고.
+    """CREATE TABLE IF NOT EXISTS geo_address (
+        gkey          TEXT PRIMARY KEY,   -- 소수점 5자리 '위도,경도'
+        lat           REAL,
+        lng           REAL,
+        road_address  TEXT,
+        jibun_address TEXT,
+        building_name TEXT,
+        updated_at    TEXT
+    )""",
+    # 아파트 매매 실거래(국토부) — 동네 소비력 가늠용. pipeline/fetch_apt_trades.py 가 채운다.
+    """CREATE TABLE IF NOT EXISTS apt_trades (
+        trade_key    TEXT PRIMARY KEY,
+        lawd_cd      TEXT,
+        sido         TEXT,
+        sigungu      TEXT,
+        dong         TEXT,
+        apt_name     TEXT,
+        jibun        TEXT,
+        area_m2      REAL,
+        floor        INTEGER,
+        build_year   INTEGER,
+        amount       INTEGER,      -- 거래금액(만원)
+        deal_date    TEXT,         -- YYYY-MM-DD
+        canceled     BOOLEAN,      -- 계약해제 건
+        collected_at TEXT
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_apt_trades_dong ON apt_trades(sigungu, dong)",
+    "CREATE INDEX IF NOT EXISTS ix_apt_trades_date ON apt_trades(deal_date)",
+    # 동별(그리고 dong='' 인 시군구별) 매매 시세 집계 — 화면이 읽는 건 이 표.
+    """CREATE TABLE IF NOT EXISTS apt_price_dong (
+        key                TEXT PRIMARY KEY,   -- '시군구|동' (동이 빈 문자열이면 시군구 전체)
+        sido               TEXT,
+        sigungu            TEXT,
+        dong               TEXT,
+        n                  INTEGER,
+        months             INTEGER,
+        median_amount      INTEGER,   -- 중앙 거래가(만원)
+        median_per_pyeong  INTEGER,   -- 중앙 평당가(만원/평)
+        p25_per_pyeong     INTEGER,
+        p75_per_pyeong     INTEGER,
+        top_apt            TEXT,
+        top_apt_per_pyeong INTEGER,
+        avg_build_year     INTEGER,
+        updated_at         TEXT
+    )""",
 ]
 
 
