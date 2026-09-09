@@ -281,7 +281,8 @@ export default function App() {
               <input type="number" value={f.netmin} placeholder="예: 0" style={{ width: 110 }} onChange={(e) => setF({ ...f, netmin: e.target.value })} /></div>
             <div className="fg"><label>정렬</label>
               <select value={f.sort} onChange={(e) => setF({ ...f, sort: e.target.value })}>
-                <option value="recent">최신순</option>
+                <option value="recent">최신순(확인일)</option>
+                <option value="fresh">🌱 새로 올라온 순</option>
                 <option value="net_desc">💰 순수익 높은순</option>
                 <option value="rent_asc">월세 낮은순</option>
                 <option value="rent_desc">월세 높은순</option>

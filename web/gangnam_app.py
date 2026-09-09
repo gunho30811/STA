@@ -35,6 +35,10 @@ _LINE_ORDER = ["1호선", "2호선", "3호선", "4호선", "5호선", "6호선",
                "부산1호선", "부산2호선", "부산3호선", "부산4호선", "동해선", "부산김해경전철"]
 M2_PER_PYEONG = 3.305785
 
+# DB 서버는 UTC로 도는데 우리 날짜값(confirmYmd·crawled_at)은 전부 KST 기준이라,
+# 그냥 now()를 쓰면 한국 시각 오전 9시 이전엔 '어제'로 계산된다 → KST로 변환해서 비교.
+_KST = "(now() AT TIME ZONE 'Asia/Seoul')"
+
 app = Flask(__name__)
 from auth import init_auth  # noqa: E402
 init_auth(app)
@@ -214,12 +218,14 @@ LIST_COLS = (
     "deposit", "rent_monthly", "maintenance_monthly", "area_exclusive_m2",
     "floor_current", "rooms", "direction", "subway_station", "subway_distance_m",
     "summary", "lat", "lng", "jibun_address", "road_address", "confirmed_at",
+    "first_seen",   # 우리가 처음 본 시각 — '새로 올라온 순' 정렬·신규 표시용
 )
 
 # 역·노선 반경 검색처럼 '전 후보를 파이썬으로 걸러야' 할 때 먼저 읽는 최소 컬럼.
 # (거리 판정 + 정렬 + 페이지 산정에 필요한 것만 — 노선 전체는 후보가 수십만 건이라
 #  21컬럼을 다 읽으면 전송·파싱만으로 십수 초가 걸린다.)
-LITE_COLS = "article_no, lat, lng, deposit, rent_monthly, area_exclusive_m2, confirmed_at"
+LITE_COLS = ("article_no, lat, lng, deposit, rent_monthly, area_exclusive_m2, "
+             "confirmed_at, first_seen")
 
 # 시군구 문자열 → (시/군, 구) 를 SQL에서 계산.
 #   "수원시 영통구" → ("수원시","영통구") · "강남구" → ("","강남구") · "화성시" → ("화성시","")
@@ -230,16 +236,20 @@ _GU_SQL = ("CASE WHEN position(' ' in sigungu) > 0 THEN split_part(sigungu, ' ',
            "WHEN right(sigungu, 1) = '구' THEN sigungu ELSE '' END")
 
 # 정렬 → SQL ORDER BY (월순수익 net_desc 는 삼삼 계산이 필요해 파이썬에서 처리).
+# 정렬. 매 정렬 뒤에 article_no 를 붙이는 이유: 같은 값(확인일·월세 등)을 가진 행이
+# 수천 개라 tie-break 가 없으면 페이지를 넘길 때마다 순서가 흔들려 매물이 중복/누락된다.
 _ORDER_SQL = {
-    # 실시간 뷰(nl_live)에서 'recent'는 크롤 최신순(crawled_at, 인덱스 정렬로 빠름).
-    # 등록확인일(confirmed_at)은 표현식이라 전체 정렬이 느려 기본 정렬로는 안 씀.
-    "recent": "crawled_at DESC NULLS LAST",
-    "rent_asc": "rent_monthly ASC NULLS LAST",
-    "rent_desc": "rent_monthly DESC NULLS LAST",
-    "deposit_asc": "deposit ASC NULLS LAST",
-    "deposit_desc": "deposit DESC NULLS LAST",
-    "area_asc": "area_exclusive_m2 ASC NULLS LAST",
-    "area_desc": "area_exclusive_m2 DESC NULLS LAST",
+    # '최신순'은 **등록확인일**(confirmed_sort = confirmYmd, listings에 인덱스 있음).
+    #   예전엔 crawled_at(우리가 크롤한 시각)이었는데, 하루 한 번 전량 크롤이라 값이
+    #   거의 같아서 사실상 무작위 순서였다(8월 매물이 맨 위에 뜨던 원인).
+    "recent": "confirmed_sort DESC NULLS LAST, article_no DESC",
+    "fresh": "first_seen DESC NULLS LAST, article_no DESC",   # 우리가 처음 본 순
+    "rent_asc": "rent_monthly ASC NULLS LAST, article_no DESC",
+    "rent_desc": "rent_monthly DESC NULLS LAST, article_no DESC",
+    "deposit_asc": "deposit ASC NULLS LAST, article_no DESC",
+    "deposit_desc": "deposit DESC NULLS LAST, article_no DESC",
+    "area_asc": "area_exclusive_m2 ASC NULLS LAST, article_no DESC",
+    "area_desc": "area_exclusive_m2 DESC NULLS LAST, article_no DESC",
 }
 
 
@@ -342,7 +352,7 @@ def api_stats():
                 "SELECT percentile_disc(0.5) WITHIN GROUP (ORDER BY rent) "
                 "FROM listings TABLESAMPLE SYSTEM(10) "
                 f"WHERE {med_where} "
-                "AND crawled_at >= to_char(now() - interval '7 days','YYYY-MM-DD') "
+                f"AND crawled_at >= to_char({_KST} - interval '7 days','YYYY-MM-DD') "
                 "AND rent > 0", med_params).fetchone()[0]
             by_type = [(r[0], r[1]) for r in conn.execute(
                 f"SELECT building_type_code, COUNT(*) c FROM {BASE} "
@@ -362,10 +372,10 @@ def api_stats():
 # 등록상태 필터/뱃지 기준일수. NEW_DAYS 이내면 '신규', STALE_DAYS 넘으면 '오래됨'.
 NEW_DAYS, STALE_DAYS = 1, 7
 _AGE_SQL = {
-    "new": f"confirmed_at >= to_char(now() - interval '{NEW_DAYS} day','YYYY-MM-DD')",
-    "week": f"confirmed_at >= to_char(now() - interval '{STALE_DAYS} day','YYYY-MM-DD')",
+    "new": f"confirmed_at >= to_char({_KST} - interval '{NEW_DAYS} day','YYYY-MM-DD')",
+    "week": f"confirmed_at >= to_char({_KST} - interval '{STALE_DAYS} day','YYYY-MM-DD')",
     "stale": ("(confirmed_at IS NULL OR confirmed_at < "
-              f"to_char(now() - interval '{STALE_DAYS} day','YYYY-MM-DD'))"),
+              f"to_char({_KST} - interval '{STALE_DAYS} day','YYYY-MM-DD'))"),
 }
 
 
@@ -480,7 +490,12 @@ def _sort_python(items, sort):
         return sorted(items, key=lambda x: -(x.get("pyeong") or 0))
     if sort == "area_asc":
         return sorted(items, key=lambda x: (x.get("pyeong") is None, x.get("pyeong") or 0))
-    return sorted(items, key=lambda x: x.get("confirmed_at") or "", reverse=True)
+    if sort == "fresh":     # 우리가 처음 본 순(신규 등록)
+        return sorted(items, key=lambda x: (x.get("first_seen") or "", x.get("article_no") or 0),
+                      reverse=True)
+    # 기본 '최신순' = 등록확인일 최신순 (SQL 경로의 confirmed_sort 와 같은 기준)
+    return sorted(items, key=lambda x: (x.get("confirmed_at") or "", x.get("article_no") or 0),
+                  reverse=True)
 
 
 def _stations_arg(a):

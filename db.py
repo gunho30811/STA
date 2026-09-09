@@ -269,7 +269,10 @@ _COLUMN_MIGRATIONS = [
     #      (반대로 하면 ADD COLUMN DEFAULT now() 가 전 행을 '방금 등록'으로 채워버린다.)
     #   크롤러의 INSERT 컬럼 목록에 first_seen 이 없으므로 UPSERT 시에도 최초값이 보존된다.
     "ALTER TABLE listings ADD COLUMN IF NOT EXISTS first_seen TEXT",
-    "ALTER TABLE listings ALTER COLUMN first_seen SET DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')",
+    # DB 서버는 UTC라 now() 그대로 쓰면 KST 기준인 나머지 시각값(crawled_at·알림 커서)과
+    # 9시간 어긋난다 → 반드시 KST로 변환해서 찍는다.
+    "ALTER TABLE listings ALTER COLUMN first_seen SET DEFAULT "
+    "to_char(now() AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI:SS')",
     # 조건 알림(부동산 매물) — 회원이 저장한 검색조건, 새 매물이 뜨면 카톡으로 보낸다.
     """CREATE TABLE IF NOT EXISTS listing_alerts (
         id          SERIAL PRIMARY KEY,
