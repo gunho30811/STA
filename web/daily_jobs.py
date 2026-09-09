@@ -23,7 +23,8 @@ for _p in (_ROOT, os.path.join(_ROOT, "common"), os.path.join(_ROOT, "pipeline")
 
 RUN_HOUR = 4              # 새벽 4시 이후 첫 기회에 실행(하루 1회)
 APT_MONTHS = 2            # 실거래는 신고 지연이 있어 최근 2개월만 다시 받으면 충분
-GEO_BUDGET = 50000        # 좌표→주소 하루 예산(카카오 로컬 한도 10만 안에서)
+GEO_BUDGET = 20000        # 좌표→주소 하루 예산 — '좌표로 주소 변환'은 API별
+                          # 무료 한도가 따로 있어(초과 시 메일 경고) 보수적으로 잡는다.
 _LOCK_ID = 823403
 _STARTED = False
 
@@ -63,10 +64,12 @@ def run_once(conn, force=False):
         print(f"[daily] 실거래 갱신 실패: {out['apt_error']}", flush=True)
     try:
         import fetch_geo_addresses as geo
+        import geocode
         todo = geo._todo(conn, GEO_BUDGET)
         filled = 0
         for i in range(0, len(todo), geo.CHUNK):
-            import geocode
+            if geocode.quota_blocked():      # 한도 소진 → 오늘은 여기까지
+                break
             filled += len(geocode.fill(conn, todo[i:i + geo.CHUNK], budget=geo.CHUNK))
         out["geo_filled"] = filled
     except Exception as e:

@@ -29,7 +29,7 @@ import db  # noqa: E402
 import geocode  # noqa: E402
 import target_regions  # noqa: E402
 
-DEFAULT_BUDGET = 80000     # 하루 한도(10만) 안에서 여유를 둔 기본 예산
+DEFAULT_BUDGET = 20000     # '좌표로 주소 변환'은 API별 일일 무료 한도가 따로 있어 보수적으로
 CHUNK = 200                # 한 번에 변환할 좌표 수(스레드 8개로 나눠 호출)
 
 
@@ -78,6 +78,9 @@ def main():
         print(f"이번에 채울 좌표: {len(todo):,}개", flush=True)
         filled, t0 = 0, time.time()
         for i in range(0, len(todo), CHUNK):
+            if geocode.quota_blocked():
+                print("  일일 한도 소진 — 중단(다음 실행에서 이어서)", flush=True)
+                break
             got = geocode.fill(conn, todo[i:i + CHUNK], budget=CHUNK)
             filled += len(got)
             if (i // CHUNK) % 10 == 0:
