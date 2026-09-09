@@ -160,6 +160,50 @@ def run_one(conn, alert, notify=True):
     return len(items), sent
 
 
+def start_scheduler(interval_sec=300):
+    """웹 프로세스 안에서 주기 스캔 스레드를 띄운다(프로세스당 1개).
+
+    외부 크론(cron-job.org)·GH Actions 스케줄이 죽어 있어도 알림이 도는 게 목적.
+    gunicorn 워커가 여러 개면 스레드도 여러 개지만, pg advisory lock + kv_cache
+    스로틀로 실제 스캔은 한 번만 돈다."""
+    global _SCHED
+    if _SCHED:
+        return
+    _SCHED = True
+
+    def loop():
+        import db
+        while True:
+            time.sleep(interval_sec)
+            conn, locked = None, False
+            try:
+                conn = db.connect()
+                try:
+                    locked = bool(conn.execute("SELECT pg_try_advisory_lock(823402)").fetchone()[0])
+                except Exception:
+                    locked = True
+                if locked:
+                    run_due(conn)
+            except Exception as e:
+                print(f"[alerts] 주기 스캔 오류: {repr(e)[:150]}", flush=True)
+            finally:
+                if conn is not None:
+                    if locked:
+                        try:
+                            conn.execute("SELECT pg_advisory_unlock(823402)")
+                        except Exception:
+                            pass
+                    conn.close()
+
+    import threading
+    threading.Thread(target=loop, daemon=True, name="listing-alerts").start()
+    print(f"[alerts] 주기 스캔 시작 ({interval_sec}s 간격, 실제 발송은 {SCAN_EVERY_MIN}분 간격)",
+          flush=True)
+
+
+_SCHED = False
+
+
 def run_due(conn, force=False):
     """켜져 있는 전 회원 알림 스캔. 크론이 자주 불러도 SCAN_EVERY_MIN 간격으로만 실제 실행."""
     if not force:

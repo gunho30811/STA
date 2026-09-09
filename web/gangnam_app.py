@@ -38,6 +38,14 @@ app = Flask(__name__)
 from auth import init_auth  # noqa: E402
 init_auth(app)
 
+# 조건 알림 주기 스캔(웹 프로세스 안에서). 외부 크론에 의존하지 않게 여기서 띄운다 —
+# 채팅 폴링용 외부 크론(cron-job.org)·GH Actions 스케줄은 07-30 이후 죽어 있었다.
+try:
+    import listing_alerts  # noqa: E402
+    listing_alerts.start_scheduler()
+except Exception as _e:   # 알림이 안 떠도 뷰어 자체는 떠야 한다
+    print(f"[alerts] 스케줄러 시작 실패: {repr(_e)[:120]}", flush=True)
+
 TYPE_NAMES = {
     "APT": "아파트", "OPST": "오피스텔", "VL": "빌라",
     "OR": "원룸", "DDDGG": "단독/다가구", "SG": "상가", "JWJT": "전원주택",
