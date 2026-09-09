@@ -248,3 +248,13 @@
   각 표에 `[단지형만]` 표시 추가 (`road_address`/`building_age`/`households`/`parking_*`/
   `floor_area_ratio`/`building_coverage_ratio`/`builder`/`dong_count`/`school_*`/`same_building_same_area_count`
   실질값). `lab/crawl_gangnam_all_types.py`(강남구 시범 수집)로 검증.
+- 2026-09-09: 보조 테이블 3종 추가(수집원 계약 밖 — 뷰어/알림이 쓰는 파생·캐시 데이터).
+  - `listings.first_seen` (TEXT): 우리가 그 매물을 **처음 적재한 시각**. 기본값 `to_char(now(),…)`,
+    UPSERT 컬럼 목록에 없어 최초값이 보존된다 → 조건 알림의 '새 매물' 판정 기준.
+    (네이버 `confirmed_at`은 중개사가 재확인만 해도 바뀌어 신규 판정에 못 씀.)
+  - `geo_address` (gkey=소수점5자리 '위도,경도' PK): 좌표→도로명/지번/건물명 캐시(카카오
+    coord2address). 목록 크롤에 주소가 없어 카드에 보여줄 주소를 좌표로 만든다.
+    수집: `pipeline/fetch_geo_addresses.py`, 사용: `common/geocode.py`.
+  - `apt_trades` / `apt_price_dong`: 국토부 아파트 매매 실거래와 동별 집계(중앙 거래가·평당가·
+    25~75% 구간·대표단지). 주변 **소비력** 가늠용. 수집: `pipeline/fetch_apt_trades.py`.
+  - `listing_alerts`: 회원이 저장한 검색조건(카톡 알림). 스캔: `web/listing_alerts.py`.
