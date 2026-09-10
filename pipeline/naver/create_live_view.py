@@ -63,7 +63,7 @@ SELECT
   n.jibun_address, n.road_address,
   COALESCE(n.confirmed_at, CASE WHEN l.confirmymd ~ '^[0-9]{{8}}$'
      THEN to_char(to_date(l.confirmymd,'YYYYMMDD'),'YYYY-MM-DD') END) AS confirmed_at,
-  l.crawled_at, l.first_seen,
+  l.crawled_at, l.first_seen, l.floorinfo,
   NULLIF(l.confirmymd,'') AS confirmed_sort
 FROM listings l
 LEFT JOIN naver_listings n ON n.article_no = l.articleno::bigint
@@ -89,7 +89,7 @@ SELECT
   NULL::text AS jibun_address, NULL::text AS road_address,
   CASE WHEN l.confirmymd ~ '^[0-9]{{8}}$'
        THEN to_char(to_date(l.confirmymd,'YYYYMMDD'),'YYYY-MM-DD') END AS confirmed_at,
-  l.crawled_at, l.first_seen,
+  l.crawled_at, l.first_seen, l.floorinfo,
   NULLIF(l.confirmymd,'') AS confirmed_sort
 FROM listings l
 WHERE {_REGION}

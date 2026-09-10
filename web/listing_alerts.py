@@ -31,7 +31,7 @@ SCAN_EVERY_MIN = 5           # 스캐너가 깨어나는 간격(실제 발송은
 INTERVAL_CHOICES = [1, 2, 4, 6, 12]      # 알림 주기(시간) — 화면에서 고를 수 있는 값
 DEFAULT_INTERVAL = 6
 MAX_PER_ALERT = 40           # 한 번에 카톡으로 알릴 매물 수 상한(그 이상은 '외 N건')
-LIST_IN_MSG = 5              # 메시지에 상세히 적는 매물 수
+MSGS_PER_RUN = 5             # 한 번에 보낼 카톡 통수(매물 1건 = 1통, 넘으면 요약 1통 추가)
 TYPE_NAMES = {"APT": "아파트", "OPST": "오피스텔", "VL": "빌라", "OR": "원룸",
               "DDDGG": "단독/다가구", "SG": "상가", "JWJT": "전원주택"}
 
@@ -99,9 +99,10 @@ def find_new(conn, query, since):
         params.append(since)
     else:
         clauses.append("first_seen IS NOT NULL")
-    cols = ("article_no, building_name, building_type_code, sigungu, dong, deposit, "
-            "rent_monthly, maintenance_monthly, area_exclusive_m2, floor_current, "
-            "lat, lng, first_seen")
+    cols = ("article_no, building_name, building_type_code, sido, sigungu, dong, deposit, "
+            "rent_monthly, maintenance_monthly, area_exclusive_m2, floor_current, floorinfo, rooms, "
+            "direction, summary, subway_station, subway_distance_m, jibun_address, "
+            "road_address, confirmed_at, lat, lng, first_seen")
     rows = conn.execute(
         f"SELECT {cols} FROM nl_live WHERE {' AND '.join(clauses)} "
         "ORDER BY first_seen DESC LIMIT 500", params).fetchall()
@@ -129,25 +130,114 @@ def find_new(conn, query, since):
     return items[:MAX_PER_ALERT]
 
 
-def _line(x):
-    """카톡 한 줄: '역삼동 오피스텔 · 보증 1000/월 85 · 8.2평 3층'"""
-    bits = [" ".join(b for b in (x.get("dong"), TYPE_NAMES.get(x.get("building_type_code"), "")) if b)]
-    dep, rent = x.get("deposit"), x.get("rent_monthly")
-    if rent:
-        bits.append(f"보증 {int(dep or 0):,}/월 {int(rent):,}")
+# ── 같은 매물 재발송 방지 ────────────────────────────────────────────────
+# 네이버는 매물을 내렸다 다시 올리면 **새 articleNo**를 준다. 그래서 매물번호만으로는
+# "어제 보낸 그 집"이 오늘 또 온다. 매물번호 + 물건 자체(동·건물·면적·층) 두 가지 키를
+# 모두 기록해두고, 둘 중 하나라도 보낸 적 있으면 다시 보내지 않는다.
+#   (가격은 키에 넣지 않는다 — 5만원 조정에 다시 울리면 그게 더 성가시다)
+def dedup_keys(x):
+    def _n(v, nd=0):
+        return "" if v is None else (f"{float(v):.{nd}f}" if nd else str(int(float(v))))
+    g = x.get("geo") or {}
+    # 물건 키는 되도록 구체적으로 — 같은 건물의 다른 호실을 같은 물건으로 묶지 않게
+    # 지번주소를 우선 쓰고(없으면 건물명), 면적·층·향까지 넣는다.
+    where = (x.get("jibun_address") or g.get("jibun") or x.get("building_name") or "").strip()
+    floor = _n(x.get("floor_current")) or (x.get("floorinfo") or "")
+    unit = "|".join((x.get("sigungu") or "", x.get("dong") or "", where,
+                     _n(x.get("area_exclusive_m2"), 1), floor,
+                     (x.get("direction") or "")))
+    return [f"a:{x.get('article_no')}", f"u:{unit}"]
+
+
+def _drop_already_sent(conn, alert_id, items):
+    """이 알림으로 이미 보낸 매물은 걸러낸다."""
+    if not items:
+        return items
+    keys = [k for x in items for k in dedup_keys(x)]
+    try:
+        seen = {r[0] for r in conn.execute(
+            "SELECT dedup_key FROM listing_alert_sent WHERE alert_id=%s AND dedup_key = ANY(%s)",
+            (alert_id, keys)).fetchall()}
+    except Exception as e:
+        print(f"[alerts] 발송이력 조회 실패({repr(e)[:80]}) — 중복 필터 생략", flush=True)
+        return items
+    return [x for x in items if not any(k in seen for k in dedup_keys(x))]
+
+
+def _mark_sent(conn, alert_id, items):
+    rows = [(alert_id, k, x.get("article_no"), _now())
+            for x in items for k in dedup_keys(x)]
+    if not rows:
+        return
+    try:
+        conn.executemany(
+            "INSERT INTO listing_alert_sent(alert_id, dedup_key, article_no, sent_at) "
+            "VALUES(%s,%s,%s,%s) ON CONFLICT (alert_id, dedup_key) DO NOTHING", rows)
+        conn.commit()
+    except Exception as e:
+        print(f"[alerts] 발송이력 기록 실패: {repr(e)[:120]}", flush=True)
+
+
+def _addr_of(conn, items):
+    """주소 보강 — 상세 크롤이 없는 매물은 좌표→주소 캐시에서 가져온다(카톡에 주소를 싣기 위해)."""
+    need = [x for x in items if not (x.get("jibun_address") or x.get("road_address"))]
+    if not need:
+        return
+    try:
+        import geocode
+        geocode.attach(conn, need, ondemand=False)   # 알림 경로에선 API 호출 없이 캐시만
+    except Exception:
+        pass
+
+
+def _detail_text(alert, x, idx, total):
+    """매물 1건 = 카톡 1통. 웹을 안 열어도 판단이 되게 핵심을 다 적는다.
+
+    카카오 텍스트 템플릿은 길이 제한이 빡빡해(200자 안팎) 한 통에 여러 건을 우겨넣으면
+    잘린다 — 그래서 건별로 보낸다."""
+    g = x.get("geo") or {}
+    addr = (x.get("jibun_address") or g.get("jibun") or x.get("road_address") or g.get("road")
+            or " ".join(b for b in (x.get("sido"), x.get("sigungu"), x.get("dong")) if b))
+    name = (x.get("building_name") or "").strip()
+    if not name or name in ("일반상가", "복합상가", "단지내상가", "일반원룸", "다가구",
+                            "단독", "빌라", "상가", "원룸", "오피스텔", "아파트") or name.endswith("동"):
+        name = g.get("building") or ""
+    head = f"🔔 {alert.get('name') or '매물 알림'}"
+    if total > 1:
+        head += f" ({idx}/{total})"
+    floor = (f"{x['floor_current']}층" if x.get("floor_current") is not None
+             else (f"{x['floorinfo']}층" if x.get("floorinfo") else ""))
+    line2 = " · ".join(b for b in (name, TYPE_NAMES.get(x.get("building_type_code"), ""), floor) if b)
+    dep, rent = int(x.get("deposit") or 0), int(x.get("rent_monthly") or 0)
+    price = f"💰 보증 {dep:,} / 월 {rent:,}"
+    if x.get("maintenance_monthly"):
+        price += f" (관리 {int(x['maintenance_monthly']):,})"
+    spec = []
     if x.get("pyeong"):
-        bits.append(f"{x['pyeong']}평")
-    if x.get("floor_current") is not None:
-        bits.append(f"{x['floor_current']}층")
-    return "· " + " · ".join(bits)
+        spec.append(f"{x['pyeong']}평")
+    if x.get("area_exclusive_m2"):
+        spec.append(f"전용 {round(float(x['area_exclusive_m2']))}㎡")
+    if x.get("rooms") is not None:
+        spec.append(f"방{x['rooms']}")
+    if x.get("direction"):
+        spec.append(str(x["direction"]).replace(" (거실 기준)", ""))
+    sub = ""
+    if x.get("subway_station"):
+        sub = f"🚇 {x['subway_station']}"
+        if x.get("subway_distance_m"):
+            sub += f" {int(x['subway_distance_m'])}m"
+    parts = [head, line2, price, " · ".join(spec) if spec else "", f"📍 {addr}", sub]
+    if x.get("confirmed_at"):
+        parts.append(f"확인일 {x['confirmed_at']}")
+    smry = " ".join((x.get("summary") or "").split())
+    if smry:
+        parts.append(f"“{smry[:40]}”")
+    return chr(10).join(p for p in parts if p)[:900]
 
 
-def _message(alert, items):
-    head = f"🔔 [{alert.get('name') or '매물 알림'}] 새 매물 {len(items)}건"
-    lines = [_line(x) for x in items[:LIST_IN_MSG]]
-    if len(items) > LIST_IN_MSG:
-        lines.append(f"…외 {len(items) - LIST_IN_MSG}건")
-    return head + "\n\n" + "\n".join(lines)
+def _summary_text(alert, items, shown):
+    return (f"🔔 {alert.get('name') or '매물 알림'} — 새 매물 {len(items)}건 중 "
+            f"{shown}건을 보냈습니다. 나머지 {len(items) - shown}건은 사이트에서 확인하세요.")
 
 
 def link_of(alert):
@@ -158,23 +248,30 @@ def link_of(alert):
 
 
 def run_one(conn, alert, notify=True):
-    """알림 1건 스캔(+발송). (신규건수, 발송여부) 반환."""
+    """알림 1건 스캔(+발송). (신규건수, 발송건수) 반환.
+
+    같은 매물은 두 번 보내지 않는다(listing_alert_sent 기록) — 매물번호가 바뀌어
+    다시 올라온 물건도 동·건물·면적·층 키로 걸러낸다."""
     items = find_new(conn, alert.get("query") or "", alert.get("last_run_at"))
-    sent = False
+    _addr_of(conn, items)          # 주소 보강 먼저 — 중복 판정 키에도 주소를 쓴다
+    items = _drop_already_sent(conn, alert["id"], items)
+    sent = 0
     if items and notify:
-        sent = bool(kakao_notify.send_to_member(
-            conn, alert["member_id"], _message(alert, items), link_of(alert), "매물 보기"))
+        show = items[:MSGS_PER_RUN]
+        msgs = [(_detail_text(alert, x, i + 1, len(show)), x.get("url") or link_of(alert),
+                 "네이버에서 보기") for i, x in enumerate(show)]
+        if len(items) > len(show):
+            msgs.append((_summary_text(alert, items, len(show)), link_of(alert), "전체 보기"))
+        sent = kakao_notify.send_many_to_member(conn, alert["member_id"], msgs)
+        if sent:
+            _mark_sent(conn, alert["id"], show)
     now = _now()
-    if sent:
+    if sent or not items:
         conn.execute(
-            "UPDATE listing_alerts SET last_run_at=%s, last_sent_at=%s, "
+            "UPDATE listing_alerts SET last_run_at=%s, last_sent_at=COALESCE(%s, last_sent_at), "
             "sent_count=COALESCE(sent_count,0)+%s WHERE id=%s",
-            (now, now, len(items), alert["id"]))
-    else:
-        # 발송 실패(카톡 미연결 등)면 last_run_at 을 안 올려 다음 스캔에서 다시 시도.
-        if not items:
-            conn.execute("UPDATE listing_alerts SET last_run_at=%s WHERE id=%s",
-                         (now, alert["id"]))
+            (now, now if sent else None, len(items) if sent else 0, alert["id"]))
+    # 보낼 게 있는데 발송이 안 됐으면(카톡 미연결 등) last_run_at 을 안 올려 다음에 재시도.
     conn.commit()
     return len(items), sent
 

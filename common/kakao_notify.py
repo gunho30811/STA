@@ -54,6 +54,47 @@ def _send_memo(access_token, text, link_url, button_title="열어보기"):
     return r.status_code, r.text[:200]
 
 
+def send_many_to_member(conn, member_id, messages):
+    """여러 건을 한 번의 토큰 갱신으로 연달아 보낸다. messages=[(text, link, button)].
+
+    카톡 텍스트 템플릿은 한 통에 많이 못 담아서(200자 안팎) 매물 알림은 건별로 보낸다 —
+    건마다 토큰을 새로 받으면 낭비라 여기서 묶는다. 보낸 건수를 반환."""
+    try:
+        row = conn.execute(
+            "SELECT kakao_refresh_token_enc FROM members "
+            "WHERE id=%s AND kakao_notify=TRUE AND kakao_refresh_token_enc IS NOT NULL",
+            (member_id,)).fetchone()
+    except Exception as e:
+        print(f"[kakao_notify] 조회 오류: {repr(e)[:120]}", flush=True)
+        return 0
+    if not row:
+        return 0
+    try:
+        rt = crypto_util.decrypt(row["kakao_refresh_token_enc"])
+        access, new_rt = _refresh_access_token(rt)
+        if new_rt and new_rt != rt:
+            conn.execute("UPDATE members SET kakao_refresh_token_enc=%s WHERE id=%s",
+                         (crypto_util.encrypt(new_rt), member_id))
+            conn.commit()
+        if not access:
+            print(f"[kakao_notify] member#{member_id} accessToken 없음", flush=True)
+            return 0
+    except Exception as e:
+        print(f"[kakao_notify] member#{member_id} 토큰 오류: {repr(e)[:150]}", flush=True)
+        return 0
+    ok = 0
+    for text, link, button in messages:
+        try:
+            sc, body = _send_memo(access, text, link, button or "열어보기")
+            if sc == 200:
+                ok += 1
+            else:
+                print(f"[kakao_notify] member#{member_id} 발송 실패 {sc}: {body}", flush=True)
+        except Exception as e:
+            print(f"[kakao_notify] member#{member_id} 발송 오류: {repr(e)[:120]}", flush=True)
+    return ok
+
+
 def send_to_member(conn, member_id, text, link_url, button_title="열어보기"):
     """해당 회원이 카톡 알림을 켜뒀으면 본인 카톡으로 발송. 실패는 로그만(호출부에 영향 없음).
     True=발송함 / False=대상 아님·실패."""

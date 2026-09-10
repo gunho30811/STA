@@ -219,6 +219,7 @@ LIST_COLS = (
     "floor_current", "rooms", "direction", "subway_station", "subway_distance_m",
     "summary", "lat", "lng", "jibun_address", "road_address", "confirmed_at",
     "first_seen",   # 우리가 처음 본 시각 — '새로 올라온 순' 정렬·신규 표시용
+    "floorinfo",    # '5/6' 형태 원본 층 정보 — 상세 크롤 전 매물의 층 표시용
 )
 
 # 역·노선 반경 검색처럼 '전 후보를 파이썬으로 걸러야' 할 때 먼저 읽는 최소 컬럼.
