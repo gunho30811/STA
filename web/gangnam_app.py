@@ -421,6 +421,32 @@ def _build_where(a):
             ors.append("(" + (" AND ".join(sub) if sub else "TRUE") + ")")
         clauses.append("(" + " OR ".join(ors) + ")")
 
+    # 지역 제외: xregion=sido|sigun|gu|dong (빈 칸=와일드카드). 여러 개면 전부 제외.
+    #   "경기 안산은 빼고 보고 싶다" 같은 요구. 알림도 같은 조건문을 쓰므로 함께 적용된다.
+    xregs = [(r.split("|") + ["", "", "", ""])[:4] for r in a.getlist("xregion") if r]
+    for sido_r, sigun_r, gu_r, dong_r in xregs:
+        sub = []
+        if sido_r:
+            sub.append("sido = %s"); params.append(sido_r)
+        if sigun_r:
+            sub.append(f"{_SI_SQL} = %s"); params.append(sigun_r)
+        if gu_r:
+            sub.append(f"{_GU_SQL} = %s"); params.append(gu_r)
+        if dong_r:
+            sub.append("dong = %s"); params.append(dong_r)
+        if sub:
+            clauses.append("NOT (" + " AND ".join(sub) + ")")
+
+    # 키워드 제외: 이 말이 들어간 매물은 숨긴다(쉼표로 여러 개).
+    #   NULL 컬럼은 NOT ILIKE 가 NULL이 되어 멀쩡한 매물까지 사라지므로 COALESCE 필수.
+    xkws = [w.strip() for w in a.get("xkeyword", "").split(",") if w.strip()]
+    for kw in xkws[:5]:
+        fields = ("building_name", "summary", "jibun_address", "road_address",
+                  "subway_station", "summary_tags", "dong", "sigungu")
+        clauses.append("NOT (" + " OR ".join(
+            f"COALESCE({f},'') ILIKE %s" for f in fields) + ")")
+        params.extend([f"%{kw}%"] * len(fields))
+
     # 방 개수: 1/2/3 정수(exact) 또는 '4+'(4개 이상)
     rooms_sel = a.getlist("rooms")
     if rooms_sel:
@@ -576,7 +602,8 @@ def api_listings():
         if not needs_python:
             # 상세전용 필터(방수/키워드/업무용)가 없으면 조인 없는 nl_base로 카운트(빠름).
             #   있으면 상세 컬럼이 필요하니 nl_live로 카운트.
-            enriched = bool(a.getlist("rooms")) or bool(a.get("keyword", "").strip()) or a.get("office") == "1"
+            enriched = (bool(a.getlist("rooms")) or bool(a.get("keyword", "").strip())
+                        or bool(a.get("xkeyword", "").strip()) or a.get("office") == "1")
             count_src = SRC if enriched else BASE
             # 총 건수(페이지네이션용) → 필터 시그니처별 60초 캐시.
             total = _cached(f"cnt:{count_src}:{where_sql}:{params}", 60,

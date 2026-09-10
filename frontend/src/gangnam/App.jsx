@@ -25,6 +25,8 @@ export default function App() {
     () => ({ sido: q1('sido'), sigun: q1('sigun'), gu: q1('gu'), dong: q1('dong') }))
   const [selRegions, setSelRegions] = useState(
     () => qAll('region').map((enc) => ({ enc, label: enc.split('|').filter(Boolean).join(' ') })))
+  const [xRegions, setXRegions] = useState(
+    () => qAll('xregion').map((enc) => ({ enc, label: enc.split('|').filter(Boolean).join(' ') })))
   const [stationInput, setStationInput] = useState('')
   const [selStations, setSelStations] = useState(() => qAll('station'))
   const [selLines, setSelLines] = useState(() => qAll('line'))
@@ -34,7 +36,7 @@ export default function App() {
     kw: q1('keyword'), depmin: q1('deposit_min'), depmax: q1('deposit_max'),
     rentmin: q1('rent_min'), rentmax: q1('rent_max'), pmin: q1('pyeong_min'),
     pmax: q1('pyeong_max'), netmin: q1('net_min'), sort: q1('sort', 'recent'),
-    office: q1('office') === '1', age: q1('age'),
+    office: q1('office') === '1', age: q1('age'), xkw: q1('xkeyword'),
   }))
 
   const [res, setRes] = useState({ items: [], total: 0, page: 1, pages: 1 })
@@ -77,6 +79,7 @@ export default function App() {
     const cascEnc = [casc.sido, casc.sigun, casc.gu, casc.dong].join('|')
     if (cascEnc !== '|||' && !selRegions.some((r) => r.enc === cascEnc)) p.append('region', cascEnc)
     selRegions.forEach((r) => p.append('region', r.enc))
+    xRegions.forEach((r) => p.append('xregion', r.enc))   // 제외 지역
 
     // 역 반경: 입력창 잔여 역명 자동 반영 + 선택 역들 + 선택 호선(그 노선 전 역)
     let stns = selStations
@@ -89,6 +92,7 @@ export default function App() {
     selLines.forEach((l) => p.append('line', l))
     if (stns.length || selLines.length) p.set('radius', radius)
 
+    if (f.xkw) p.set('xkeyword', f.xkw)
     if (f.age) p.set('age', f.age)
     if (f.kw) p.set('keyword', f.kw)
     if (f.depmin) p.set('deposit_min', f.depmin)
@@ -101,7 +105,7 @@ export default function App() {
     if (f.office) p.set('office', '1')
     p.set('sort', f.sort); p.set('page', page); p.set('size', 24)
     return p
-  }, [selTypes, selRooms, casc, selRegions, selStations, selLines, stationInput, stationSet, radius, f])
+  }, [selTypes, selRooms, casc, selRegions, xRegions, selStations, selLines, stationInput, stationSet, radius, f])
 
   const doSearch = useCallback(async (page) => {
     const r = await getJSON('api/listings?' + buildQuery(page).toString())
@@ -121,6 +125,13 @@ export default function App() {
     if (selRegions.some((r) => r.enc === enc)) return
     setSelRegions([...selRegions, { enc, label }])
   }
+  const addXRegion = () => {
+    const parts = [casc.sido, casc.sigun, casc.gu, casc.dong]
+    if (!parts.some(Boolean)) return
+    const enc = parts.join('|'), label = parts.filter(Boolean).join(' ')
+    if (xRegions.some((r) => r.enc === enc)) return
+    setXRegions([...xRegions, { enc, label }])
+  }
   const addStation = () => {
     const s0 = stationInput.trim()
     if (!s0) return
@@ -134,9 +145,9 @@ export default function App() {
     setStationInput('')
   }
   const reset = () => {
-    setSelTypes([]); setSelRooms([]); setSelRegions([]); setSelStations([]); setStationInput('')
+    setSelTypes([]); setSelRooms([]); setSelRegions([]); setXRegions([]); setSelStations([]); setStationInput('')
     setSelLines([]); setCasc({ sido: '', sigun: '', gu: '', dong: '' }); setRadius('1000')
-    setF({ kw: '', depmin: '', depmax: '', rentmin: '', rentmax: '', pmin: '', pmax: '', netmin: '', sort: 'recent', office: false, age: '' })
+    setF({ kw: '', depmin: '', depmax: '', rentmin: '', rentmax: '', pmin: '', pmax: '', netmin: '', sort: 'recent', office: false, age: '', xkw: '' })
     getJSON('api/listings?sort=recent&page=1&size=24').then(setRes)
   }
 
@@ -214,11 +225,17 @@ export default function App() {
                 <option value="">동 전체</option>{dongs.map((s) => <option key={s}>{s}</option>)}
               </select>
               <button type="button" className="btn" style={{ background: '#e0e7ff', color: '#3730a3' }} onClick={addRegion}>➕ 지역 추가</button>
+              <button type="button" className="btn btn-x" onClick={addXRegion} title="이 지역 매물은 결과에서 빼기">➖ 이 지역 제외</button>
             </div>
             <div className="selchips">
               {selRegions.map((r, i) => (
                 <span className="selchip" key={r.enc}>📍 {r.label}
                   <span className="rm" onClick={() => setSelRegions(selRegions.filter((_, j) => j !== i))}>×</span>
+                </span>
+              ))}
+              {xRegions.map((r, i) => (
+                <span className="selchip xchip" key={'x' + r.enc}>🚫 {r.label} 제외
+                  <span className="rm" onClick={() => setXRegions(xRegions.filter((_, j) => j !== i))}>×</span>
                 </span>
               ))}
             </div>
@@ -260,6 +277,9 @@ export default function App() {
           <div className="filters">
             <div className="fg"><label>키워드(건물/요약/주소/역)</label>
               <input value={f.kw} placeholder="예: 래미안, 역세권" onChange={(e) => setF({ ...f, kw: e.target.value })}
+                onKeyDown={(e) => { if (e.key === 'Enter') doSearch(1) }} /></div>
+            <div className="fg"><label>🚫 제외 키워드(쉼표)</label>
+              <input value={f.xkw} placeholder="예: 안산, 지분, 경매" onChange={(e) => setF({ ...f, xkw: e.target.value })}
                 onKeyDown={(e) => { if (e.key === 'Enter') doSearch(1) }} /></div>
             <div className="fg"><label>보증금(만)</label><div style={{ display: 'flex', gap: 4 }}>
               <input type="number" value={f.depmin} placeholder="최소" onChange={(e) => setF({ ...f, depmin: e.target.value })} />
