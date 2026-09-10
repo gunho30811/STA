@@ -13,6 +13,7 @@ export default function Card({ x, onClick }) {
   if (x.pyeong) specs.push(`${x.pyeong}평`)
   if (x.area_exclusive_m2) specs.push(`전용 ${x.area_exclusive_m2}㎡`)
   if (x.floor_current != null) specs.push(`${x.floor_current}층`)
+  else if (x.floorinfo) specs.push(`${x.floorinfo}층`)
   if (x.rooms != null) specs.push(`방${x.rooms}`)
   if (x.direction) specs.push(x.direction.replace(' (거실 기준)', ''))
   const sub = x.subway_station ? `${x.subway_station} ${x.subway_distance_m ? x.subway_distance_m + 'm' : ''}` : ''

@@ -289,6 +289,16 @@ _COLUMN_MIGRATIONS = [
     # 알림 주기(시간). 이 주기마다 그 조건만 따로 크롤하고(로컬 PC) 새 매물을 알린다.
     "ALTER TABLE listing_alerts ADD COLUMN IF NOT EXISTS interval_hours INTEGER DEFAULT 6",
     "ALTER TABLE listing_alerts ADD COLUMN IF NOT EXISTS last_crawl_at TEXT",
+    # 알림별 발송 이력 — 같은 매물을 두 번 보내지 않으려고.
+    #   dedup_key: 'a:<매물번호>' 와 'u:<시군구|동|건물|면적|층>' 두 가지를 함께 기록한다.
+    #   (네이버는 매물을 내렸다 다시 올리면 새 매물번호를 주기 때문에 물건 키가 따로 필요)
+    """CREATE TABLE IF NOT EXISTS listing_alert_sent (
+        alert_id   INTEGER NOT NULL,
+        dedup_key  TEXT NOT NULL,
+        article_no BIGINT,
+        sent_at    TEXT,
+        PRIMARY KEY (alert_id, dedup_key)
+    )""",
     # 좌표 → 주소 캐시(카카오 coord2address). 목록 크롤엔 주소가 없어 카드에 보여줄
     # 도로명·지번·건물명을 좌표로 만들어 쓴다. common/geocode.py 참고.
     """CREATE TABLE IF NOT EXISTS geo_address (
