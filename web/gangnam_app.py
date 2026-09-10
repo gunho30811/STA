@@ -11,6 +11,7 @@ naver_listings(Supabase) 를 SQL로 조회(필터·페이지네이션)해 카드
 import math
 import os
 import sys
+import urllib.parse
 
 from flask import Flask, jsonify, request, send_from_directory
 
@@ -254,11 +255,27 @@ _ORDER_SQL = {
 }
 
 
+def naver_search_url(d):
+    """네이버 검색 링크(주소+건물명).
+
+    예전엔 매물번호 딥링크(new.land/offices?articleNo=…)를 줬는데, 네이버가 그 경로를
+    없애서(2026-09 확인: fin.land·m.land·new.land 모두 404) 눌러도 아무것도 안 나온다.
+    대신 확실히 열리는 통합검색으로 보낸다."""
+    g = d.get("geo") or {}
+    parts = [d.get("jibun_address") or g.get("jibun") or d.get("road_address") or g.get("road")
+             or " ".join(b for b in (d.get("sigungu"), d.get("dong")) if b)]
+    bn = (d.get("building_name") or g.get("building") or "").strip()
+    if bn and not bn.endswith("동"):
+        parts.append(bn)
+    q = urllib.parse.quote(" ".join(p for p in parts if p))
+    return f"https://m.search.naver.com/search.naver?query={q}"
+
+
 def _enrich_row(d):
     """DB 행(dict) → 뷰에 필요한 파생(pyeong·url) 부착. (파일 버전 _load 와 동일)"""
     area = d.get("area_exclusive_m2")
     d["pyeong"] = round(area / M2_PER_PYEONG, 1) if isinstance(area, (int, float)) else None
-    d["url"] = f"https://new.land.naver.com/offices?articleNo={d.get('article_no')}"
+    d["url"] = naver_search_url(d)
     return d
 
 

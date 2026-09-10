@@ -116,6 +116,15 @@ export default function App() {
   // 최초 로드(facets 준비 후 1회)
   useEffect(() => { if (facets) doSearch(1) /* eslint-disable-next-line */ }, [facets])
 
+  // 카톡 알림 링크(/gangnam/?article=2648213899) — 그 매물 상세를 바로 연다.
+  useEffect(() => {
+    const no = q1('article')
+    if (!no) return
+    getJSON('api/detail/' + no)
+      .then((full) => { if (full && !full.error) setModal({ article_no: Number(no), ...full }) })
+      .catch(() => {})
+  }, [])
+
   const toggle = (list, setList, v) => setList(list.includes(v) ? list.filter((x) => x !== v) : [...list, v])
 
   const addRegion = () => {

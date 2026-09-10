@@ -3,6 +3,13 @@ import { TYPES, GROUPS, won, fmtVal, addrOf, roadOf, titleOf } from './helpers.j
 import SamArea from './SamArea.jsx'
 import AptPrice from './AptPrice.jsx'
 
+// 주소(+건물명)로 네이버 통합검색. 매물번호 딥링크가 죽어 대체한 경로.
+function naverSearch(x, addr) {
+  const bn = (x.building_name || (x.geo || {}).building || '').trim()
+  const q = [addr, bn && !bn.endsWith('동') ? bn : ''].filter(Boolean).join(' ')
+  return 'https://m.search.naver.com/search.naver?query=' + encodeURIComponent(q)
+}
+
 // 상세 모달. 기존 renderM 이식. item은 리스트값+DB 상세 병합본.
 export default function Modal({ item, onClose }) {
   useEffect(() => {
@@ -54,7 +61,10 @@ export default function Modal({ item, onClose }) {
           })}
           <AptPrice ap={x.apt_price} trades={x.apt_trades || []} />
           <SamArea sa={x.sam_area} />
-          {x.url && <a className="mlink" href={x.url} target="_blank" rel="noreferrer">부동산에서 보기 →</a>}
+          {/* 네이버 매물번호 딥링크는 네이버가 경로를 없애 404가 뜬다(2026-09) → 주소로 검색 */}
+          <a className="mlink" href={naverSearch(x, addr)} target="_blank" rel="noreferrer">
+            네이버에서 검색 →
+          </a>
         </div>
       </div>
     </div>

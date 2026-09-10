@@ -240,6 +240,14 @@ def _summary_text(alert, items, shown):
             f"{shown}건을 보냈습니다. 나머지 {len(items) - shown}건은 사이트에서 확인하세요.")
 
 
+def item_link(x):
+    """카톡 버튼이 여는 곳 — 우리 사이트의 그 매물 상세.
+
+    네이버 매물번호 딥링크는 네이버가 경로를 없애 404가 뜬다(2026-09 확인). 우리 화면은
+    주소·시세·주변 아파트 매매가·렌트 수익까지 같이 보여주므로 이쪽이 낫다."""
+    return f"{SITE}/gangnam/?article={x.get('article_no')}"
+
+
 def link_of(alert):
     """알림에서 열 링크 — 저장한 조건 그대로 부동산 뷰어를 연다."""
     q = [(k, v) for k, v in parse_qsl(alert.get("query") or "", keep_blank_values=True)
@@ -258,8 +266,8 @@ def run_one(conn, alert, notify=True):
     sent = 0
     if items and notify:
         show = items[:MSGS_PER_RUN]
-        msgs = [(_detail_text(alert, x, i + 1, len(show)), x.get("url") or link_of(alert),
-                 "네이버에서 보기") for i, x in enumerate(show)]
+        msgs = [(_detail_text(alert, x, i + 1, len(show)), item_link(x), "매물 상세 보기")
+                for i, x in enumerate(show)]
         if len(items) > len(show):
             msgs.append((_summary_text(alert, items, len(show)), link_of(alert), "전체 보기"))
         sent = kakao_notify.send_many_to_member(conn, alert["member_id"], msgs)
