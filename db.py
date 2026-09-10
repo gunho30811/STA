@@ -286,6 +286,9 @@ _COLUMN_MIGRATIONS = [
         created_at  TEXT
     )""",
     "CREATE INDEX IF NOT EXISTS ix_listing_alerts_member ON listing_alerts(member_id)",
+    # 알림 주기(시간). 이 주기마다 그 조건만 따로 크롤하고(로컬 PC) 새 매물을 알린다.
+    "ALTER TABLE listing_alerts ADD COLUMN IF NOT EXISTS interval_hours INTEGER DEFAULT 6",
+    "ALTER TABLE listing_alerts ADD COLUMN IF NOT EXISTS last_crawl_at TEXT",
     # 좌표 → 주소 캐시(카카오 coord2address). 목록 크롤엔 주소가 없어 카드에 보여줄
     # 도로명·지번·건물명을 좌표로 만들어 쓴다. common/geocode.py 참고.
     """CREATE TABLE IF NOT EXISTS geo_address (

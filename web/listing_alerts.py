@@ -27,7 +27,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(_HERE), "common"))   # kakao_not
 import kakao_notify  # noqa: E402
 
 SITE = f"https://{os.environ.get('RENDIT_DOMAIN', 'rendits.duckdns.org')}"
-SCAN_EVERY_MIN = 15          # 크론이 1분마다 불러도 실제 스캔은 이 간격으로만
+SCAN_EVERY_MIN = 5           # 스캐너가 깨어나는 간격(실제 발송은 알림별 주기를 따른다)
+INTERVAL_CHOICES = [1, 2, 4, 6, 12]      # 알림 주기(시간) — 화면에서 고를 수 있는 값
+DEFAULT_INTERVAL = 6
 MAX_PER_ALERT = 40           # 한 번에 카톡으로 알릴 매물 수 상한(그 이상은 '외 N건')
 LIST_IN_MSG = 5              # 메시지에 상세히 적는 매물 수
 TYPE_NAMES = {"APT": "아파트", "OPST": "오피스텔", "VL": "빌라", "OR": "원룸",
@@ -41,15 +43,32 @@ def _now():
 # ── 회원용 CRUD ────────────────────────────────────────────────────────────
 def list_for(conn, member_id):
     rows = conn.execute(
-        "SELECT id, name, query, enabled, last_run_at, last_sent_at, sent_count, created_at "
+        "SELECT id, name, query, enabled, last_run_at, last_sent_at, sent_count, created_at, "
+        "interval_hours, last_crawl_at "
         "FROM listing_alerts WHERE member_id=%s ORDER BY id", (member_id,)).fetchall()
     return [dict(r) for r in rows]
 
 
-def create(conn, member_id, name, query):
+def clean_interval(v):
+    """화면에서 온 주기 값을 허용 목록 안으로."""
+    try:
+        h = int(v)
+    except (TypeError, ValueError):
+        return DEFAULT_INTERVAL
+    return h if h in INTERVAL_CHOICES else DEFAULT_INTERVAL
+
+
+def create(conn, member_id, name, query, interval_hours=DEFAULT_INTERVAL):
     conn.execute(
-        "INSERT INTO listing_alerts(member_id, name, query, enabled, last_run_at, created_at) "
-        "VALUES(%s,%s,%s,TRUE,%s,%s)", (member_id, name, query, _now(), _now()))
+        "INSERT INTO listing_alerts(member_id, name, query, enabled, last_run_at, created_at,"
+        " interval_hours) VALUES(%s,%s,%s,TRUE,%s,%s,%s)",
+        (member_id, name, query, _now(), _now(), clean_interval(interval_hours)))
+    conn.commit()
+
+
+def set_interval(conn, member_id, alert_id, interval_hours):
+    conn.execute("UPDATE listing_alerts SET interval_hours=%s WHERE id=%s AND member_id=%s",
+                 (clean_interval(interval_hours), alert_id, member_id))
     conn.commit()
 
 
@@ -221,9 +240,12 @@ def run_due(conn, force=False):
         ("listing_alerts_last", json.dumps({"at": time.time()}), _now()))
     conn.commit()
 
+    # 알림마다 주기(1·2·4·6·12시간)가 다르다 — 아직 주기가 안 된 알림은 건너뛴다.
     alerts = [dict(r) for r in conn.execute(
-        "SELECT id, member_id, name, query, last_run_at FROM listing_alerts "
-        "WHERE enabled IS TRUE").fetchall()]
+        "SELECT id, member_id, name, query, last_run_at, interval_hours FROM listing_alerts "
+        "WHERE enabled IS TRUE AND (last_run_at IS NULL OR last_run_at <= to_char("
+        "  now() AT TIME ZONE 'Asia/Seoul' - make_interval(hours => COALESCE(interval_hours, %s)),"
+        "  'YYYY-MM-DD HH24:MI:SS'))", (DEFAULT_INTERVAL,)).fetchall()]
     total_new, total_sent = 0, 0
     for al in alerts:
         try:
@@ -233,5 +255,6 @@ def run_due(conn, force=False):
             continue
         total_new += n
         total_sent += 1 if sent else 0
-    print(f"[alerts] {len(alerts)}건 스캔 · 새매물 {total_new} · 카톡 {total_sent}건", flush=True)
+    if alerts:
+        print(f"[alerts] {len(alerts)}건 스캔 · 새매물 {total_new} · 카톡 {total_sent}건", flush=True)
     return {"alerts": len(alerts), "new": total_new, "sent": total_sent}

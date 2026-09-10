@@ -6,6 +6,7 @@ import { getJSON, sendJSON } from '../shared/api.js'
 export default function AlertPanel({ currentQuery, onClose }) {
   const [data, setData] = useState(null)
   const [name, setName] = useState('')
+  const [interval, setInterval_] = useState(6)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
 
@@ -14,14 +15,14 @@ export default function AlertPanel({ currentQuery, onClose }) {
 
   const add = async () => {
     setBusy(true); setMsg('')
-    const r = await sendJSON('api/alerts', 'POST', { name: name.trim(), query: currentQuery })
+    const r = await sendJSON('api/alerts', 'POST', { name: name.trim(), query: currentQuery, interval })
     setBusy(false)
     if (!r.ok) { setMsg(r.data?.error || '저장하지 못했습니다.'); return }
     setName(''); setData((d) => ({ ...d, items: r.data.items }))
-    setMsg('저장했습니다. 새 매물이 뜨면 카톡으로 알려드려요.')
+    setMsg(`저장했습니다. ${interval}시간마다 이 조건만 따로 크롤해서 새 매물이 있으면 카톡으로 보내드려요.`)
   }
-  const patch = async (id, enabled) => {
-    const r = await sendJSON(`api/alerts/${id}`, 'PATCH', { enabled })
+  const patch = async (id, body) => {
+    const r = await sendJSON(`api/alerts/${id}`, 'PATCH', body)
     if (r.ok) setData((d) => ({ ...d, items: r.data.items }))
   }
   const remove = async (id) => {
@@ -61,6 +62,11 @@ export default function AlertPanel({ currentQuery, onClose }) {
             <input value={name} maxLength={40} placeholder="알림 이름 (예: 강남 오피스텔 월 90 이하)"
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !busy) add() }} />
+            <select value={interval} onChange={(e) => setInterval_(Number(e.target.value))} title="이 주기마다 이 조건만 따로 크롤해서 확인합니다">
+              {(data?.intervals || [1, 2, 4, 6, 12]).map((h) => (
+                <option key={h} value={h}>{h}시간마다</option>
+              ))}
+            </select>
             <button className="btn btn-go" disabled={busy} onClick={add}>이 조건 저장</button>
           </div>
           <div className="alertq">현재 조건: {decodeURIComponent(currentQuery.replace(/&?(page|size)=[^&]*/g, '')) || '(전체 매물)'}</div>
@@ -75,14 +81,21 @@ export default function AlertPanel({ currentQuery, onClose }) {
                   <div className="ai">
                     <div className="an">{a.name}</div>
                     <div className="ad">
+                      {a.last_crawl_at ? `최근 크롤 ${a.last_crawl_at.slice(5, 16)} · ` : ''}
                       {a.last_sent_at ? `최근 발송 ${a.last_sent_at.slice(5, 16)}` : '아직 발송 없음'}
                       {a.sent_count > 0 && ` · 누적 ${a.sent_count}건`}
                       {' · '}<a href={a.link}>조건 열기</a>
                     </div>
                   </div>
                   <div className="ac">
+                    <select className="aint" value={a.interval_hours || 6}
+                      onChange={(e) => patch(a.id, { interval: Number(e.target.value) })}>
+                      {(data?.intervals || [1, 2, 4, 6, 12]).map((h) => (
+                        <option key={h} value={h}>{h}시간마다</option>
+                      ))}
+                    </select>
                     <label className="atog">
-                      <input type="checkbox" checked={!!a.enabled} onChange={(e) => patch(a.id, e.target.checked)} />
+                      <input type="checkbox" checked={!!a.enabled} onChange={(e) => patch(a.id, { enabled: e.target.checked })} />
                       {a.enabled ? '켜짐' : '꺼짐'}
                     </label>
                     <button className="btn btn-reset" disabled={busy} onClick={() => test(a.id)}>테스트</button>

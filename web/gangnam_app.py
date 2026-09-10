@@ -729,7 +729,8 @@ def api_alerts():
     for r in rows:
         r["link"] = listing_alerts.link_of(r)
     return jsonify({"items": rows, "kakao_ready": bool(kakao and kakao[0]),
-                    "max": _ALERT_MAX})
+                    "max": _ALERT_MAX, "intervals": listing_alerts.INTERVAL_CHOICES,
+                    "default_interval": listing_alerts.DEFAULT_INTERVAL})
 
 
 @app.route("/api/alerts", methods=["POST"])
@@ -750,7 +751,7 @@ def api_alerts_create():
                          (u["id"],)).fetchone()[0]
         if n >= _ALERT_MAX:
             return jsonify({"error": f"알림은 최대 {_ALERT_MAX}개까지 만들 수 있어요."}), 400
-        listing_alerts.create(conn, u["id"], name, query)
+        listing_alerts.create(conn, u["id"], name, query, body.get("interval"))
         items = listing_alerts.list_for(conn, u["id"])
     finally:
         conn.close()
@@ -770,7 +771,10 @@ def api_alerts_edit(aid):
             listing_alerts.delete(conn, u["id"], aid)
         else:
             body = request.get_json(silent=True) or {}
-            listing_alerts.set_enabled(conn, u["id"], aid, bool(body.get("enabled")))
+            if "interval" in body:
+                listing_alerts.set_interval(conn, u["id"], aid, body["interval"])
+            if "enabled" in body:
+                listing_alerts.set_enabled(conn, u["id"], aid, bool(body["enabled"]))
         items = listing_alerts.list_for(conn, u["id"])
     finally:
         conn.close()
